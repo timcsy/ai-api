@@ -1,6 +1,6 @@
 image:
   # Renovate watches these tags via renovate.json
-  repository: ghcr.io/your-org/ai-api
+  repository: ghcr.io/timcsy/ai-api
   tag: "0.1.0"
   # LiteLLM is a Python dependency — its version is pinned in pyproject.toml
   # and bumped via Renovate PRs against `pyproject.toml`.
