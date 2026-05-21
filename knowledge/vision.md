@@ -55,7 +55,7 @@ Azure OpenAI 為首選 AI 供應商；其他細節待設計。
 
 ### 階段 1：分流核心可運作
 
-- [ ] 完成（待叢集上 SC-005 / SC-006 人工驗證 + 真實 Azure OpenAI 串接）
+- [x] 完成（2026-05-21：本機 + k3s-tew 叢集全部 SC 達標）
 
 > **交付**：LiteLLM 跑起來、可代理 Azure OpenAI、可發行可撤回的憑證
 > **前置條件**：無
@@ -64,7 +64,7 @@ Azure OpenAI 為首選 AI 供應商；其他細節待設計。
 - [x] LiteLLM 本機可運作（docker-compose 或直接執行）
 - [x] K8s 部署以宣告式定義（Helm/Kustomize）並可在開發叢集驗證
 - [x] LiteLLM 鏡像版本以自動化方式追蹤上游，且有回滾路徑
-- [ ] Azure OpenAI 串接成功，可代理至少一個模型（程式完成，待真實 key 驗收）
+- [x] Azure OpenAI 串接成功，可代理至少一個模型
 - [x] 可手動建立一筆「分配」並取得獨立憑證
 - [x] 該憑證的呼叫可追溯到分配 ID
 - [x] 撤回後該憑證立即失效

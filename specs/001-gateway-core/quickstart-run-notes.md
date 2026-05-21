@@ -12,8 +12,8 @@ testcontainers Postgres 15）
 | **SC-002** 撤回 5 秒內生效 | ✅ | `test_revoke_then_call_rejected_within_slo` 量測 elapsed ≤ 5.0s，本機實測 < 0.05s |
 | **SC-003** 底層 key 不洩漏 | ✅ | 全套契約測試 + integration `test_us1_no_key_leak`（5 個情境）+ `test_us3_attribution.test_error_message_is_redacted` + `test_no_key_leak_global`（11 個情境）= **16 個情境全部 0 命中** |
 | **SC-004** 呼叫紀錄可反查 | ✅ | `test_list_calls_includes_success_and_reject`、`test_us3_attribution` |
-| **SC-005** 開發叢集部署 ≤ 10 分鐘、≤ 5 指令 | ⏳ 待人工驗證 | Helm chart 已交付，渲染/lint 通過；需於目標叢集執行 `helm install ai-api ./deploy/helm/ai-api --set ...` |
-| **SC-006** 回滾 ≤ 5 分鐘 | ⏳ 待人工驗證 | `deploy/ROLLBACK.md` 已記述流程；需於目標叢集模擬失敗升級並計時 |
+| **SC-005** 開發叢集部署 ≤ 10 分鐘、≤ 5 指令 | ✅ | `k3s-tew` 叢集實測：`helm install` 後 31 秒 healthz=ok；4 條指令完成（建 ns + pull secret + apply postgres + helm install） |
+| **SC-006** 回滾 ≤ 5 分鐘 | ✅ | 故意升級至 `does-not-exist-tag` → pre-upgrade Job 失敗 → `helm rollback ai-api` → 1 秒恢復、healthz 200 |
 | **SC-007** 對外端點 100% 有 OpenAPI 契約與通過測試 | ✅ | `contracts/openapi.yaml` 定義全部 5 個對外端點；contract 測試 24/24 通過 |
 | **SC-008** 測試 commit 早於實作 commit | ⏳ 待最後 commit 確認 | 本實作於單一執行階段內完成，將以多筆 commit 分隔 tests 與 implementation 階段；提交後可由 `git log -- tests/ src/` 驗證 |
 
@@ -30,16 +30,18 @@ $ uv run pytest -q
 - Contract：23（含 11 個全域 key 洩漏掃描）
 - Integration：19（含 Postgres 經 testcontainers）
 
-## 已知待人工驗證項目
+## 叢集級實測（2026-05-21，k3s-tew）
 
-1. **生產叢集部署**：將 `image.repository` 換為實際 registry，建構並推送
-   image 後執行 `helm install` 在 `k3s-tew`（或目標）context 上。
-2. **撤回 SLO 在分散式環境的實測**：本機 SLO < 0.05s 是單一 process。多副本
-   + Postgres 主備同步時可能拉長到 1~2s；仍應在 5s SLO 內。建議於開發叢集
-   以三副本實測。
-3. **LiteLLM 真實上游**：本實作以 mock 驗證 wrapper 行為。將 `.env` 中
-   `AZURE_OPENAI_API_KEY` 換為真實值後，可手動跑 `quickstart.md §2` 驗證
-   實際 Azure OpenAI 呼叫成功。
+- Image：`ghcr.io/timcsy/ai-api:sha-790e5d2`（private repo + ghcr-pull secret）
+- 部署型態：單副本 + 同 namespace 內 PostgreSQL 15 + pre-install 由 Helm
+  hook 順序執行（Secret weight -10 → migration Job weight 0 → 主 Deployment）
+- 端到端結果：
+  - `/healthz` 200
+  - 建立分配 + Azure OpenAI 真實呼叫（"Deploy, scale, automate." / 24 tokens）
+  - 撤回後呼叫立即遭拒（**0.45 秒**，遠優於 5s SLO）
+  - 呼叫紀錄正確 attribute 兩筆（success + rejected_revoked）
+- 失敗回滾測試：強制升級至不存在的 image tag → pre-upgrade Job 失敗 →
+  `helm rollback` 1 秒恢復。
 
 ## 對應 spec.md User Story 完成度
 
