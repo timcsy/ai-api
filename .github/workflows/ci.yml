@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: aiapi
+          POSTGRES_PASSWORD: aiapi
+          POSTGRES_DB: aiapi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aiapi"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      AIAPI_TEST_PG_URL: postgresql+asyncpg://aiapi:aiapi@localhost:5432/aiapi
+      AZURE_OPENAI_API_KEY: ci-test-key-DO-NOT-LEAK
+      AZURE_OPENAI_API_BASE: https://ci.openai.azure.com
+      AZURE_OPENAI_API_VERSION: "2024-06-01"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.11.8"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Sync deps
+        run: uv sync --extra dev
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Mypy type-check
+        run: uv run mypy src/ai_api
+
+      - name: Pytest (unit + contract + integration)
+        run: uv run pytest -q

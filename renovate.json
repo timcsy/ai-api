@@ -1,0 +1,37 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":timezone(Asia/Taipei)"
+  ],
+  "schedule": ["before 6am on monday"],
+  "packageRules": [
+    {
+      "description": "Group LiteLLM updates; bump to latest but require CI",
+      "matchPackageNames": ["litellm"],
+      "groupName": "litellm",
+      "schedule": ["at any time"],
+      "labels": ["litellm-upgrade", "security"]
+    },
+    {
+      "description": "Container image tag in Helm values",
+      "matchManagers": ["helm-values"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": false
+    }
+  ],
+  "pip_requirements": {
+    "enabled": true
+  },
+  "pep621": {
+    "enabled": true
+  },
+  "helm-values": {
+    "fileMatch": ["^deploy/helm/.*/values\\.yaml$"]
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"]
+  }
+}

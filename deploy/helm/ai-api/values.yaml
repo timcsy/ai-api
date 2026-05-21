@@ -1,0 +1,62 @@
+image:
+  # Renovate watches these tags via renovate.json
+  repository: ghcr.io/timcsy/ai-api
+  tag: "0.1.0"
+  # LiteLLM is a Python dependency — its version is pinned in pyproject.toml
+  # and bumped via Renovate PRs against `pyproject.toml`.
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: false
+  className: ""
+  hosts:
+    - host: ai-api.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Secrets — provide via --set / sealed-secrets / external-secrets in real env.
+adminBootstrapToken: ""
+azureOpenAI:
+  apiBase: ""
+  apiKey: ""
+  apiVersion: "2024-06-01"
+
+database:
+  # External Postgres URL (asyncpg). e.g. postgresql+asyncpg://user:pass@host:5432/db
+  url: ""
+
+logging:
+  level: INFO
+
+migrationJob:
+  enabled: true
+  backoffLimit: 3
+
+probes:
+  readiness:
+    path: /healthz
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 3
+  liveness:
+    path: /healthz
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    failureThreshold: 3
