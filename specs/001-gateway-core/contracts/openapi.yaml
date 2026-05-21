@@ -1,0 +1,318 @@
+openapi: 3.1.0
+info:
+  title: AI API Manager — Gateway Core (Phase 1)
+  version: 0.1.0
+  description: |
+    階段 1 對外契約：管理 API（建立／撤回／查詢分配與呼叫紀錄）+ 代理路徑
+    （以分配憑證代理至 Azure OpenAI）。
+
+    認證：
+    - `/admin/**` 端點以 `X-Admin-Token` header 傳入 bootstrap admin token
+    - `/v1/**` 代理端點以 `Authorization: Bearer <allocation-token>` 傳入分配憑證
+
+    所有錯誤回應一律使用 ErrorResponse schema；底層 Azure OpenAI 端點細節與 key
+    皆**不得**出現在任何回應或錯誤訊息中。
+servers:
+  - url: http://localhost:8000
+    description: 本機開發
+
+tags:
+  - name: admin
+    description: 分配管理（管理員專用）
+  - name: proxy
+    description: 代理至 Azure OpenAI（持分配憑證使用者）
+
+paths:
+  /admin/allocations:
+    post:
+      tags: [admin]
+      operationId: createAllocation
+      summary: 建立分配並發行憑證
+      security:
+        - AdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateAllocationRequest' }
+      responses:
+        '201':
+          description: 建立成功，回傳憑證明文（僅此一次）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AllocationCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+    get:
+      tags: [admin]
+      operationId: listAllocations
+      summary: 列出分配
+      security:
+        - AdminToken: []
+      parameters:
+        - in: query
+          name: subject
+          schema: { type: string }
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, revoked]
+      responses:
+        '200':
+          description: 分配清單
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Allocation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /admin/allocations/{allocationId}:
+    parameters:
+      - in: path
+        name: allocationId
+        required: true
+        schema: { type: string, pattern: '^[0-9A-HJKMNP-TV-Z]{26}$' }
+    delete:
+      tags: [admin]
+      operationId: revokeAllocation
+      summary: 撤回分配（冪等）
+      security:
+        - AdminToken: []
+      responses:
+        '200':
+          description: 已撤回（或本來就是撤回狀態）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Allocation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/allocations/{allocationId}/calls:
+    parameters:
+      - in: path
+        name: allocationId
+        required: true
+        schema: { type: string, pattern: '^[0-9A-HJKMNP-TV-Z]{26}$' }
+      - in: query
+        name: limit
+        schema: { type: integer, minimum: 1, maximum: 1000, default: 100 }
+      - in: query
+        name: before
+        description: cursor（ULID），回傳早於此 ID 的紀錄
+        schema: { type: string }
+    get:
+      tags: [admin]
+      operationId: listAllocationCalls
+      summary: 查詢分配的呼叫紀錄
+      security:
+        - AdminToken: []
+      responses:
+        '200':
+          description: 呼叫紀錄列表（時間倒序）
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CallRecord' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/chat/completions:
+    post:
+      tags: [proxy]
+      operationId: proxyChatCompletions
+      summary: 以分配憑證代理至 Azure OpenAI Chat Completions
+      description: |
+        路徑與請求／回應 schema 對齊 OpenAI 相容介面（由 LiteLLM 提供）。
+        本契約**不重述** OpenAI schema，而是規範閘道層的額外行為：
+        - 必須以 `Authorization: Bearer <allocation-token>` 傳入分配憑證
+        - 必須以 `model` 欄位指定目標模型；該值必須等於分配的 `resource_model`
+      security:
+        - AllocationToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model, messages]
+              additionalProperties: true
+              properties:
+                model: { type: string }
+                messages:
+                  type: array
+                  items: { type: object }
+      responses:
+        '200':
+          description: 成功（內容由上游 Azure OpenAI 決定）
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: 憑證已撤回或模型未授權
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '502':
+          description: 上游 Azure OpenAI 錯誤（已 redact 細節）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /healthz:
+    get:
+      tags: []
+      operationId: healthz
+      summary: 健康檢查（K8s readiness/liveness）
+      security: []
+      responses:
+        '200':
+          description: 服務正常
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok] }
+
+components:
+  securitySchemes:
+    AdminToken:
+      type: apiKey
+      in: header
+      name: X-Admin-Token
+    AllocationToken:
+      type: http
+      scheme: bearer
+
+  responses:
+    BadRequest:
+      description: 請求格式錯誤
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    Unauthorized:
+      description: 未提供或無效憑證
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+    NotFound:
+      description: 資源不存在
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  schemas:
+    CreateAllocationRequest:
+      type: object
+      required: [subject, resource_model]
+      properties:
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: 被分配對象識別（email/暱稱）
+        resource_model:
+          type: string
+          pattern: '^[A-Za-z0-9_\-.]+$'
+          maxLength: 128
+          description: 綁定的 Azure OpenAI 模型 deployment 名稱
+        note:
+          type: string
+          maxLength: 500
+
+    AllocationCreated:
+      allOf:
+        - $ref: '#/components/schemas/Allocation'
+        - type: object
+          required: [token]
+          properties:
+            token:
+              type: string
+              description: 分配憑證明文，僅在建立時回傳一次
+
+    Allocation:
+      type: object
+      required: [id, subject, resource_model, status, created_at, created_by, token_prefix]
+      properties:
+        id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        subject: { type: string }
+        resource_model: { type: string }
+        status:
+          type: string
+          enum: [active, revoked]
+        created_at: { type: string, format: date-time }
+        revoked_at:
+          oneOf:
+            - { type: string, format: date-time }
+            - { type: 'null' }
+        created_by: { type: string }
+        note:
+          oneOf:
+            - { type: string }
+            - { type: 'null' }
+        token_prefix:
+          type: string
+          description: 憑證前 8 字（含 `aiapi_` 前綴的可見部分），供管理員識別
+
+    CallRecord:
+      type: object
+      required: [id, request_id, started_at, finished_at, status_code, outcome]
+      properties:
+        id: { type: string }
+        request_id: { type: string }
+        allocation_id:
+          oneOf:
+            - { type: string }
+            - { type: 'null' }
+        subject:
+          oneOf:
+            - { type: string }
+            - { type: 'null' }
+        model:
+          oneOf:
+            - { type: string }
+            - { type: 'null' }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+        status_code: { type: integer }
+        outcome:
+          type: string
+          enum:
+            - success
+            - rejected_unauthenticated
+            - rejected_revoked
+            - rejected_model_mismatch
+            - upstream_error
+            - gateway_error
+        prompt_tokens: { type: integer, nullable: true }
+        completion_tokens: { type: integer, nullable: true }
+        total_tokens: { type: integer, nullable: true }
+        error_message:
+          oneOf:
+            - { type: string }
+            - { type: 'null' }
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: 結構化錯誤碼，例 `unauthorized`、`allocation_revoked`、`model_mismatch`、`upstream_error`
+            message:
+              type: string
+              description: 人類可讀訊息（**已 redact**，不含底層 key 或內部端點）
+            request_id:
+              type: string
+              description: 對應日誌的 request ID
