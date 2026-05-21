@@ -14,7 +14,7 @@ from ai_api.models import Allocation, CallOutcome
 from ai_api.observability.logging import redact_string
 from ai_api.observability.request_id import current_request_id
 from ai_api.proxy import upstream
-from ai_api.proxy.auth import parse_bearer_token, resolve_allocation
+from ai_api.proxy.auth import parse_bearer_token
 from ai_api.proxy.guard import enforce_model_binding
 from ai_api.services.allocations import AllocationService
 from ai_api.services.records import RecordsService
