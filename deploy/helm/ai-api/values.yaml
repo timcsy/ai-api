@@ -1,10 +1,15 @@
 image:
   # Renovate watches these tags via renovate.json
   repository: ghcr.io/timcsy/ai-api
-  tag: "0.1.0"
+  tag: "main"
   # LiteLLM is a Python dependency — its version is pinned in pyproject.toml
   # and bumped via Renovate PRs against `pyproject.toml`.
   pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+# Example:
+# imagePullSecrets:
+#   - name: ghcr-pull
 
 replicaCount: 2
 
