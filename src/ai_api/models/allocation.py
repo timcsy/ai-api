@@ -3,11 +3,15 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Enum, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai_api.db import Base
+
+if TYPE_CHECKING:
+    from ai_api.models.credential import Credential
 
 
 class AllocationStatus(enum.StrEnum):
@@ -31,7 +35,7 @@ class Allocation(Base):
     created_by: Mapped[str] = mapped_column(String(128), nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    credential: Mapped[Credential] = relationship(  # noqa: F821
+    credential: Mapped[Credential] = relationship(
         back_populates="allocation", uselist=False, cascade="all, delete-orphan"
     )
 
