@@ -1,45 +1,62 @@
 # 經驗
 
-<!--
-  這份文件記錄從開發過程中蒸餾出的教訓——不是 changelog，
-  而是應該影響未來決策的模式。
-
-  每個教訓記錄「理論」和「現實」之間的落差。
-  保持簡短、可操作。詳細的事件記錄放在 knowledge/history/。
--->
-
 ## 教訓
 
-<!--
-  每個重要的教訓加一個小節，使用四段式格式：
-  1. 理論/預期怎麼說
-  2. 實際發生了什麼
-  3. 如何解決
-  4. 蒸餾出的教訓
+### 在 async SQLAlchemy 中禁止 lazy-load
 
-  這個格式迫使你清楚說明「為什麼」令人意外，
-  而不只是「發生了什麼」。
--->
+- **理論說**：SQLAlchemy 的關聯欄位 (`relationship`) 在用到時自動 lazy-load。
+- **實際發生**：在 async handler 裡存取 `allocation.credential.token_prefix`
+  噴出 `MissingGreenlet: greenlet_spawn has not been called`。lazy-load 會
+  在屬性存取時偷偷做同步 IO，在 async 邊界無法執行。
+- **解決方式**：所有會跨越 async 邊界的查詢，都用 `selectinload()` 顯式預載
+  關聯；`get()` 改寫成 `select(...).options(selectinload(...))`。
+- **教訓**：async ORM 沒有「自動 lazy-load」這回事 — 預載是規則，不是優化。
+- **來源**：`src/ai_api/services/allocations.py` 的 `revoke()` / `lookup_by_token()`
 
-### [教訓標題]
+### datetime 一律 tz-aware
 
-- **理論說**：[基於設計、原則或假設，你預期會發生什麼]
-- **實際發生**：[真正發生了什麼——要具體]
-- **解決方式**：[如何彌合落差——修復、替代方案或洞察]
-- **教訓**：[一句話的可複用模式]
-- **來源**：[history/ 中的記錄或 PR/commit 連結]
+- **理論說**：SQLAlchemy 的 `Mapped[datetime]` 預設行為跨資料庫相容。
+- **實際發生**：本機 SQLite 跑得好好的，到 testcontainers Postgres 立刻炸：
+  `can't subtract offset-naive and offset-aware datetimes`。Postgres 拒絕
+  混用 naive 與 aware。
+- **解決方式**：所有時間欄位 `mapped_column(DateTime(timezone=True), ...)`；
+  Python 端一律 `datetime.now(UTC)`，不用 `datetime.utcnow()`。
+- **教訓**：當開發與生產用不同資料庫後端時，「能跑」不等於「正確」；明確
+  寫出時區語意是 DB-portability 的底線。
+- **來源**：`src/ai_api/models/{allocation,credential,call_record}.py`
 
-<!--
-  範例：
+### Helm pre-install Job 需要 Secret，Secret 必須也是 hook
 
-  ### 實作前先確認功能是否已存在
+- **理論說**：Helm install 把 manifests 全部建立後才執行 hook。
+- **實際發生**：把 migration Job 標為 `pre-install` hook 後，Job 啟動但
+  `Error: secret "..." not found` — 因為 hook 在 regular manifests **之前**
+  跑，Secret 還沒被建立。
+- **解決方式**：給 Secret 加 `helm.sh/hook: pre-install,pre-upgrade` +
+  `helm.sh/hook-weight: "-10"`，比 Job 的預設 weight 0 更早執行。
+- **教訓**：Helm hook 順序 = (前置 hook 全部跑完) → (regular manifests) →
+  (post hook)。任何被 pre-hook 依賴的東西也必須是 pre-hook。
+- **來源**：`deploy/helm/ai-api/templates/secret.yaml`
 
-  - **理論說**：核心模組只處理求值，所以我們需要從頭建一個
-    type checker。
-  - **實際發生**：花了兩天在建，結果發現核心模組已經有完整的
-    型別檢查功能——只是沒有文件記錄。
-  - **解決方式**：刪除重複的實作，為既有功能補上文件。
-  - **教訓**：動手之前先搜尋既有程式碼。答案可能已經在那裡，
-    只是沒被記錄。
-  - **來源**：history/010-duplicate-checker.md
--->
+### 拒絕路徑必須在 raise 前綁定上下文
+
+- **理論說**：例外捕捉時，附近的變數狀態足以重建情境。
+- **實際發生**：撤回後再呼叫應該記為 `rejected_revoked` 並帶 `allocation_id`，
+  但實際紀錄 `allocation_id=null` — 因為 `allocation` 變數在 `resolve_allocation()`
+  raise HTTPException 前還沒被 assign，closure 仍指向 None。
+- **解決方式**：把「查找」與「狀態檢驗」拆開：先 lookup_by_token 取得 allocation
+  並 bind 到 closure，再判斷狀態並 raise。
+- **教訓**：拒絕／錯誤路徑跟成功路徑一樣需要審計資訊；要先把 context bind
+  好，再做會 raise 的檢查。
+- **來源**：`src/ai_api/proxy/router.py` 的「3. Allocation」段
+
+### 快速迭代不要用 mutable tag
+
+- **理論說**：`helm upgrade --set image.tag=main` 配合 push 新版到 ghcr，
+  叢集會拉到最新。
+- **實際發生**：image 推上去了，但 kubelet 仍用先前 `main` 的 layer
+  ——因為 `pullPolicy: IfNotPresent` 且 tag 相同，**不會重新解析 digest**。
+- **解決方式**：驗證迭代時使用 immutable sha tag（`sha-<short>`），或暫時
+  改 `pullPolicy: Always`。生產可以維持 `IfNotPresent` + 不可變 tag。
+- **教訓**：mutable tag (`main` / `latest`) 適合宣告「想要某個流」，不適合
+  「想要這個版本」。任何「為什麼跑舊版？」的除錯都從 image digest 開始查。
+- **來源**：2026-05-21 k3s-tew 部署驗證
