@@ -56,3 +56,27 @@ def admin_headers() -> dict[str, str]:
 @pytest.fixture
 def azure_key() -> str:
     return os.environ["AZURE_OPENAI_API_KEY"]
+
+
+@pytest_asyncio.fixture
+async def member_id() -> str:
+    from ai_api.db import get_sessionmaker
+    from tests._helpers import create_external_member
+
+    sm = get_sessionmaker()
+    async with sm() as s:
+        return await create_external_member(s, "alice@example.com")
+
+
+@pytest_asyncio.fixture
+async def make_member():
+    from ai_api.db import get_sessionmaker
+    from tests._helpers import create_external_member
+
+    sm = get_sessionmaker()
+
+    async def _make(email: str) -> str:
+        async with sm() as s:
+            return await create_external_member(s, email)
+
+    return _make

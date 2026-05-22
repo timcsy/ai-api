@@ -1,0 +1,578 @@
+openapi: 3.1.0
+info:
+  title: AI API Manager — Auth & Membership (Phase 2)
+  version: 0.2.0
+  description: |
+    階段 2 新增端點：認證流程（Google OIDC + Local password）、會員管理、
+    管控規則、成員自助。階段 1 既有 `/admin/allocations*`、`/v1/chat/completions`、
+    `/healthz` 不在此檔重複定義；對應行為見 specs/001-gateway-core/contracts/openapi.yaml。
+
+    認證機制：
+    - `/auth/**`：公開或 cookie 驗證
+    - `/admin/**`：bootstrap admin token （X-Admin-Token） OR admin Member session
+    - `/me/**`：cookie session 必填
+    - `/v1/**`：分配憑證 Bearer token（同 Phase 1）
+
+servers:
+  - url: http://localhost:8000
+
+tags:
+  - { name: auth, description: 認證流程 }
+  - { name: me, description: 一般成員自助 }
+  - { name: admin-members, description: 成員管理 }
+  - { name: admin-access, description: 存取控制（白名單 / 規則 / 來源限制） }
+
+paths:
+  # ============ AUTH ============
+  /auth/oidc/start:
+    get:
+      tags: [auth]
+      operationId: oidcStart
+      summary: 觸發 Google OIDC 流程
+      description: 檢查來源限制 → 產生 state/nonce → 302 至 Google 授權端點
+      parameters:
+        - in: query
+          name: next
+          schema: { type: string }
+          description: 認證成功後要回到的相對路徑（防 open redirect — 必須以 `/` 開頭）
+      responses:
+        '302': { description: 重新導向至 Google 授權頁 }
+        '401':
+          description: 來源被限制
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  /auth/oidc/callback:
+    get:
+      tags: [auth]
+      operationId: oidcCallback
+      summary: Google 授權回呼
+      parameters:
+        - in: query
+          name: code
+          required: true
+          schema: { type: string }
+        - in: query
+          name: state
+          required: true
+          schema: { type: string }
+      responses:
+        '302':
+          description: 設置 session cookie 並導向 `next` 或預設首頁
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+              description: aiapi_session, HttpOnly, Secure, SameSite=Lax
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/local/login:
+    post:
+      tags: [auth]
+      operationId: localLogin
+      summary: Email + 密碼登入
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LocalLoginRequest' }
+      responses:
+        '200':
+          description: 成功登入；設 session cookie；body 不含敏感資料
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberPublic' }
+        '401':
+          description: 帳號或密碼錯誤；訊息對「email 不存在」與「密碼錯誤」一致
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+        '429':
+          description: rate limit 鎖定
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      security: [{ SessionCookie: [] }]
+      summary: 登出（撤銷 server-side session 並清 cookie）
+      responses:
+        '204': { description: 已登出 }
+
+  /auth/invitation/{token}:
+    parameters:
+      - in: path
+        name: token
+        required: true
+        schema: { type: string }
+    get:
+      tags: [auth]
+      operationId: invitationView
+      summary: 邀請連結 — 顯示設密碼表單（HTML）
+      responses:
+        '200':
+          description: HTML 設密碼頁面
+          content: { text/html: {} }
+        '404':
+          description: token 不存在、已用、已過期
+          content: { text/html: {} }
+    post:
+      tags: [auth]
+      operationId: invitationAccept
+      summary: 提交首次密碼
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SetPasswordRequest' }
+      responses:
+        '200':
+          description: 設密碼成功；自動登入；發 cookie
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberPublic' }
+        '400':
+          description: 密碼不符合政策
+        '404':
+          description: token 已失效
+
+  # ============ /me ============
+  /me:
+    get:
+      tags: [me]
+      operationId: getMe
+      security: [{ SessionCookie: [] }]
+      responses:
+        '200':
+          description: 當前登入 Member 資料
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberPublic' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /me/allocations:
+    get:
+      tags: [me]
+      operationId: listMyAllocations
+      security: [{ SessionCookie: [] }]
+      responses:
+        '200':
+          description: 屬於該 Member 的分配
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Allocation' }
+
+  /me/allocations/{allocationId}/calls:
+    parameters:
+      - in: path
+        name: allocationId
+        required: true
+        schema: { type: string }
+    get:
+      tags: [me]
+      operationId: listMyAllocationCalls
+      security: [{ SessionCookie: [] }]
+      responses:
+        '200':
+          description: 該分配的呼叫紀錄
+        '403':
+          description: 該分配不屬於當前 Member
+
+  /me/password:
+    put:
+      tags: [me]
+      operationId: changePassword
+      security: [{ SessionCookie: [] }, { CsrfHeader: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '204': { description: 已更新 }
+        '400': { description: 舊密碼錯、或新密碼不符合政策 }
+        '403': { description: 該 Member 為 OIDC / external，不能改密碼 }
+
+  # ============ /admin/members ============
+  /admin/members:
+    post:
+      tags: [admin-members]
+      operationId: adminCreateMember
+      security: [{ AdminAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateMemberRequest' }
+      responses:
+        '201':
+          description: Member 建立成功；若 Local + 「發邀請」模式，回 invitation_url
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreateMemberResponse' }
+        '409':
+          description: email 已存在
+    get:
+      tags: [admin-members]
+      operationId: adminListMembers
+      security: [{ AdminAuth: [] }]
+      parameters:
+        - { in: query, name: provider, schema: { type: string, enum: [google_oidc, local_password, external] } }
+        - { in: query, name: status, schema: { type: string, enum: [active, disabled] } }
+        - { in: query, name: q, schema: { type: string }, description: 模糊比對 email/display_name }
+      responses:
+        '200':
+          description: Member 清單
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MemberAdmin' }
+
+  /admin/members/{memberId}:
+    parameters:
+      - in: path
+        name: memberId
+        required: true
+        schema: { type: string }
+    get:
+      tags: [admin-members]
+      operationId: adminGetMember
+      security: [{ AdminAuth: [] }]
+      responses:
+        '200':
+          content: { application/json: { schema: { $ref: '#/components/schemas/MemberAdmin' } } }
+
+    patch:
+      tags: [admin-members]
+      operationId: adminUpdateMember
+      security: [{ AdminAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateMemberRequest' }
+      responses:
+        '200':
+          content: { application/json: { schema: { $ref: '#/components/schemas/MemberAdmin' } } }
+
+    delete:
+      tags: [admin-members]
+      operationId: adminDeleteMember
+      security: [{ AdminAuth: [] }]
+      description: 刪除（連同其分配 RESTRICT — 若有分配先撤回再刪）
+      responses:
+        '204': { description: 已刪除 }
+        '409': { description: 該 Member 仍有未撤回分配 }
+
+  /admin/members/{memberId}/sessions:
+    parameters:
+      - in: path
+        name: memberId
+        required: true
+        schema: { type: string }
+    get:
+      tags: [admin-members]
+      operationId: adminListMemberSessions
+      security: [{ AdminAuth: [] }]
+      responses:
+        '200':
+          description: 該 Member 的 session 列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SessionInfo' }
+    delete:
+      tags: [admin-members]
+      operationId: adminRevokeMemberSessions
+      security: [{ AdminAuth: [] }]
+      description: 撤銷該 Member 所有 active sessions
+      responses:
+        '204': { description: 已撤銷 }
+
+  # ============ /admin/access ============
+  /admin/whitelist:
+    get:
+      tags: [admin-access]
+      security: [{ AdminAuth: [] }]
+      operationId: listWhitelist
+      responses:
+        '200':
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/WhitelistEntry' } } } }
+    post:
+      tags: [admin-access]
+      security: [{ AdminAuth: [] }]
+      operationId: addToWhitelist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+                note: { type: string }
+      responses:
+        '201': { description: 已加入 }
+
+  /admin/whitelist/{email}:
+    parameters:
+      - in: path
+        name: email
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [admin-access]
+      security: [{ AdminAuth: [] }]
+      operationId: removeFromWhitelist
+      responses:
+        '204': { description: 已移除 }
+
+  /admin/rules:
+    get:
+      tags: [admin-access]
+      security: [{ AdminAuth: [] }]
+      operationId: listRules
+      responses:
+        '200':
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AutoRegisterRule' } } } }
+    post:
+      tags: [admin-access]
+      security: [{ AdminAuth: [] }]
+      operationId: createRule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rule_type, pattern]
+              properties:
+                rule_type: { type: string, enum: [email_domain] }
+                pattern: { type: string }
+                enabled: { type: boolean, default: true }
+                note: { type: string }
+      responses:
+        '201':
+          content: { application/json: { schema: { $ref: '#/components/schemas/AutoRegisterRule' } } }
+
+  /admin/rules/{ruleId}:
+    parameters:
+      - in: path
+        name: ruleId
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [admin-access]
+      security: [{ AdminAuth: [] }]
+      operationId: deleteRule
+      responses:
+        '204': {}
+
+  /admin/source-restrictions:
+    get:
+      tags: [admin-access]
+      security: [{ AdminAuth: [] }]
+      operationId: listSourceRestrictions
+      responses:
+        '200':
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/SourceRestriction' } } } }
+    post:
+      tags: [admin-access]
+      security: [{ AdminAuth: [] }]
+      operationId: createSourceRestriction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cidr]
+              properties:
+                cidr: { type: string, example: "10.0.0.0/8" }
+                enabled: { type: boolean, default: true }
+                note: { type: string }
+      responses:
+        '201':
+          content: { application/json: { schema: { $ref: '#/components/schemas/SourceRestriction' } } }
+
+  /admin/source-restrictions/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [admin-access]
+      security: [{ AdminAuth: [] }]
+      operationId: deleteSourceRestriction
+      responses:
+        '204': {}
+
+components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: aiapi_session
+    CsrfHeader:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+    AdminAuth:
+      type: apiKey
+      in: header
+      name: X-Admin-Token  # OR cookie session of an admin Member; service-level check
+
+  responses:
+    Unauthorized:
+      description: 未授權
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            request_id: { type: string }
+
+    LocalLoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password, minLength: 1, maxLength: 1024 }
+
+    SetPasswordRequest:
+      type: object
+      required: [password]
+      properties:
+        password: { type: string, format: password, minLength: 10 }
+
+    ChangePasswordRequest:
+      type: object
+      required: [old_password, new_password]
+      properties:
+        old_password: { type: string, format: password }
+        new_password: { type: string, format: password, minLength: 10 }
+
+    MemberPublic:
+      type: object
+      required: [id, email, provider, status, display_name]
+      properties:
+        id: { type: string }
+        email: { type: string }
+        provider: { type: string, enum: [google_oidc, local_password, external] }
+        display_name: { type: string }
+        status: { type: string, enum: [active, disabled] }
+
+    MemberAdmin:
+      allOf:
+        - $ref: '#/components/schemas/MemberPublic'
+        - type: object
+          properties:
+            external_id: { type: string, nullable: true }
+            created_at: { type: string, format: date-time }
+            disabled_at: { type: string, format: date-time, nullable: true }
+            created_by: { type: string }
+            has_password: { type: boolean }
+
+    CreateMemberRequest:
+      type: object
+      required: [email, provider]
+      properties:
+        email: { type: string, format: email }
+        provider: { type: string, enum: [google_oidc, local_password, external] }
+        display_name: { type: string }
+        external_id: { type: string }
+        initial_password:
+          type: string
+          format: password
+          description: 僅 provider=local_password 時可用；提供即直接設密碼，否則發邀請連結
+        send_invitation:
+          type: boolean
+          default: true
+          description: 僅 provider=local_password 適用
+
+    CreateMemberResponse:
+      allOf:
+        - $ref: '#/components/schemas/MemberAdmin'
+        - type: object
+          properties:
+            invitation_url:
+              type: string
+              description: 僅在 Local + send_invitation=true 時提供；管理員需自行轉交
+
+    UpdateMemberRequest:
+      type: object
+      properties:
+        display_name: { type: string }
+        status: { type: string, enum: [active, disabled] }
+
+    SessionInfo:
+      type: object
+      required: [id, member_id, created_at, last_seen_at, expires_at, status]
+      properties:
+        id: { type: string, description: SHA-256 fingerprint (not the cookie value) }
+        member_id: { type: string }
+        created_at: { type: string, format: date-time }
+        last_seen_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+        source_ip: { type: string, nullable: true }
+        user_agent: { type: string, nullable: true }
+        status: { type: string, enum: [active, revoked] }
+
+    WhitelistEntry:
+      type: object
+      required: [email, added_at, added_by]
+      properties:
+        email: { type: string }
+        added_at: { type: string, format: date-time }
+        added_by: { type: string }
+        note: { type: string, nullable: true }
+
+    AutoRegisterRule:
+      type: object
+      required: [id, rule_type, pattern, enabled, created_at, created_by]
+      properties:
+        id: { type: string }
+        rule_type: { type: string, enum: [email_domain] }
+        pattern: { type: string }
+        enabled: { type: boolean }
+        created_at: { type: string, format: date-time }
+        created_by: { type: string }
+        note: { type: string, nullable: true }
+
+    SourceRestriction:
+      type: object
+      required: [id, cidr, enabled, created_at, created_by]
+      properties:
+        id: { type: string }
+        cidr: { type: string }
+        enabled: { type: boolean }
+        created_at: { type: string, format: date-time }
+        created_by: { type: string }
+        note: { type: string, nullable: true }
+
+    Allocation:
+      type: object
+      description: 引用 Phase 1 contracts/openapi.yaml 的 Allocation；此處同等結構
+      properties:
+        id: { type: string }
+        member_id: { type: string }
+        subject_snapshot: { type: string }
+        resource_model: { type: string }
+        status: { type: string, enum: [active, revoked] }
+        created_at: { type: string, format: date-time }
+        revoked_at: { type: string, format: date-time, nullable: true }
+        token_prefix: { type: string }

@@ -5,13 +5,14 @@ import enum
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, Index, String, Text
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai_api.db import Base
 
 if TYPE_CHECKING:
     from ai_api.models.credential import Credential
+    from ai_api.models.member import Member
 
 
 class AllocationStatus(enum.StrEnum):
@@ -23,7 +24,10 @@ class Allocation(Base):
     __tablename__ = "allocations"
 
     id: Mapped[str] = mapped_column(String(26), primary_key=True)
-    subject: Mapped[str] = mapped_column(String(256), nullable=False)
+    member_id: Mapped[str] = mapped_column(
+        String(26), ForeignKey("members.id", ondelete="RESTRICT"), nullable=False
+    )
+    subject_snapshot: Mapped[str] = mapped_column(String(256), nullable=False)
     resource_model: Mapped[str] = mapped_column(String(128), nullable=False)
     status: Mapped[AllocationStatus] = mapped_column(
         Enum(AllocationStatus, native_enum=False, length=16),
@@ -38,8 +42,9 @@ class Allocation(Base):
     credential: Mapped[Credential] = relationship(
         back_populates="allocation", uselist=False, cascade="all, delete-orphan"
     )
+    member: Mapped[Member] = relationship(back_populates="allocations")
 
     __table_args__ = (
-        Index("idx_allocation_subject", "subject", "created_at"),
+        Index("idx_allocation_member", "member_id", "created_at"),
         Index("idx_allocation_status", "status"),
     )

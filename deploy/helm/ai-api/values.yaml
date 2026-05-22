@@ -47,6 +47,15 @@ database:
   # External Postgres URL (asyncpg). e.g. postgresql+asyncpg://user:pass@host:5432/db
   url: ""
 
+# Phase 2: auth
+baseUrl: "http://localhost:8000"
+cookieSecure: false
+cookieDomain: ""
+googleOauth:
+  clientId: ""
+  clientSecret: ""
+  discoveryUrl: "https://accounts.google.com/.well-known/openid-configuration"
+
 logging:
   level: INFO
 

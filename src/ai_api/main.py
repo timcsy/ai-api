@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from ai_api.api import allocations, health, records
+from ai_api.api import admin_access, admin_members, allocations, auth, health, me, records
 from ai_api.config import get_settings
 from ai_api.db import dispose_engine
 from ai_api.observability.logging import setup_logging
@@ -32,8 +32,12 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestIdMiddleware)
 
     app.include_router(health.router, tags=[])
+    app.include_router(auth.router, tags=["auth"])
+    app.include_router(me.router, tags=["me"])
     app.include_router(allocations.router, prefix="/admin", tags=["admin"])
     app.include_router(records.router, prefix="/admin", tags=["admin"])
+    app.include_router(admin_members.router, prefix="/admin", tags=["admin-members"])
+    app.include_router(admin_access.router, prefix="/admin", tags=["admin-access"])
     app.include_router(proxy_router, prefix="/v1", tags=["proxy"])
 
     # touch settings to fail-fast on misconfiguration
