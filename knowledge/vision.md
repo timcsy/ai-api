@@ -194,14 +194,33 @@ Azure OpenAI 為首選 AI 供應商；其他細節待設計。
 - ❌ 多池（按 model / Team 切池）— 首版單一全域池
 - ❌ 跨月借貸 / 過期 token roll-over
 
-### 階段 4：使用情境目錄
+### 階段 4：模型目錄 + 多面向 Filter
 
-- [ ] 完成
+- [x] 完成（2026-05-23；194 tests 全綠：10 unit + 12 contract + 5 integration on top of 167 prior）
 
-> **交付**：成員可依需求情境查到該用哪個 API
-> **前置條件**：階段 1（其他階段可並行）
+> **交付**：類 Azure Foundry 的模型目錄；以「模型」為第一公民、提供
+> modality / capability / cost_tier / recommended_for 等多 facet filter；
+> faceted counts API 讓 UI 直接渲染 sidebar。
+> **前置條件**：階段 1（與 3b 並行不衝突）
 
 **成功標準：**
-- [ ] 至少涵蓋 5 種常見情境（文生圖、STT、TTS、摘要、翻譯）
-- [ ] 每種情境有推薦 API、最簡使用範例、預估成本級距
-- [ ] 不熟悉 LLM API 的成員看完目錄能自行開始試用
+- [x] `model_catalog` 表 + Alembic migration 0006
+- [x] 首版 YAML 含 ≥ 8 個 Azure OpenAI 主力模型（實際 9：gpt-4o, gpt-4o-mini,
+      o1-mini, o3-mini, text-embedding-3-small/large, dall-e-3, whisper-1, tts-1）
+- [x] `GET /catalog/models` 多面向 filter，list 欄位 AND 語意
+      （`?capability=vision&capability=function-calling&cost_tier=low` → 唯一命中 gpt-4o-mini）
+- [x] `GET /catalog/filters` 回 faceted counts，schema 穩定（空 DB 與
+      有資料 DB 回相同 dimension key 集合）
+- [x] `GET /catalog/models/{slug}` 含 `example_request`（curl + JSON body）
+- [x] CLI `python -m ai_api.cli.load_models <yaml>` upsert by slug；
+      idempotent；YAML 未列出的 model **不刪除**（防事故 wipe，FR-005）
+- [x] 棄用隔離：`status=deprecated` 不出現在預設列表，但 detail 仍可查到含
+      `deprecation_note`
+- [x] 任何 active member 可看（新 `require_active_member` 依賴；
+      無認證 401、disabled 403）
+
+**明確排除（留 3b 或後階段）：**
+- ❌ UI / 視覺呈現（留 3b SPA）
+- ❌ 整合到「建立 allocation」流程作為 model picker（留 3b）
+- ❌ 從 Azure / LiteLLM 自動同步 model 清單（YAGNI）
+- ❌ 即時定價（cost_tier 而非絕對價；docs/model-catalog.md 記載未來整合 SOP）

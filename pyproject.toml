@@ -57,6 +57,7 @@ ignore = ["E501", "S101", "B008", "S105", "N818"]  # B008/S105/N818: FastAPI Dep
 "src/ai_api/api/quota_pool.py" = ["N806"]
 "tests/unit/test_compute_rebalance.py" = ["N803", "N806", "RUF003"]
 "tests/integration/test_quota_pool_rebalance.py" = ["N803"]
+"tests/contract/test_catalog_api.py" = ["RUF001"]  # Chinese deprecation note contains fullwidth comma
 
 [tool.mypy]
 python_version = "3.11"

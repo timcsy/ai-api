@@ -1,0 +1,113 @@
+"""Catalog endpoints (Phase 4): list / detail / filters.
+
+All endpoints require an active member.
+"""
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ai_api.api.deps import get_db_session, require_active_member
+from ai_api.models import ModelCatalog
+from ai_api.services.model_catalog import compute_facets, filter_models
+
+router = APIRouter(dependencies=[Depends(require_active_member)])
+
+
+def _err(code: str, message: str) -> dict[str, Any]:
+    return {"error": {"code": code, "message": message}}
+
+
+def _to_summary(m: ModelCatalog) -> dict[str, Any]:
+    return {
+        "slug": m.slug,
+        "provider": m.provider,
+        "display_name": m.display_name,
+        "family": m.family,
+        "description": m.description,
+        "modality_input": list(m.modality_input),
+        "modality_output": list(m.modality_output),
+        "capabilities": list(m.capabilities),
+        "context_window": m.context_window,
+        "cost_tier": m.cost_tier,
+        "recommended_for": list(m.recommended_for),
+        "tags": list(m.tags),
+        "official_doc_url": m.official_doc_url,
+        "status": m.status,
+    }
+
+
+def _to_detail(m: ModelCatalog) -> dict[str, Any]:
+    out = _to_summary(m)
+    out["example_request"] = m.example_request
+    out["deprecation_note"] = m.deprecation_note
+    out["created_at"] = m.created_at.isoformat()
+    out["updated_at"] = m.updated_at.isoformat()
+    return out
+
+
+@router.get("/models")
+async def list_models(
+    capability: list[str] | None = Query(default=None),
+    modality_input: list[str] | None = Query(default=None),
+    modality_output: list[str] | None = Query(default=None),
+    recommended_for: list[str] | None = Query(default=None),
+    tag: list[str] | None = Query(default=None),
+    cost_tier: str | None = Query(default=None),
+    provider: str | None = Query(default=None),
+    family: str | None = Query(default=None),
+    min_context_window: int | None = Query(default=None, ge=0),
+    include_deprecated: bool = Query(default=False),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, Any]]:
+    stmt = select(ModelCatalog).order_by(ModelCatalog.slug)
+    if not include_deprecated:
+        stmt = stmt.where(ModelCatalog.status != "deprecated")
+    models = list((await session.execute(stmt)).scalars().all())
+    filtered = filter_models(
+        models,
+        capabilities=capability,
+        modality_input=modality_input,
+        modality_output=modality_output,
+        recommended_for=recommended_for,
+        tags=tag,
+        cost_tier=cost_tier,
+        provider=provider,
+        family=family,
+        min_context_window=min_context_window,
+    )
+    return [_to_summary(m) for m in filtered]
+
+
+@router.get("/models/{slug:path}")
+async def get_model(
+    slug: str,
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    model = (
+        await session.execute(
+            select(ModelCatalog).where(ModelCatalog.slug == slug)
+        )
+    ).scalar_one_or_none()
+    if model is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_err("not_found", f"model {slug} not found"),
+        )
+    return _to_detail(model)
+
+
+@router.get("/filters")
+async def get_filters(
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, dict[str, int]]:
+    stmt = (
+        select(ModelCatalog)
+        .where(ModelCatalog.status != "deprecated")
+        .order_by(ModelCatalog.slug)
+    )
+    models = list((await session.execute(stmt)).scalars().all())
+    return compute_facets(models)
