@@ -3,13 +3,13 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 
-from fastapi import Cookie, Header, HTTPException, Request, status
+from fastapi import Cookie, Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.auth.sessions import SESSION_COOKIE_NAME, validate_session
 from ai_api.config import Settings, get_settings
 from ai_api.db import get_sessionmaker
-from ai_api.models import Member
+from ai_api.models import Member, MemberStatus
 
 ADMIN_TOKEN_HEADER = "X-Admin-Token"
 CSRF_COOKIE = "aiapi_csrf"
@@ -75,3 +75,20 @@ async def require_csrf(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"error": {"code": "csrf_failed", "message": "CSRF check failed"}},
         )
+
+
+async def require_active_member(
+    member: Member = Depends(current_member),
+) -> Member:
+    """current_member + enforce status=active. Returns Member or raises 403."""
+    if member.status != MemberStatus.active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": {
+                    "code": "member_disabled",
+                    "message": f"member status is {member.status.value}, not active",
+                }
+            },
+        )
+    return member

@@ -12,6 +12,7 @@ from ai_api.api import (
     admin_members,
     allocations,
     auth,
+    catalog,
     health,
     me,
     quota_pool,
@@ -61,6 +62,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_access.router, prefix="/admin", tags=["admin-access"])
     app.include_router(usage.router, prefix="/admin", tags=["admin-usage"])
     app.include_router(quota_pool.router, prefix="/admin", tags=["admin-quota-pool"])
+    app.include_router(catalog.router, prefix="/catalog", tags=["catalog"])
     app.include_router(proxy_router, prefix="/v1", tags=["proxy"])
 
     # touch settings to fail-fast on misconfiguration

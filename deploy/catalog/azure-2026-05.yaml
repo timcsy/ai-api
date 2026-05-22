@@ -1,0 +1,238 @@
+# Azure OpenAI 主力模型目錄 — Phase 4 首版
+# 載入：python -m ai_api.cli.load_models deploy/catalog/azure-2026-05.yaml
+
+models:
+  - slug: azure/gpt-4o
+    provider: azure
+    display_name: GPT-4o
+    family: gpt-4
+    description: |
+      旗艦多模態模型；文字 + 視覺 + 高精度推理；
+      支援 function-calling、tool-use、JSON mode。適合複雜對話、agent、視覺理解。
+    modality_input: [text, image]
+    modality_output: [text]
+    capabilities: [chat, vision, function-calling, json-mode, tool-use, streaming]
+    context_window: 128000
+    cost_tier: high
+    recommended_for: [chat, agent, code, summarization, translation]
+    tags: [multimodal, flagship]
+    example_request:
+      curl: |
+        curl -X POST $BASE/v1/chat/completions \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d @body.json
+      body:
+        model: gpt-4o
+        messages:
+          - role: user
+            content: "請用繁體中文解釋量子糾纏。"
+    official_doc_url: https://learn.microsoft.com/azure/ai-services/openai/concepts/models
+    status: active
+
+  - slug: azure/gpt-4o-mini
+    provider: azure
+    display_name: GPT-4o mini
+    family: gpt-4
+    description: |
+      高 CP 值多模態小模型；支援文字 + 視覺 + function-calling。
+      適合大量請求、低成本場景。
+    modality_input: [text, image]
+    modality_output: [text]
+    capabilities: [chat, vision, function-calling, json-mode, tool-use, streaming]
+    context_window: 128000
+    cost_tier: low
+    recommended_for: [chat, agent, summarization, translation, code]
+    tags: [multimodal, cost-effective]
+    example_request:
+      curl: |
+        curl -X POST $BASE/v1/chat/completions \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d @body.json
+      body:
+        model: gpt-4o-mini
+        messages:
+          - role: user
+            content: "Hello"
+    official_doc_url: https://learn.microsoft.com/azure/ai-services/openai/concepts/models
+    status: active
+
+  - slug: azure/o1-mini
+    provider: azure
+    display_name: o1-mini
+    family: o-series
+    description: |
+      推理優先模型；擅長數學、程式、邏輯題；單一回合深度思考。
+      不支援 function-calling 與 vision。
+    modality_input: [text]
+    modality_output: [text]
+    capabilities: [chat, reasoning]
+    context_window: 128000
+    cost_tier: medium
+    recommended_for: [code, agent]
+    tags: [reasoning]
+    example_request:
+      curl: |
+        curl -X POST $BASE/v1/chat/completions \
+          -H "Authorization: Bearer $TOKEN" \
+          -d @body.json
+      body:
+        model: o1-mini
+        messages:
+          - role: user
+            content: "證明 sqrt(2) 是無理數。"
+    official_doc_url: https://learn.microsoft.com/azure/ai-services/openai/concepts/models
+    status: active
+
+  - slug: azure/o3-mini
+    provider: azure
+    display_name: o3-mini
+    family: o-series
+    description: |
+      新一代推理模型；比 o1-mini 更強的數學與程式能力；支援 function-calling。
+    modality_input: [text]
+    modality_output: [text]
+    capabilities: [chat, reasoning, function-calling]
+    context_window: 200000
+    cost_tier: medium
+    recommended_for: [code, agent]
+    tags: [reasoning]
+    example_request:
+      curl: |
+        curl -X POST $BASE/v1/chat/completions \
+          -H "Authorization: Bearer $TOKEN" \
+          -d @body.json
+      body:
+        model: o3-mini
+        messages:
+          - role: user
+            content: "寫一個 Python 函式判斷字串是否為迴文。"
+    official_doc_url: https://learn.microsoft.com/azure/ai-services/openai/concepts/models
+    status: active
+
+  - slug: azure/text-embedding-3-small
+    provider: azure
+    display_name: Text Embedding 3 Small
+    family: embedding
+    description: |
+      高 CP 值文字向量模型；1536 維（可降維）。
+      適合語意搜尋、RAG、分類等。
+    modality_input: [text]
+    modality_output: [embedding]
+    capabilities: [embedding]
+    context_window: 8191
+    cost_tier: low
+    recommended_for: [embedding, classification]
+    tags: [embedding]
+    example_request:
+      curl: |
+        curl -X POST $BASE/v1/embeddings \
+          -H "Authorization: Bearer $TOKEN" \
+          -d @body.json
+      body:
+        model: text-embedding-3-small
+        input: ["這是一段要轉成向量的文字"]
+    official_doc_url: https://learn.microsoft.com/azure/ai-services/openai/concepts/models
+    status: active
+
+  - slug: azure/text-embedding-3-large
+    provider: azure
+    display_name: Text Embedding 3 Large
+    family: embedding
+    description: |
+      高精度文字向量模型；3072 維（可降維）。
+      適合對精度要求高的 RAG 與語意搜尋。
+    modality_input: [text]
+    modality_output: [embedding]
+    capabilities: [embedding]
+    context_window: 8191
+    cost_tier: medium
+    recommended_for: [embedding, classification]
+    tags: [embedding]
+    example_request:
+      curl: |
+        curl -X POST $BASE/v1/embeddings \
+          -H "Authorization: Bearer $TOKEN" \
+          -d @body.json
+      body:
+        model: text-embedding-3-large
+        input: ["this is a sentence"]
+    official_doc_url: https://learn.microsoft.com/azure/ai-services/openai/concepts/models
+    status: active
+
+  - slug: azure/dall-e-3
+    provider: azure
+    display_name: DALL·E 3
+    family: dall-e
+    description: |
+      文字生圖模型；高解析度（1024×1024 以上）；對 prompt 理解力強。
+    modality_input: [text]
+    modality_output: [image]
+    capabilities: []
+    context_window: 4000
+    cost_tier: high
+    recommended_for: [image-gen]
+    tags: [image-generation]
+    example_request:
+      curl: |
+        curl -X POST $BASE/v1/images/generations \
+          -H "Authorization: Bearer $TOKEN" \
+          -d @body.json
+      body:
+        model: dall-e-3
+        prompt: "一隻穿著太空衣的柴犬，賽博龐克風格"
+        size: "1024x1024"
+        n: 1
+    official_doc_url: https://learn.microsoft.com/azure/ai-services/openai/concepts/models
+    status: active
+
+  - slug: azure/whisper-1
+    provider: azure
+    display_name: Whisper
+    family: whisper
+    description: |
+      語音轉文字（STT）；支援多語言；可輸出 SRT/VTT 字幕格式。
+    modality_input: [audio]
+    modality_output: [text]
+    capabilities: []
+    context_window: 0
+    cost_tier: low
+    recommended_for: [stt]
+    tags: [speech]
+    example_request:
+      curl: |
+        curl -X POST $BASE/v1/audio/transcriptions \
+          -H "Authorization: Bearer $TOKEN" \
+          -F file=@audio.mp3 \
+          -F model=whisper-1
+      body:
+        model: whisper-1
+        file: "audio.mp3"
+    official_doc_url: https://learn.microsoft.com/azure/ai-services/openai/concepts/models
+    status: active
+
+  - slug: azure/tts-1
+    provider: azure
+    display_name: TTS
+    family: tts
+    description: |
+      文字轉語音（TTS）；6 種預設音色；mp3 / opus / aac / flac 輸出。
+    modality_input: [text]
+    modality_output: [audio]
+    capabilities: []
+    context_window: 4096
+    cost_tier: low
+    recommended_for: [tts]
+    tags: [speech]
+    example_request:
+      curl: |
+        curl -X POST $BASE/v1/audio/speech \
+          -H "Authorization: Bearer $TOKEN" \
+          -d @body.json --output speech.mp3
+      body:
+        model: tts-1
+        input: "你好，這是一段語音測試。"
+        voice: "alloy"
+    official_doc_url: https://learn.microsoft.com/azure/ai-services/openai/concepts/models
+    status: active

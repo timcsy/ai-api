@@ -13,6 +13,7 @@ from ai_api.models.call_record import CallOutcome, CallRecord
 from ai_api.models.credential import Credential
 from ai_api.models.invitation import InvitationToken
 from ai_api.models.member import Member, MemberProvider, MemberStatus
+from ai_api.models.model_catalog import ModelCatalog
 from ai_api.models.oidc_state import OidcState
 from ai_api.models.password_attempt import AttemptOutcome, PasswordAttempt
 from ai_api.models.price_list import PriceList
@@ -35,6 +36,7 @@ __all__ = [
     "Member",
     "MemberProvider",
     "MemberStatus",
+    "ModelCatalog",
     "OidcState",
     "PasswordAttempt",
     "PriceList",
