@@ -77,6 +77,16 @@ anomalyDetector:
 # Example: '["https://admin.example.com"]'
 corsOrigins: "[]"
 
+# Phase 3c: adaptive quota pool rebalance — runs on the 1st of every month UTC.
+rebalanceCron:
+  enabled: true
+  schedule: "0 0 1 * *"
+
+# Phase 3c quota pool settings
+pool:
+  totalTokensPerMonth: 0  # 0 = pool disabled
+  floorPerAllocation: 1000
+
 probes:
   readiness:
     path: /healthz

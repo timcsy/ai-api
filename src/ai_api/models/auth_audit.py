@@ -30,6 +30,11 @@ class AuditEventType(enum.StrEnum):
     allocation_quarantined = "allocation_quarantined"
     allocation_unquarantined = "allocation_unquarantined"
     anomaly_detector_run = "anomaly_detector_run"
+    # Phase 3c
+    quota_pool_rebalanced = "quota_pool_rebalanced"
+    rebalance_failed = "rebalance_failed"
+    pool_exhausted_by_reserved = "pool_exhausted_by_reserved"
+    pool_idle = "pool_idle"
 
 
 class ActorType(enum.StrEnum):
