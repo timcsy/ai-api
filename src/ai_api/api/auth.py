@@ -152,7 +152,10 @@ async def oidc_callback(
     _exp = state_row.expires_at if state_row.expires_at.tzinfo else state_row.expires_at.replace(tzinfo=UTC)
     if _exp <= datetime.now(UTC):
         return _error_response("invalid_state", "state expired or invalid", 401)
+    # Capture attributes before deletion (SQLA may expire them post-flush).
     redirect_to = state_row.redirect_to
+    code_verifier = state_row.code_verifier
+    nonce = state_row.nonce
     await session.delete(state_row)
     await session.flush()
 
@@ -162,17 +165,21 @@ async def oidc_callback(
             {
                 "code": code,
                 "redirect_uri": f"{settings.base_url.rstrip('/')}/auth/oidc/callback",
-                "code_verifier": state_row.code_verifier,
-                "nonce": state_row.nonce,
+                "code_verifier": code_verifier,
+                "nonce": nonce,
             }
         )
     except AuthError as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "oidc auth failed code=%s message=%s", exc.code, exc.message
+        )
         await audit.record(
             session,
             event_type=AuditEventType.login_failure,
             actor_type=ActorType.anonymous,
             source_ip=_client_ip(request),
-            details={"reason": exc.code, "stage": "oidc"},
+            details={"reason": exc.code, "stage": "oidc", "message": exc.message},
         )
         return _error_response("invalid_credentials", "auth failed", 401)
 

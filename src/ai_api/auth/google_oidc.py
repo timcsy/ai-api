@@ -118,9 +118,14 @@ class GoogleOidcProvider(AuthProvider):
                     "nonce": {"essential": True, "value": expected_nonce},
                 },
             )
-            claims.validate()
+            # 60s leeway covers small clock skew between us and Google.
+            claims.validate(leeway=60)
         except JoseError as exc:
-            raise AuthError("invalid_credentials", "id_token validation failed") from exc
+            import logging
+            logging.getLogger(__name__).warning(
+                "id_token validation failed: %s (type=%s)", exc, type(exc).__name__
+            )
+            raise AuthError("invalid_credentials", f"id_token validation failed: {type(exc).__name__}: {exc}") from exc
         return claims
 
     async def authenticate(self, credentials: dict[str, Any]) -> AuthResult:
