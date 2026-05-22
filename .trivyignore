@@ -1,0 +1,11 @@
+# Trivy ignore list — controlled via PR review.
+#
+# Each entry MUST include:
+#   - CVE id
+#   - one-line reason for ignoring (e.g. "false positive: package not used at runtime",
+#     "fix pending upstream, mitigated by NetworkPolicy", "vulnerable code path
+#     unreachable")
+#   - link to the PR that added it
+#
+# Example:
+# CVE-2024-XXXXX  # not exploitable: only loaded in test env (#42)

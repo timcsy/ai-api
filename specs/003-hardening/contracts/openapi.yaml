@@ -1,0 +1,124 @@
+openapi: 3.1.0
+info:
+  title: AI API Manager — Hardening (Phase 2.5)
+  version: 0.3.0
+  description: |
+    階段 2.5 對既有契約的增量：
+    - Allocation `status` 加 `quarantined` 值；表現於既有 `/admin/allocations*` 與
+      `/me/allocations` 回應
+    - 新增 `POST /admin/allocations/{id}/unquarantine`
+    - `/v1/chat/completions` 新增兩個錯誤碼：`provider_not_allowed`、
+      `allocation_quarantined`
+
+    其餘端點不變（見 specs/001-gateway-core 與 specs/002-auth-membership 的契約）。
+
+servers:
+  - url: http://localhost:8000
+
+paths:
+  /admin/allocations/{allocationId}/unquarantine:
+    parameters:
+      - in: path
+        name: allocationId
+        required: true
+        schema: { type: string, pattern: '^[0-9A-HJKMNP-TV-Z]{26}$' }
+    post:
+      tags: [admin]
+      operationId: unquarantineAllocation
+      summary: 解除分配的隔離狀態
+      security:
+        - AdminToken: []
+      responses:
+        '200':
+          description: 已解除（status → active）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Allocation' }
+        '404':
+          description: 分配不存在
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+        '409':
+          description: 分配不在 quarantined 狀態（active 或 revoked）
+          content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
+
+  /v1/chat/completions:
+    post:
+      tags: [proxy]
+      operationId: proxyChatCompletionsHardened
+      summary: 既有端點 — 階段 2.5 加 provider allowlist 與 quarantine 檢查
+      description: |
+        延續階段 1 契約。額外行為：
+
+        1. **Provider allowlist 檢查**：請求中 `model` 字串的 provider 前綴
+           （`<provider>/<model>` 或預設為 `azure`）若不在 `Settings.allowed_providers`，
+           回 403 + `provider_not_allowed`。
+        2. **Quarantine 檢查**：對應分配若狀態為 `quarantined`，回 403 +
+           `allocation_quarantined`。
+
+      security:
+        - AllocationToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model, messages]
+              additionalProperties: true
+              properties:
+                model: { type: string }
+                messages: { type: array, items: { type: object } }
+      responses:
+        '200':
+          description: 成功
+        '403':
+          description: |
+            Provider 被禁、模型不匹配、分配已撤回、或分配被隔離。
+            錯誤碼可能為 `provider_not_allowed`、`model_mismatch`、
+            `allocation_revoked`、`allocation_quarantined`。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+components:
+  securitySchemes:
+    AdminToken:
+      type: apiKey
+      in: header
+      name: X-Admin-Token
+    AllocationToken:
+      type: http
+      scheme: bearer
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: |
+                結構化錯誤碼。階段 2.5 新增的值：
+                - `provider_not_allowed` (HTTP 403, /v1/*)
+                - `allocation_quarantined` (HTTP 403, /v1/*)
+            message: { type: string }
+            request_id: { type: string }
+
+    Allocation:
+      type: object
+      description: 階段 2.5 後 status 可為 active / revoked / **quarantined**
+      properties:
+        id: { type: string }
+        member_id: { type: string }
+        subject_snapshot: { type: string }
+        resource_model: { type: string }
+        status:
+          type: string
+          enum: [active, revoked, quarantined]
+        created_at: { type: string, format: date-time }
+        revoked_at: { type: string, format: date-time, nullable: true }
+        token_prefix: { type: string }
