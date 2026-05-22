@@ -1,0 +1,163 @@
+openapi: 3.1.0
+info:
+  title: AI API Manager — Model Catalog (Phase 4)
+  version: 0.7.0
+  description: |
+    階段 4：模型目錄。所有端點要求 active member 登入（session cookie）。
+
+servers:
+  - url: http://localhost:8000
+
+paths:
+  /catalog/models:
+    get:
+      tags: [catalog]
+      operationId: listModels
+      summary: 列出 / filter models
+      description: |
+        Filter 規則：
+        - list 欄位（capability、modality_input、modality_output、
+          recommended_for、tag）：重複 query key = AND（全部必須具備）
+        - single 欄位（cost_tier、provider、family、status）：單一值
+        - 跨欄位 AND
+        - filter 值大小寫不敏感
+        - 預設只回 status=active；`?include_deprecated=true` 才含 deprecated
+      security: [{ SessionCookie: [] }]
+      parameters:
+        - { in: query, name: capability, schema: { type: array, items: { type: string } }, explode: true, style: form }
+        - { in: query, name: modality_input, schema: { type: array, items: { type: string } }, explode: true, style: form }
+        - { in: query, name: modality_output, schema: { type: array, items: { type: string } }, explode: true, style: form }
+        - { in: query, name: recommended_for, schema: { type: array, items: { type: string } }, explode: true, style: form }
+        - { in: query, name: tag, schema: { type: array, items: { type: string } }, explode: true, style: form }
+        - { in: query, name: cost_tier, schema: { type: string, enum: [low, medium, high] } }
+        - { in: query, name: provider, schema: { type: string } }
+        - { in: query, name: family, schema: { type: string } }
+        - { in: query, name: min_context_window, schema: { type: integer, minimum: 0 } }
+        - { in: query, name: include_deprecated, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          description: list (空陣列也回 200)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ModelSummary' }
+        '401':
+          description: 未登入
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+        '403':
+          description: member disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /catalog/models/{slug}:
+    parameters:
+      - in: path
+        name: slug
+        required: true
+        schema: { type: string }
+        description: URL-encoded slug，例 `azure%2Fgpt-4o-mini`
+    get:
+      tags: [catalog]
+      operationId: getModel
+      summary: 取單一 model 完整資訊
+      security: [{ SessionCookie: [] }]
+      responses:
+        '200':
+          description: 含 example_request、deprecation_note
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModelDetail' }
+        '404':
+          description: slug 不存在
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /catalog/filters:
+    get:
+      tags: [catalog]
+      operationId: getFilters
+      summary: 取所有 filter dimension + 各 value 的命中數
+      description: |
+        Faceted search 用。dimension key 集合穩定（即使某 dim 全 0 也回空 dict）。
+        計數排除 deprecated。
+      security: [{ SessionCookie: [] }]
+      responses:
+        '200':
+          description: faceted dict
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FacetResponse' }
+
+components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: ai_api_session
+
+  schemas:
+    ModelSummary:
+      type: object
+      required: [slug, provider, display_name, family, description, modality_input, modality_output, capabilities, context_window, cost_tier, recommended_for, tags, status]
+      properties:
+        slug: { type: string, example: "azure/gpt-4o-mini" }
+        provider: { type: string }
+        display_name: { type: string }
+        family: { type: string }
+        description: { type: string }
+        modality_input: { type: array, items: { type: string } }
+        modality_output: { type: array, items: { type: string } }
+        capabilities: { type: array, items: { type: string } }
+        context_window: { type: integer }
+        cost_tier: { type: string, enum: [low, medium, high] }
+        recommended_for: { type: array, items: { type: string } }
+        tags: { type: array, items: { type: string } }
+        official_doc_url:
+          oneOf:
+            - { type: string, format: uri }
+            - { type: 'null' }
+        status: { type: string, enum: [active, preview, deprecated] }
+
+    ModelDetail:
+      allOf:
+        - $ref: '#/components/schemas/ModelSummary'
+        - type: object
+          required: [example_request]
+          properties:
+            example_request: { type: object, additionalProperties: true }
+            deprecation_note:
+              oneOf:
+                - { type: string }
+                - { type: 'null' }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+
+    FacetResponse:
+      type: object
+      required: [modality_input, modality_output, capabilities, cost_tier, recommended_for, family, tags]
+      description: 每個 dimension 對應 dict[value, count]；穩定 schema
+      properties:
+        modality_input: { type: object, additionalProperties: { type: integer } }
+        modality_output: { type: object, additionalProperties: { type: integer } }
+        capabilities: { type: object, additionalProperties: { type: integer } }
+        cost_tier: { type: object, additionalProperties: { type: integer } }
+        recommended_for: { type: object, additionalProperties: { type: integer } }
+        family: { type: object, additionalProperties: { type: integer } }
+        tags: { type: object, additionalProperties: { type: integer } }
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            request_id: { type: string }
