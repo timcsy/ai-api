@@ -52,6 +52,9 @@ class AllocationOut(BaseModel):
     created_by: str
     note: str | None
     token_prefix: str
+    # Phase 3a
+    quota_tokens_per_month: int | None = None
+    is_service_allocation: bool = False
 
     @computed_field  # type: ignore[prop-decorator]
     @property

@@ -73,6 +73,10 @@ anomalyDetector:
   enabled: true
   schedule: "*/5 * * * *"
 
+# Phase 3a: CORS for upcoming 3b SPA. Empty string = disabled.
+# Example: '["https://admin.example.com"]'
+corsOrigins: "[]"
+
 probes:
   readiness:
     path: /healthz

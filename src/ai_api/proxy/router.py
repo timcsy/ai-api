@@ -19,6 +19,8 @@ from ai_api.proxy.allowlist import check_allowed, parse_provider
 from ai_api.proxy.auth import parse_bearer_token
 from ai_api.proxy.guard import enforce_model_binding
 from ai_api.services.allocations import AllocationService
+from ai_api.services.pricing import calculate_cost, lookup_price_for_call
+from ai_api.services.quota import current_month_usage, is_over_quota
 from ai_api.services.records import RecordsService
 
 logger = logging.getLogger(__name__)
@@ -42,6 +44,7 @@ def _outcome_for_code(code: str) -> CallOutcome:
         "model_mismatch": CallOutcome.rejected_model_mismatch,
         "provider_not_allowed": CallOutcome.rejected_provider,
         "allocation_quarantined": CallOutcome.rejected_quarantined,
+        "quota_exceeded": CallOutcome.rejected_quota_exceeded,
         "upstream_error": CallOutcome.upstream_error,
     }.get(code, CallOutcome.gateway_error)
 
@@ -128,6 +131,16 @@ async def proxy_chat_completions(
             403,
         )
 
+    # Phase 3a: monthly quota check (FR-007)
+    if allocation.quota_tokens_per_month is not None:
+        usage = await current_month_usage(session, allocation.id)
+        if is_over_quota(allocation, usage):
+            return await record_and_respond(
+                "quota_exceeded",
+                f"monthly quota reached ({usage}/{allocation.quota_tokens_per_month} tokens)",
+                403,
+            )
+
     # 4. Model binding
     try:
         enforce_model_binding(allocation, requested_model)
@@ -150,7 +163,18 @@ async def proxy_chat_completions(
         )
 
     payload = result if isinstance(result, dict) else result.model_dump()
-    usage = payload.get("usage") or {}
+    usage_obj: dict[str, Any] = payload.get("usage") or {}
+
+    # Point-in-time pricing: look up the price effective at started_at.
+    price = await lookup_price_for_call(
+        session, provider=provider, model=requested_model.split("/", 1)[-1], call_time=started_at
+    )
+    cost = calculate_cost(
+        price=price,
+        prompt_tokens=usage_obj.get("prompt_tokens"),
+        completion_tokens=usage_obj.get("completion_tokens"),
+    )
+
     await records.record_call(
         request_id=request_id,
         allocation_id=allocation.id,
@@ -159,8 +183,9 @@ async def proxy_chat_completions(
         started_at=started_at,
         status_code=200,
         outcome=CallOutcome.success,
-        prompt_tokens=usage.get("prompt_tokens"),
-        completion_tokens=usage.get("completion_tokens"),
-        total_tokens=usage.get("total_tokens"),
+        prompt_tokens=usage_obj.get("prompt_tokens"),
+        completion_tokens=usage_obj.get("completion_tokens"),
+        total_tokens=usage_obj.get("total_tokens"),
+        cost_usd=cost,
     )
     return payload

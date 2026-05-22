@@ -3,8 +3,19 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, SmallInteger, String, Text
+from sqlalchemy import (
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    SmallInteger,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai_api.db import Base
@@ -17,6 +28,7 @@ class CallOutcome(enum.StrEnum):
     rejected_model_mismatch = "rejected_model_mismatch"
     rejected_provider = "rejected_provider"
     rejected_quarantined = "rejected_quarantined"
+    rejected_quota_exceeded = "rejected_quota_exceeded"
     upstream_error = "upstream_error"
     gateway_error = "gateway_error"
 
@@ -40,6 +52,8 @@ class CallRecord(Base):
     prompt_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     completion_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Phase 3a: point-in-time cost. NULL when no PriceList match was found.
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (

@@ -1,0 +1,14 @@
+# Phase 3a: Azure OpenAI price snapshot — manually transcribed
+# from Azure pricing page on 2026-05-22.
+# Loader: python -m ai_api.cli.load_prices deploy/prices/azure-2026-05.yaml
+effective_from: "2026-05-01T00:00:00Z"
+source_note: "Azure OpenAI Service pricing — captured 2026-05-22"
+prices:
+  - provider: azure
+    model: gpt-4o-mini
+    input_per_1k_tokens_usd: 0.000150
+    output_per_1k_tokens_usd: 0.000600
+  - provider: azure
+    model: gpt-4o
+    input_per_1k_tokens_usd: 0.0025
+    output_per_1k_tokens_usd: 0.010

@@ -78,6 +78,36 @@
   子型別，否則 debug 等於猜謎。
 - **來源**：`src/ai_api/auth/google_oidc.py`，修正於 commit ce3d640
 
+### SQLAlchemy 多分支 select 的型別衝突
+
+- **理論說**：同一個 service 函式內，可以根據參數分支構造不同的 `select(...)`
+  並重用同一個 `stmt` 變數，型別推導應該自動處理。
+- **實際發生**：在 `services/usage.py` 的 `aggregate_usage` 寫
+  `if group_by == "member": stmt = select(...)` / `elif "allocation": stmt = select(...)`，
+  mypy 立刻抱怨 `Incompatible types in assignment` — 因為
+  `Select[tuple[X, Y, Z]]` 與 `Select[tuple[A, B, C]]` 是不同型別。連
+  `# type: ignore` 都解不開（後續 `rows = (await db.execute(stmt)).all()`
+  還是會撞型別）。
+- **解決方式**：**每分支用獨立變數名**（`alloc_stmt`、`model_stmt`）+ 獨立
+  `alloc_rows`、`model_rows`；保留 `stmt`/`rows` 給第一個分支。
+- **教訓**：在強型別 + SQLAlchemy Core 環境下，分支建構的查詢別硬要共用
+  變數名。「變數即型別」原則對 Core 特別重要。
+- **來源**：`src/ai_api/services/usage.py` `aggregate_usage`
+
+### httpx 測試 URL 帶 ISO datetime 必須先 quote
+
+- **理論說**：`datetime.isoformat()` 產出的字串放進 query string 應該沒
+  問題。
+- **實際發生**：`f"?from={now.isoformat()}"` 給 httpx，FastAPI 端解析回
+  422。原因：`isoformat()` 含 `+00:00`，`+` 在 query string 中是合法字元
+  但被解析視為**空格**，導致 datetime 反序列化失敗。
+- **解決方式**：測試端 `urllib.parse.quote(now.isoformat())`；或更穩的
+  做法 — 改用 `client.get("/path", params={"from": now.isoformat()})` 由
+  httpx 自行 URL-encode。
+- **教訓**：任何「自行拼 query string」的測試都該過一遍 `quote`；偏好走
+  client 的 `params=` 介面把這層事情交給工具。
+- **來源**：`tests/integration/test_aggregation.py`
+
 ### 快速迭代不要用 mutable tag
 
 - **理論說**：`helm upgrade --set image.tag=main` 配合 push 新版到 ghcr，

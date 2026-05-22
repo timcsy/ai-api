@@ -1,0 +1,249 @@
+openapi: 3.1.0
+info:
+  title: AI API Manager — Usage & Billing (Phase 3a)
+  version: 0.4.0
+  description: |
+    新增端點（admin token 必填）：
+    - GET /admin/usage             — 聚合查詢
+    - GET /admin/usage.csv         — CSV 匯出
+    - GET /admin/usage.json        — JSON 匯出（同 /admin/usage 但強制 JSON content-type）
+    - GET /admin/allocations/{id}/usage-timeseries — 單分配時間序列
+
+    擴充端點：
+    - PATCH /admin/allocations/{id} — 加 quota_tokens_per_month + is_service_allocation
+    - POST /v1/chat/completions    — 配額超過時回 403 quota_exceeded
+
+    CORS：當 Settings.cors_origins 非空時，FastAPI CORSMiddleware 套用 allowlist。
+
+servers:
+  - url: http://localhost:8000
+
+paths:
+  /admin/usage:
+    get:
+      tags: [admin-usage]
+      operationId: getUsage
+      summary: 聚合用量查詢
+      security:
+        - AdminToken: []
+      parameters:
+        - { in: query, name: from, required: true, schema: { type: string, format: date-time }, description: ISO 8601 UTC }
+        - { in: query, name: to, required: true, schema: { type: string, format: date-time } }
+        - { in: query, name: group_by, required: true, schema: { type: string, enum: [member, allocation, model] } }
+        - { in: query, name: service_only, required: false, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          description: 聚合結果
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsageResponse' }
+        '400':
+          description: |
+            可能的錯誤碼：
+            - `invalid_time_range` — from ≥ to 或日期格式錯
+            - `range_too_wide` — (to - from) > 90 days
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /admin/usage.csv:
+    get:
+      tags: [admin-usage]
+      operationId: getUsageCsv
+      summary: 用量匯出為 CSV
+      security:
+        - AdminToken: []
+      parameters:
+        - { in: query, name: from, required: true, schema: { type: string, format: date-time } }
+        - { in: query, name: to, required: true, schema: { type: string, format: date-time } }
+        - { in: query, name: group_by, required: true, schema: { type: string, enum: [member, allocation, model] } }
+        - { in: query, name: service_only, required: false, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          description: CSV
+          content:
+            text/csv:
+              schema: { type: string }
+
+  /admin/usage.json:
+    get:
+      tags: [admin-usage]
+      operationId: getUsageJson
+      summary: 用量匯出為 JSON（同 /admin/usage 但強制 JSON content-type）
+      security:
+        - AdminToken: []
+      parameters:
+        - { in: query, name: from, required: true, schema: { type: string, format: date-time } }
+        - { in: query, name: to, required: true, schema: { type: string, format: date-time } }
+        - { in: query, name: group_by, required: true, schema: { type: string, enum: [member, allocation, model] } }
+        - { in: query, name: service_only, required: false, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          description: JSON array
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/UsageItem' }
+
+  /admin/allocations/{allocationId}/usage-timeseries:
+    get:
+      tags: [admin-usage]
+      operationId: getAllocationUsageTimeseries
+      summary: 單分配的時間序列用量
+      security:
+        - AdminToken: []
+      parameters:
+        - { in: path, name: allocationId, required: true, schema: { type: string } }
+        - { in: query, name: bucket, required: true, schema: { type: string, enum: [hour, day] } }
+        - { in: query, name: from, required: true, schema: { type: string, format: date-time } }
+        - { in: query, name: to, required: true, schema: { type: string, format: date-time } }
+      responses:
+        '200':
+          description: 時間序列
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [allocation_id, bucket, points]
+                properties:
+                  allocation_id: { type: string }
+                  bucket: { type: string, enum: [hour, day] }
+                  points:
+                    type: array
+                    items:
+                      type: object
+                      required: [ts, tokens, cost_usd, call_count]
+                      properties:
+                        ts: { type: string, format: date-time }
+                        tokens: { type: integer }
+                        cost_usd: { type: number, format: float }
+                        call_count: { type: integer }
+        '400':
+          description: bucket=hour 且區間 > 7 天 → range_too_wide_for_bucket
+        '404':
+          description: allocation 不存在
+
+  /admin/allocations/{allocationId}:
+    patch:
+      tags: [admin-allocations]
+      operationId: patchAllocation
+      summary: 更新分配（包含 quota / service flag）
+      security:
+        - AdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                quota_tokens_per_month:
+                  oneOf:
+                    - { type: integer, minimum: 0 }
+                    - { type: 'null' }
+                is_service_allocation: { type: boolean }
+                note: { type: string }
+      responses:
+        '200':
+          description: 更新後的 allocation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Allocation' }
+
+  /v1/chat/completions:
+    post:
+      tags: [proxy]
+      operationId: proxyChatCompletionsBilled
+      summary: 既有端點 — 階段 3a 加 quota_exceeded 拒絕路徑
+      description: |
+        延續既有契約。額外行為：
+        - 若 allocation `quota_tokens_per_month` 非 NULL 且當月累計 ≥ quota，
+          回 403 + `error.code=quota_exceeded`，**不**上送 LiteLLM。
+        - 成功呼叫的 CallRecord 含 `cost_usd`（依當下價目計算）。
+      security:
+        - AllocationToken: []
+      responses:
+        '403':
+          description: |
+            錯誤碼新增：`quota_exceeded`。
+            完整列表：`provider_not_allowed`, `model_mismatch`,
+            `allocation_revoked`, `allocation_quarantined`, `quota_exceeded`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+components:
+  securitySchemes:
+    AdminToken:
+      type: apiKey
+      in: header
+      name: X-Admin-Token
+    AllocationToken:
+      type: http
+      scheme: bearer
+
+  schemas:
+    UsageItem:
+      type: object
+      required: [group_key, total_tokens, prompt_tokens, completion_tokens, total_cost_usd, call_count]
+      properties:
+        group_key: { type: string, description: "member_id / allocation_id / model" }
+        display_name: { type: string }
+        total_tokens: { type: integer }
+        prompt_tokens: { type: integer }
+        completion_tokens: { type: integer }
+        total_cost_usd: { type: number, format: float }
+        call_count: { type: integer }
+        is_service_allocation:
+          type: boolean
+          description: 只在 group_by=allocation 時出現
+        pricing_missing:
+          type: boolean
+          description: true 表示部分 CallRecord 無對應 PriceList（cost 為 0 處理）
+
+    UsageResponse:
+      type: object
+      required: [from, to, group_by, items]
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        group_by: { type: string, enum: [member, allocation, model] }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/UsageItem' }
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: |
+                Phase 3a 新增錯誤碼：`quota_exceeded`, `invalid_time_range`,
+                `range_too_wide`, `range_too_wide_for_bucket`
+            message: { type: string }
+            request_id: { type: string }
+
+    Allocation:
+      type: object
+      description: 階段 3a 加 quota_tokens_per_month + is_service_allocation
+      properties:
+        id: { type: string }
+        member_id: { type: string }
+        subject_snapshot: { type: string }
+        resource_model: { type: string }
+        status: { type: string, enum: [active, revoked, quarantined] }
+        quota_tokens_per_month:
+          oneOf:
+            - { type: integer }
+            - { type: 'null' }
+        is_service_allocation: { type: boolean }
+        created_at: { type: string, format: date-time }
+        revoked_at: { type: string, format: date-time, nullable: true }
+        token_prefix: { type: string }

@@ -7,6 +7,7 @@ Auto-generated from all feature plans. Last updated: 2026-05-22
 - PostgreSQL（含新表：members、sessions、email_whitelist、 (002-auth-membership)
 - Python 3.11+（不變） (003-hardening)
 - PostgreSQL（不變）；無新表，只修 Allocation enum (003-hardening)
+- PostgreSQL（生產）/ SQLite（dev、CI） (004-usage-billing)
 
 - Python 3.11+ + LiteLLM（proxy core）、FastAPI（admin API）、 (001-gateway-core)
 
@@ -27,10 +28,10 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 004-usage-billing: Added Python 3.11+
 - 003-hardening: Added Python 3.11+（不變）
 - 002-auth-membership: Added Python 3.11+（同 Phase 1）
 
-- 001-gateway-core: Added Python 3.11+ + LiteLLM（proxy core）、FastAPI（admin API）、
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
