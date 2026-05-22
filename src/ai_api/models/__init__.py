@@ -15,6 +15,7 @@ from ai_api.models.invitation import InvitationToken
 from ai_api.models.member import Member, MemberProvider, MemberStatus
 from ai_api.models.oidc_state import OidcState
 from ai_api.models.password_attempt import AttemptOutcome, PasswordAttempt
+from ai_api.models.price_list import PriceList
 from ai_api.models.session import Session, SessionStatus
 
 __all__ = [
@@ -35,6 +36,7 @@ __all__ = [
     "MemberStatus",
     "OidcState",
     "PasswordAttempt",
+    "PriceList",
     "RuleType",
     "Session",
     "SessionStatus",

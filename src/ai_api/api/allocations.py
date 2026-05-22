@@ -30,6 +30,8 @@ def _to_out(a: Any) -> AllocationOut:
         created_by=a.created_by,
         note=a.note,
         token_prefix=a.credential.token_prefix,
+        quota_tokens_per_month=a.quota_tokens_per_month,
+        is_service_allocation=a.is_service_allocation,
     )
 
 
@@ -120,5 +122,47 @@ async def unquarantine_allocation(
         target_type="allocation",
         target_id=allocation.id,
     )
+    await session.flush()
+    return _to_out(allocation)
+
+
+@router.patch("/allocations/{allocation_id}", response_model=AllocationOut)
+async def patch_allocation(
+    allocation_id: str,
+    payload: dict[str, Any],
+    session: AsyncSession = Depends(get_db_session),
+) -> AllocationOut:
+    """Update mutable allocation fields. Accepts:
+    - quota_tokens_per_month (int | null) — null = unlimited
+    - is_service_allocation (bool)
+    - note (str)
+    """
+
+    allowed = {"quota_tokens_per_month", "is_service_allocation", "note"}
+    unknown = set(payload.keys()) - allowed
+    if unknown:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "bad_request", "message": f"unknown fields: {sorted(unknown)}"}},
+        )
+    service = AllocationService(session)
+    allocation = await service.get(allocation_id)
+    if allocation is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": {"code": "not_found", "message": "allocation not found"}},
+        )
+    if "quota_tokens_per_month" in payload:
+        v = payload["quota_tokens_per_month"]
+        if v is not None and (not isinstance(v, int) or v < 0):
+            raise HTTPException(
+                status_code=400,
+                detail={"error": {"code": "bad_request", "message": "quota_tokens_per_month must be int >= 0 or null"}},
+            )
+        allocation.quota_tokens_per_month = v
+    if "is_service_allocation" in payload:
+        allocation.is_service_allocation = bool(payload["is_service_allocation"])
+    if "note" in payload:
+        allocation.note = payload["note"]
     await session.flush()
     return _to_out(allocation)

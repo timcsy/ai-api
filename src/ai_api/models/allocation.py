@@ -5,7 +5,7 @@ import enum
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai_api.db import Base
@@ -39,6 +39,9 @@ class Allocation(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by: Mapped[str] = mapped_column(String(128), nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Phase 3a
+    quota_tokens_per_month: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_service_allocation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     credential: Mapped[Credential] = relationship(
         back_populates="allocation", uselist=False, cascade="all, delete-orphan"

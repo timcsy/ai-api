@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     anomaly_min_calls: int = Field(default=100, alias="ANOMALY_MIN_CALLS")
     perip_lockout_threshold: int = Field(default=10, alias="PERIP_LOCKOUT_THRESHOLD")
 
+    # Phase 3a: usage & billing
+    cors_origins: list[str] = Field(default=[], alias="CORS_ORIGINS")
+
 
 @lru_cache
 def get_settings() -> Settings:

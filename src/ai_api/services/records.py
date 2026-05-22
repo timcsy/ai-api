@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import cast
 
 from sqlalchemy import select
@@ -30,6 +31,7 @@ class RecordsService:
         completion_tokens: int | None = None,
         total_tokens: int | None = None,
         error_message: str | None = None,
+        cost_usd: Decimal | None = None,
     ) -> CallRecord:
         record = CallRecord(
             id=str(ULID()),
@@ -44,6 +46,7 @@ class RecordsService:
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
+            cost_usd=cost_usd,
             error_message=redact_string(error_message) if error_message else None,
         )
         self._s.add(record)

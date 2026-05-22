@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -61,13 +61,17 @@ _INVITATION_INVALID_HTML = (
 
 def _set_session_cookie(response: Response, plaintext: str) -> None:
     settings = get_settings()
+    # Phase 3a FR-016: cross-origin SPAs require SameSite=None + Secure.
+    cors_enabled = bool(settings.cors_origins)
+    samesite: Literal["lax", "none"] = "none" if cors_enabled else "lax"
+    secure = True if cors_enabled else settings.cookie_secure
     response.set_cookie(
         key=sessions.SESSION_COOKIE_NAME,
         value=plaintext,
         max_age=int(sessions.DEFAULT_LIFETIME.total_seconds()),
         httponly=True,
-        secure=settings.cookie_secure,
-        samesite="lax",
+        secure=secure,
+        samesite=samesite,
         domain=settings.cookie_domain or None,
         path="/",
     )
@@ -77,8 +81,8 @@ def _set_session_cookie(response: Response, plaintext: str) -> None:
         value=csrf,
         max_age=int(sessions.DEFAULT_LIFETIME.total_seconds()),
         httponly=False,  # JS reads to echo into X-CSRF-Token
-        secure=settings.cookie_secure,
-        samesite="lax",
+        secure=secure,
+        samesite=samesite,
         domain=settings.cookie_domain or None,
         path="/",
     )
