@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     # Phase 3a: usage & billing
     cors_origins: list[str] = Field(default=[], alias="CORS_ORIGINS")
 
+    # Phase 3c: adaptive quota pool
+    pool_total_tokens_per_month: int = Field(default=0, alias="POOL_TOTAL_TOKENS_PER_MONTH")
+    pool_floor_per_allocation: int = Field(default=1000, alias="POOL_FLOOR_PER_ALLOCATION")
+
 
 @lru_cache
 def get_settings() -> Settings:

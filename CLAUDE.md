@@ -29,9 +29,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 006-quota-pool: Added Python 3.11+
 - 005-supply-chain: Added GitHub Actions workflow YAML（無 source code 變更）
 - 004-usage-billing: Added Python 3.11+
-- 003-hardening: Added Python 3.11+（不變）
 
 
 <!-- MANUAL ADDITIONS START -->

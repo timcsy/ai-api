@@ -42,6 +42,8 @@ class Allocation(Base):
     # Phase 3a
     quota_tokens_per_month: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_service_allocation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Phase 3c
+    quota_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     credential: Mapped[Credential] = relationship(
         back_populates="allocation", uselist=False, cascade="all, delete-orphan"

@@ -53,6 +53,10 @@ ignore = ["E501", "S101", "B008", "S105", "N818"]  # B008/S105/N818: FastAPI Dep
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S105", "S106", "S603", "S607"]
+"src/ai_api/services/quota_pool.py" = ["N803", "N806"]  # T, N, D are math notation
+"src/ai_api/api/quota_pool.py" = ["N806"]
+"tests/unit/test_compute_rebalance.py" = ["N803", "N806", "RUF003"]
+"tests/integration/test_quota_pool_rebalance.py" = ["N803"]
 
 [tool.mypy]
 python_version = "3.11"
