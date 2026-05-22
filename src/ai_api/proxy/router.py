@@ -61,7 +61,7 @@ async def proxy_chat_completions(
         await records.record_call(
             request_id=request_id,
             allocation_id=allocation.id if allocation else None,
-            subject=allocation.subject if allocation else None,
+            subject=allocation.subject_snapshot if allocation else None,
             model=requested_model,
             started_at=started_at,
             status_code=http_status,
@@ -134,7 +134,7 @@ async def proxy_chat_completions(
     await records.record_call(
         request_id=request_id,
         allocation_id=allocation.id,
-        subject=allocation.subject,
+        subject=allocation.subject_snapshot,
         model=requested_model,
         started_at=started_at,
         status_code=200,

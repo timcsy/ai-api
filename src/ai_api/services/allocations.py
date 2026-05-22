@@ -10,7 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from ulid import ULID
 
-from ai_api.models import Allocation, AllocationStatus, Credential
+from ai_api.models import (
+    Allocation,
+    AllocationStatus,
+    Credential,
+    Member,
+    MemberProvider,
+    MemberStatus,
+)
 from ai_api.services.credentials import GeneratedToken, fingerprint_for, generate_token
 
 
@@ -28,16 +35,32 @@ class AllocationService:
 
     async def create(
         self,
-        subject: str,
-        resource_model: str,
+        member_id: str | None = None,
+        resource_model: str = "",
         note: str | None = None,
         created_by: str | None = None,
+        subject: str | None = None,
     ) -> AllocationCreated:
+        if not resource_model:
+            raise ValueError("resource_model is required")
+        if member_id is None and subject is None:
+            raise ValueError("either member_id or subject must be provided")
+        member: Member
+        if member_id is None:
+            # Phase 1 back-compat: auto-create external Member for a subject string.
+            assert subject is not None
+            member = await self._ensure_external_member(subject)
+        else:
+            found = await self._s.get(Member, member_id)
+            if found is None:
+                raise ValueError(f"member {member_id} not found")
+            member = found
         now = datetime.now(UTC)
         token = generate_token()
         allocation = Allocation(
             id=str(ULID()),
-            subject=subject,
+            member_id=member.id,
+            subject_snapshot=member.email,
             resource_model=resource_model,
             status=AllocationStatus.active,
             created_at=now,
@@ -81,7 +104,7 @@ class AllocationService:
 
     async def list(
         self,
-        subject: str | None = None,
+        member_id: str | None = None,
         status: AllocationStatus | None = None,
     ) -> list[Allocation]:
         stmt = (
@@ -89,12 +112,35 @@ class AllocationService:
             .options(selectinload(Allocation.credential))
             .order_by(Allocation.created_at.desc())
         )
-        if subject is not None:
-            stmt = stmt.where(Allocation.subject == subject)
+        if member_id is not None:
+            stmt = stmt.where(Allocation.member_id == member_id)
         if status is not None:
             stmt = stmt.where(Allocation.status == status)
         result = await self._s.execute(stmt)
         return cast(list[Allocation], list(result.scalars().all()))
+
+    async def _ensure_external_member(self, subject: str) -> Member:
+        """Phase 1 back-compat: find-or-create an `external` Member for a subject string."""
+        email_n = subject.lower()
+        stmt = select(Member).where(Member.email == email_n)
+        existing = (await self._s.execute(stmt)).scalar_one_or_none()
+        if existing is not None:
+            return existing
+        member = Member(
+            id=str(ULID()),
+            email=email_n,
+            provider=MemberProvider.external,
+            external_id=subject,
+            display_name=subject,
+            status=MemberStatus.active,
+            password_hash=None,
+            created_at=datetime.now(UTC),
+            disabled_at=None,
+            created_by=self.BOOTSTRAP_ADMIN,
+        )
+        self._s.add(member)
+        await self._s.flush()
+        return member
 
     async def lookup_by_token(self, plaintext: str) -> Allocation | None:
         fp = fingerprint_for(plaintext)

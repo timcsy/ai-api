@@ -34,6 +34,17 @@ class Settings(BaseSettings):
 
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
+    # Phase 2: auth
+    base_url: str = Field(default="http://localhost:8000", alias="BASE_URL")
+    cookie_secure: bool = Field(default=False, alias="COOKIE_SECURE")
+    cookie_domain: str = Field(default="", alias="COOKIE_DOMAIN")
+    google_oauth_client_id: str = Field(default="", alias="GOOGLE_OAUTH_CLIENT_ID")
+    google_oauth_client_secret: str = Field(default="", alias="GOOGLE_OAUTH_CLIENT_SECRET")
+    google_discovery_url: str = Field(
+        default="https://accounts.google.com/.well-known/openid-configuration",
+        alias="GOOGLE_DISCOVERY_URL",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:
