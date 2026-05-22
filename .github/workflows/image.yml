@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+  pull_request:  # build (no push) + Trivy scan to gate merges
   workflow_dispatch:
 
 permissions:
@@ -34,11 +35,26 @@ jobs:
             type=sha,format=short
 
       - uses: docker/build-push-action@v6
+        id: build
         with:
           context: .
           file: deploy/docker/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
+          # On PRs we still need the image locally for Trivy; load it into Docker.
+          load: ${{ github.event_name == 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Trivy CVE scan — fails the job on HIGH/CRITICAL.
+      # See Phase 2.5 FR-006/FR-007.
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@master  # pin to commit SHA after first run
+        with:
+          image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          format: table

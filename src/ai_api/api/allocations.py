@@ -84,3 +84,41 @@ async def revoke_allocation(
             detail={"error": {"code": "not_found", "message": "allocation not found"}},
         )
     return _to_out(allocation)
+
+
+@router.post("/allocations/{allocation_id}/unquarantine", response_model=AllocationOut)
+async def unquarantine_allocation(
+    allocation_id: str,
+    session: AsyncSession = Depends(get_db_session),
+) -> AllocationOut:
+    """Manually clear `quarantined` status back to `active`."""
+    from ai_api.auth import audit
+    from ai_api.models import ActorType, AuditEventType
+
+    service = AllocationService(session)
+    allocation = await service.get(allocation_id)
+    if allocation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "not_found", "message": "allocation not found"}},
+        )
+    if allocation.status != AllocationStatus.quarantined:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "error": {
+                    "code": "not_quarantined",
+                    "message": f"allocation is {allocation.status.value}, not quarantined",
+                }
+            },
+        )
+    allocation.status = AllocationStatus.active
+    await audit.record(
+        session,
+        event_type=AuditEventType.allocation_unquarantined,
+        actor_type=ActorType.admin,
+        target_type="allocation",
+        target_id=allocation.id,
+    )
+    await session.flush()
+    return _to_out(allocation)

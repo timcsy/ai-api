@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 class AllocationStatus(enum.StrEnum):
     active = "active"
     revoked = "revoked"
+    quarantined = "quarantined"
 
 
 class Allocation(Base):

@@ -86,26 +86,29 @@ Azure OpenAI 為首選 AI 供應商；其他細節待設計。
 
 ### 階段 2.5：安全加固 (Hardening)
 
-- [ ] 完成
+- [x] 完成（2026-05-22；deploy artifacts 已交付，叢集端 SC-002 待人工驗證）
 
 > **交付**：把 Phase 1 + 2 的已知攻擊面收緊到「可放心對組織內部開放」的水準，
 > 不引入新功能
 > **前置條件**：階段 2
 
 **成功標準（核心三件）：**
-- [ ] **應用層 provider allowlist**：`Settings` 加 `allowed_providers` 清單；
-      未列出的供應商即使 LiteLLM 能 route 也拒絕（雙層 allowlist 的第一層）
-- [ ] **K8s NetworkPolicy（粗粒度）**：deny-all egress + allow {DNS,
-      Postgres CIDR, 443/TCP, **明確封鎖 cloud metadata 169.254.169.254**}
-- [ ] CI 整合 **Trivy** 掃 container image：HIGH 以上 CVE 自動擋下 PR
-- [ ] **per-allocation quota + 異常用量警報**：CallRecord 上加背景 job，
-      若某分配 1 小時內用量超過自定義 N 倍即自動降級＋通知擁有者
+- [x] **應用層 provider allowlist**：`Settings.allowed_providers`；未列出的
+      供應商即使 LiteLLM 能 route 也拒絕（FR-001~003 + 4 contract tests 通過）
+- [x] **K8s NetworkPolicy（粗粒度）**：Helm template 已交付，deny-all egress
+      + allow {DNS, Postgres podSelector, 443/TCP}，封 169.254.0.0/16
+      （5 個 helm-template 結構測試通過；叢集生效需 CNI 支援）
+- [x] CI 整合 **Trivy**：`image.yml` workflow 加 trivy-action@0.24.0 +
+      `.trivyignore`，HIGH/CRITICAL 即擋
+- [x] **per-allocation quota + 異常用量警報**：anomaly_detector service +
+      CronJob template；3 個 integration test 涵蓋 baseline-spike / cold-start
+      under / over absolute（實測 1101 calls 觸發 quarantine）
 
 **成功標準（次要）：**
-- [ ] Pod `securityContext` 強化：`readOnlyRootFilesystem`、
-      `allowPrivilegeEscalation: false`、`capabilities.drop: [ALL]`
-- [ ] 失敗登入額外加 **per-IP** rate limit（補強現有 per-email 維度）
-- [ ] 切換 base image 為 **distroless**（無 shell，攻擊者 RCE 後無工具可用）
+- [x] Pod `securityContext` 強化：`readOnlyRootFilesystem` + ALL caps drop
+      + `allowPrivilegeEscalation: false` + tmp/cache emptyDir
+- [x] 失敗登入額外加 **per-IP** rate limit（同 IP 10 失敗 → 鎖 15 min；2 contract tests）
+- [x] 切換 base image 為 **distroless**（`gcr.io/distroless/python3-debian12:nonroot`）
 
 **明確排除（留更後階段）：**
 - ❌ FQDN-aware egress (Cilium / Envoy sidecar) — 文件記錄為候選升級

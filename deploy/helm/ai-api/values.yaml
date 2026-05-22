@@ -63,6 +63,16 @@ migrationJob:
   enabled: true
   backoffLimit: 3
 
+# Phase 2.5 hardening
+networkPolicy:
+  enabled: true
+  postgresPodSelector:
+    app: ai-api-pg
+
+anomalyDetector:
+  enabled: true
+  schedule: "*/5 * * * *"
+
 probes:
   readiness:
     path: /healthz

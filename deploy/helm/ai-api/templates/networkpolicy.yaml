@@ -1,0 +1,48 @@
+{{- if .Values.networkPolicy.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "ai-api.fullname" . }}
+  labels:
+    {{- include "ai-api.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "ai-api.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Egress
+    - Ingress
+  egress:
+    # DNS resolution (kube-dns / CoreDNS)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    # HTTPS to public Internet (LLM providers) — block RFC1918 + cloud metadata
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.0.0/16   # cloud metadata + link-local
+              - 10.0.0.0/8       # private (Postgres allowed via podSelector below)
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - { protocol: TCP, port: 443 }
+    # In-cluster Postgres
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.postgresPodSelector | nindent 14 }}
+      ports:
+        - { protocol: TCP, port: 5432 }
+  ingress:
+    # Allow any namespace inside the cluster to call the service (Ingress controller)
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - { protocol: TCP, port: 8000 }
+{{- end }}

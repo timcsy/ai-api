@@ -1,0 +1,35 @@
+{{- if .Values.anomalyDetector.enabled -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "ai-api.fullname" . }}-anomaly
+  labels:
+    {{- include "ai-api.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.anomalyDetector.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            {{- include "ai-api.selectorLabels" . | nindent 12 }}
+            job: anomaly
+        spec:
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          restartPolicy: Never
+          containers:
+            - name: anomaly
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              envFrom:
+                - secretRef:
+                    name: {{ include "ai-api.fullname" . }}-secrets
+              command: ["python3", "-m", "ai_api.cli.run_anomaly_detector"]
+{{- end }}

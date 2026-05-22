@@ -10,10 +10,12 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import get_db_session
+from ai_api.config import get_settings
 from ai_api.models import Allocation, CallOutcome
 from ai_api.observability.logging import redact_string
 from ai_api.observability.request_id import current_request_id
 from ai_api.proxy import upstream
+from ai_api.proxy.allowlist import check_allowed, parse_provider
 from ai_api.proxy.auth import parse_bearer_token
 from ai_api.proxy.guard import enforce_model_binding
 from ai_api.services.allocations import AllocationService
@@ -38,6 +40,8 @@ def _outcome_for_code(code: str) -> CallOutcome:
         "unauthorized": CallOutcome.rejected_unauthenticated,
         "allocation_revoked": CallOutcome.rejected_revoked,
         "model_mismatch": CallOutcome.rejected_model_mismatch,
+        "provider_not_allowed": CallOutcome.rejected_provider,
+        "allocation_quarantined": CallOutcome.rejected_quarantined,
         "upstream_error": CallOutcome.upstream_error,
     }.get(code, CallOutcome.gateway_error)
 
@@ -95,6 +99,16 @@ async def proxy_chat_completions(
             400,
         )
 
+    # Provider allowlist gate (FR-001/002): check before any DB lookups.
+    settings = get_settings()
+    provider, _ = parse_provider(requested_model)
+    if not check_allowed(provider, settings.allowed_providers):
+        return await record_and_respond(
+            "provider_not_allowed",
+            f"provider '{provider}' is not in the allowlist",
+            403,
+        )
+
     # 3. Allocation — split lookup from status check so revoked-reject records
     #    can still attribute to the allocation (FR-011 / SC-004).
     alloc_service = AllocationService(session)
@@ -106,6 +120,12 @@ async def proxy_chat_completions(
     if allocation.status.value == "revoked":
         return await record_and_respond(
             "allocation_revoked", "allocation has been revoked", 403
+        )
+    if allocation.status.value == "quarantined":
+        return await record_and_respond(
+            "allocation_quarantined",
+            "allocation is quarantined due to anomalous usage",
+            403,
         )
 
     # 4. Model binding

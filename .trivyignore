@@ -1,0 +1,24 @@
+# Trivy ignore list — controlled via PR review.
+#
+# Each entry MUST include:
+#   - CVE id
+#   - one-line reason for ignoring (e.g. "false positive: package not used at runtime",
+#     "fix pending upstream, mitigated by NetworkPolicy", "vulnerable code path
+#     unreachable")
+#   - link to the PR that added it
+#
+# Example:
+# CVE-2024-XXXXX  # not exploitable: only loaded in test env (#42)
+
+# ---- Phase 2.5 initial baseline (PR #3) ----
+# All three are unreachable at runtime; follow-up issue: clean builder leftovers + bump distroless.
+
+# libpython3.11-minimal DoS via http.client — we don't use http.client (httpx instead).
+# Fixed in 3.11.2-6+deb12u7; will pick up via next distroless `:nonroot` rebuild.
+CVE-2025-13836
+
+# jaraco.context — pulled in by setuptools as a transitive build-time dep; not invoked at runtime.
+CVE-2026-23949
+
+# wheel — pip/uv build-time dep; runtime never installs packages.
+CVE-2026-24049
