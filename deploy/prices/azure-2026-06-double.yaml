@@ -1,0 +1,13 @@
+# Test fixture — Phase 3a US5 point-in-time billing verification.
+# Same models, prices doubled, effective one month later.
+effective_from: "2026-06-01T00:00:00Z"
+source_note: "TEST FIXTURE — 2x of 2026-05; do NOT load in production"
+prices:
+  - provider: azure
+    model: gpt-4o-mini
+    input_per_1k_tokens_usd: 0.000300
+    output_per_1k_tokens_usd: 0.001200
+  - provider: azure
+    model: gpt-4o
+    input_per_1k_tokens_usd: 0.005
+    output_per_1k_tokens_usd: 0.020
