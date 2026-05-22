@@ -115,6 +115,31 @@ Azure OpenAI 為首選 AI 供應商；其他細節待設計。
 - ❌ cosign image 簽章 + admission controller（需建立簽章基建）
 - ❌ external-secrets + Vault/KMS 接通（需挑選 KMS 供應商）
 
+### 階段 2.6：供應鏈 / Scanner 加固 (Supply Chain Hardening)
+
+- [ ] 完成
+
+> **交付**：把 Phase 2.5 引入的 Trivy 與 image build 流程從「能用」拉到
+> 「能信」— 消除 mutable action / mutable scanner version、加上排程重掃、
+> SBOM 與第二掃描器交叉驗證。
+> **前置條件**：階段 2.5
+> **建議排程**：可與 3b 並行（CI 工作，不阻擋 UI 開發）
+
+**成功標準（核心兩件）：**
+- [ ] `aquasecurity/trivy-action@<commit-sha>` 取代 `@master`；Trivy CLI 版本
+      也 pin（呼應 experience.md「mutable tag」教訓）
+- [ ] 新增 `scheduled-scan.yml`（每週一）：對 `ghcr.io/timcsy/ai-api:main`
+      重跑 Trivy，發現新 CVE 自動開 issue 通知
+
+**成功標準（次要）：**
+- [ ] `scan-type: fs` 步驟掃 lockfile（在 build 前先抓出可疑依賴）
+- [ ] SBOM 產出（CycloneDX 格式）並附加到 image release artifacts
+- [ ] 季度跑一次 OSV-Scanner 或 Grype 作為第二意見，紀錄與 Trivy 差異
+
+**明確排除（留後階段或不做）：**
+- ❌ 自架 trivy-server + 私有 vuln DB mirror（YAGNI，小團隊不需要）
+- ❌ cosign image 簽章 + admission control（仍延後；範圍同 2.5 排除項）
+
 ### 階段 3：管理員介面、用量觀測與費用計算
 
 > 階段拆為 **3a（後端，本次完成）** + **3b（管理員 UI，待開）**。
