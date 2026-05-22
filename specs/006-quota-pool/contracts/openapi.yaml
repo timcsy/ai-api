@@ -1,0 +1,179 @@
+openapi: 3.1.0
+info:
+  title: AI API Manager — Adaptive Quota Pool (Phase 3c)
+  version: 0.6.0
+  description: |
+    階段 3c 新增 admin 端點。所有端點走既有 admin auth（X-Admin-Token）。
+
+servers:
+  - url: http://localhost:8000
+
+paths:
+  /admin/quota-pool/status:
+    get:
+      tags: [admin-quota-pool]
+      operationId: getQuotaPoolStatus
+      summary: 池當前狀態
+      security: [{ AdminToken: [] }]
+      responses:
+        '200':
+          description: 池容量概況
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PoolStatus' }
+
+  /admin/quota-pool/rebalance:
+    post:
+      tags: [admin-quota-pool]
+      operationId: triggerRebalance
+      summary: 手動觸發 rebalance
+      description: |
+        立即跑一次 rebalance（不受 cron 同月去重限制）。回傳 RebalanceLog 摘要。
+      security: [{ AdminToken: [] }]
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RebalanceLogSummary' }
+        '409':
+          description: |
+            可能的錯誤碼：
+            - `pool_disabled` — T=0
+            - `pool_exhausted_by_reserved` — service+locked+floor·N > T
+            - `pool_idle` — 池內 0 個 allocation
+            - `rebalance_failed` — 其他演算法／DB 失敗
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /admin/quota-pool/rebalance-log:
+    get:
+      tags: [admin-quota-pool]
+      operationId: listRebalanceLog
+      summary: 列出近 N 筆 RebalanceLog 摘要
+      security: [{ AdminToken: [] }]
+      parameters:
+        - { in: query, name: limit, schema: { type: integer, default: 50, minimum: 1, maximum: 200 } }
+      responses:
+        '200':
+          description: 摘要列表（不含 details）
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RebalanceLogSummary' }
+
+  /admin/quota-pool/rebalance-log/{logId}:
+    parameters:
+      - in: path
+        name: logId
+        required: true
+        schema: { type: string, pattern: '^[0-9A-HJKMNP-TV-Z]{26}$' }
+    get:
+      tags: [admin-quota-pool]
+      operationId: getRebalanceLog
+      summary: 取單筆完整 RebalanceLog（含 details）
+      security: [{ AdminToken: [] }]
+      responses:
+        '200':
+          description: 完整 log
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RebalanceLogDetail' }
+        '404':
+          description: 不存在
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+components:
+  securitySchemes:
+    AdminToken:
+      type: apiKey
+      in: header
+      name: X-Admin-Token
+
+  schemas:
+    PoolStatus:
+      type: object
+      required: [total_T, reserved, distributable, pool_member_count, floor, settings]
+      properties:
+        total_T: { type: integer, description: "Settings.pool_total_tokens_per_month" }
+        reserved:
+          type: object
+          properties:
+            service: { type: integer, description: "Sum of quotas of service allocations" }
+            locked: { type: integer, description: "Sum of quotas of quota_locked allocations" }
+        distributable: { type: integer, description: "T - reserved.service - reserved.locked" }
+        pool_member_count: { type: integer, description: "Allocations subject to rebalance" }
+        floor: { type: integer, description: "Settings.pool_floor_per_allocation" }
+        settings:
+          type: object
+          properties:
+            enabled: { type: boolean, description: "true if T > 0" }
+        last_rebalance_at:
+          oneOf:
+            - { type: string, format: date-time }
+            - { type: 'null' }
+
+    RebalanceLogSummary:
+      type: object
+      required: [id, period_yyyymm, triggered_by, started_at, finished_at, T_before, T_after, scanned, changed, algorithm_version]
+      properties:
+        id: { type: string }
+        period_yyyymm: { type: string, example: "202605" }
+        triggered_by: { type: string, example: "cron" }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+        T_before: { type: integer }
+        T_after: { type: integer }
+        scanned: { type: integer }
+        changed: { type: integer }
+        algorithm_version: { type: string, example: "v1" }
+
+    RebalanceLogDetail:
+      allOf:
+        - $ref: '#/components/schemas/RebalanceLogSummary'
+        - type: object
+          properties:
+            details:
+              type: object
+              properties:
+                allocations:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      before: { type: integer }
+                      after: { type: integer }
+                      usage: { type: integer }
+                      reason:
+                        type: string
+                        enum: [ratio, floor, first_round, locked, service, leftover_target]
+                reserved:
+                  type: object
+                  properties:
+                    service: { type: integer }
+                    locked: { type: integer }
+                leftover_target:
+                  oneOf:
+                    - { type: string }
+                    - { type: 'null' }
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: |
+                Phase 3c 新增錯誤碼：`pool_disabled`, `pool_exhausted_by_reserved`,
+                `pool_idle`, `rebalance_failed`
+            message: { type: string }
+            request_id: { type: string }
