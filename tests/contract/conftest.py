@@ -40,3 +40,29 @@ async def app_client() -> AsyncIterator[AsyncClient]:
 @pytest.fixture
 def admin_headers() -> dict[str, str]:
     return {"X-Admin-Token": "test-admin-token"}
+
+
+@pytest_asyncio.fixture
+async def member_id() -> str:
+    """Return id of a freshly-created external Member (single use per test)."""
+    from ai_api.db import get_sessionmaker
+    from tests._helpers import create_external_member
+
+    sm = get_sessionmaker()
+    async with sm() as s:
+        return await create_external_member(s, "alice@example.com")
+
+
+@pytest_asyncio.fixture
+async def make_member():
+    """Return a coroutine factory that creates Members on demand."""
+    from ai_api.db import get_sessionmaker
+    from tests._helpers import create_external_member
+
+    sm = get_sessionmaker()
+
+    async def _make(email: str) -> str:
+        async with sm() as s:
+            return await create_external_member(s, email)
+
+    return _make
