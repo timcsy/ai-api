@@ -175,19 +175,19 @@ Azure OpenAI 為首選 AI 供應商；其他細節待設計。
 - **馬太效應**：上月用量越多 → 下月 quota 越大（按比例 + 保底）
 
 **成功標準：**
-- [ ] `Settings.pool_total_tokens_per_month` 與 `pool_floor_per_allocation`
+- [x] `Settings.pool_total_tokens_per_month` 與 `pool_floor_per_allocation`
       可設；資源池僅涵蓋**非服務型 active allocations**
-- [ ] 每月 UTC 月初由 CronJob 自動 rebalance；演算法：
+- [x] 每月 UTC 月初由 CronJob 自動 rebalance；演算法：
       `q_i_new = floor + (T - floor*N) * (usage_i / Σ usage)`
-- [ ] 守恆檢核：rebalance 結束時 `Σq = T` assertion 通過
-- [ ] **保底**：每個 allocation 即使上月零用量也至少拿到 `floor`
-- [ ] **`quota_locked` 旗標**：admin 手動設的 quota 不被 rebalance 覆寫；
+- [x] 守恆檢核：rebalance 結束時 `Σq = T` assertion 通過（compute + apply 雙層）
+- [x] **保底**：每個 allocation 即使上月零用量也至少拿到 `floor`
+- [x] **`quota_locked` 旗標**：admin 手動設的 quota 不被 rebalance 覆寫；
       被鎖住的 quota 從 T 中扣除，剩餘給池內動態分配
-- [ ] **服務型分配豁免**：`is_service_allocation=true` 不進池、quota 由
-      admin 獨立管理（呼應 vision 既有設計）
-- [ ] 新增 `RebalanceLog` 表記錄每次再分配前後的 quota（稽核「為什麼我這月變少」）
-- [ ] Edge: 新分配加入只拿 floor 直到下次月初；`floor * N > T` 時禁止新增
-      並寫 audit 警告
+- [x] **服務型分配豁免**：`is_service_allocation=true` 不進池、quota 由
+      admin 獨立管理
+- [x] 新增 `RebalanceLog` 表記錄每次再分配前後的 quota（含 algorithm_version 欄位以便未來升 v2）
+- [x] Edge: 新分配加入只拿 floor 直到下次月初；`floor * N > T` 即
+      `pool_exhausted_by_reserved`，rollback 並寫 audit
 
 **明確排除：**
 - ❌ 即時池容量視覺化（留 3b UI）
