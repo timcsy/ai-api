@@ -21,8 +21,10 @@
 
 ## 現狀
 
-全新專案，尚未開始實作。技術選型上已選定 LiteLLM 為底層分流引擎、
-Azure OpenAI 為首選 AI 供應商；其他細節待設計。
+**2026-05-23：除階段 3b（管理員 SPA）外，所有階段已完成並上線。** 主分支
+有 194 tests（unit + contract + integration）全綠；image 經 Trivy + SBOM
+gate；K8s manifest 已交付（Helm + NetworkPolicy + CronJob ×2）。
+詳細狀態見下方〈路線圖〉每個階段標記。
 
 ## 架構
 
