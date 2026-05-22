@@ -50,7 +50,7 @@ jobs:
       # Trivy CVE scan — fails the job on HIGH/CRITICAL.
       # See Phase 2.5 FR-006/FR-007.
       - name: Trivy scan
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@master  # pin to commit SHA after first run
         with:
           image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
           severity: HIGH,CRITICAL
