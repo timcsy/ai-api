@@ -164,6 +164,36 @@ Azure OpenAI 為首選 AI 供應商；其他細節待設計。
 > **交付**：消費 3a API 的 SPA；視覺化用量、配額管理、價目查看
 > **前置條件**：3a
 
+#### 階段 3c — 自適應配額池（馬太效應 + 能量守恆）⏳
+- [ ] 完成
+
+> **交付**：每月自動再分配 quota，用量高的拿更多、低的被壓縮；總量守恆。
+> **前置條件**：3a（3b 可並行，但 UI 顯示池資訊建議在 3b 完成後追加）
+
+**核心原則：**
+- **能量守恆**：`Σq_i = T`（T 為池總量），rebalance 前後不變，除非 admin 動 T
+- **馬太效應**：上月用量越多 → 下月 quota 越大（按比例 + 保底）
+
+**成功標準：**
+- [ ] `Settings.pool_total_tokens_per_month` 與 `pool_floor_per_allocation`
+      可設；資源池僅涵蓋**非服務型 active allocations**
+- [ ] 每月 UTC 月初由 CronJob 自動 rebalance；演算法：
+      `q_i_new = floor + (T - floor*N) * (usage_i / Σ usage)`
+- [ ] 守恆檢核：rebalance 結束時 `Σq = T` assertion 通過
+- [ ] **保底**：每個 allocation 即使上月零用量也至少拿到 `floor`
+- [ ] **`quota_locked` 旗標**：admin 手動設的 quota 不被 rebalance 覆寫；
+      被鎖住的 quota 從 T 中扣除，剩餘給池內動態分配
+- [ ] **服務型分配豁免**：`is_service_allocation=true` 不進池、quota 由
+      admin 獨立管理（呼應 vision 既有設計）
+- [ ] 新增 `RebalanceLog` 表記錄每次再分配前後的 quota（稽核「為什麼我這月變少」）
+- [ ] Edge: 新分配加入只拿 floor 直到下次月初；`floor * N > T` 時禁止新增
+      並寫 audit 警告
+
+**明確排除：**
+- ❌ 即時池容量視覺化（留 3b UI）
+- ❌ 多池（按 model / Team 切池）— 首版單一全域池
+- ❌ 跨月借貸 / 過期 token roll-over
+
 ### 階段 4：使用情境目錄
 
 - [ ] 完成
