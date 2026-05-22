@@ -27,6 +27,9 @@ class AuditEventType(enum.StrEnum):
     password_changed = "password_changed"
     invitation_issued = "invitation_issued"
     invitation_used = "invitation_used"
+    allocation_quarantined = "allocation_quarantined"
+    allocation_unquarantined = "allocation_unquarantined"
+    anomaly_detector_run = "anomaly_detector_run"
 
 
 class ActorType(enum.StrEnum):

@@ -42,6 +42,12 @@ def create_app() -> FastAPI:
 
     # touch settings to fail-fast on misconfiguration
     _ = settings.admin_bootstrap_token
+    # Phase 2.5 FR-003: empty provider allowlist is a config error.
+    if not settings.allowed_providers:
+        raise RuntimeError(
+            "ALLOWED_PROVIDERS is empty — refusing to start. "
+            "Set at least one provider (e.g. ['azure'])."
+        )
     return app
 
 

@@ -21,6 +21,7 @@ from ai_api.auth.google_oidc import GoogleOidcProvider
 from ai_api.auth.invitations import consume as consume_invite
 from ai_api.auth.invitations import lookup as lookup_invite
 from ai_api.auth.ratelimit import (
+    is_ip_locked,
     is_locked,
     record_attempt,
 )
@@ -268,6 +269,8 @@ async def local_login(
     ip = _client_ip(request)
     if not await policy.is_source_allowed(session, ip):
         return _error_response("source_not_allowed", "this source is not allowed", 401)
+    if await is_ip_locked(session, ip):
+        return _error_response("rate_limited", "too many attempts from this source", 429)
     if await is_locked(session, email):
         return _error_response("rate_limited", "too many attempts; try again later", 429)
 

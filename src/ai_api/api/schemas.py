@@ -17,7 +17,7 @@ from ai_api.models import AllocationStatus
 
 ResourceModelStr = Annotated[
     str,
-    StringConstraints(pattern=r"^[A-Za-z0-9_\-.]+$", min_length=1, max_length=128),
+    StringConstraints(pattern=r"^[A-Za-z0-9_\-./]+$", min_length=1, max_length=128),
 ]
 MemberIdStr = Annotated[str, StringConstraints(min_length=26, max_length=26)]
 SubjectStr = Annotated[str, StringConstraints(min_length=1, max_length=256)]

@@ -45,6 +45,18 @@ class Settings(BaseSettings):
         alias="GOOGLE_DISCOVERY_URL",
     )
 
+    # Phase 2.5: hardening
+    allowed_providers: list[str] = Field(default=["azure"], alias="ALLOWED_PROVIDERS")
+    anomaly_check_interval_min: int = Field(default=5, alias="ANOMALY_CHECK_INTERVAL_MIN")
+    anomaly_threshold_multiplier: float = Field(
+        default=10.0, alias="ANOMALY_THRESHOLD_MULTIPLIER"
+    )
+    anomaly_absolute_cold_start: int = Field(
+        default=10000, alias="ANOMALY_ABSOLUTE_COLD_START"
+    )
+    anomaly_min_calls: int = Field(default=100, alias="ANOMALY_MIN_CALLS")
+    perip_lockout_threshold: int = Field(default=10, alias="PERIP_LOCKOUT_THRESHOLD")
+
 
 @lru_cache
 def get_settings() -> Settings:

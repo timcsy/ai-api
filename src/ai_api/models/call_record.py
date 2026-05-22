@@ -15,6 +15,8 @@ class CallOutcome(enum.StrEnum):
     rejected_unauthenticated = "rejected_unauthenticated"
     rejected_revoked = "rejected_revoked"
     rejected_model_mismatch = "rejected_model_mismatch"
+    rejected_provider = "rejected_provider"
+    rejected_quarantined = "rejected_quarantined"
     upstream_error = "upstream_error"
     gateway_error = "gateway_error"
 
