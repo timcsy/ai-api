@@ -15,17 +15,19 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # All `uses:` pinned to commit SHAs (Phase 2.6 FR-001).
+      # Comment shows the semver tag that SHA points to at pinning time.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # v4.0.0
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee  # v4.2.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/metadata-action@v5
+      - uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9  # v6.1.0
         id: meta
         with:
           images: ghcr.io/${{ github.repository_owner }}/ai-api
@@ -34,7 +36,20 @@ jobs:
             type=ref,event=tag
             type=sha,format=short
 
-      - uses: docker/build-push-action@v6
+      # Phase 2.6 US3: fail-fast filesystem scan BEFORE the (expensive) image build.
+      - name: Trivy fs scan (lockfile)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+        with:
+          version: v0.70.0  # Phase 2.6 FR-002
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
+          trivyignores: .trivyignore
+          format: table
+
+      - uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf  # v7.2.0
         id: build
         with:
           context: .
@@ -49,12 +64,29 @@ jobs:
 
       # Trivy CVE scan — fails the job on HIGH/CRITICAL.
       # See Phase 2.5 FR-006/FR-007.
-      - name: Trivy scan
-        uses: aquasecurity/trivy-action@master  # pin to commit SHA after first run
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
+          version: v0.70.0  # Phase 2.6 FR-002
           image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
           severity: HIGH,CRITICAL
           exit-code: '1'
           ignore-unfixed: true
           trivyignores: .trivyignore
           format: table
+
+      # Phase 2.6 US4: SBOM (CycloneDX) as workflow artifact.
+      - name: Generate SBOM (CycloneDX)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+        with:
+          version: v0.70.0
+          scan-type: image
+          image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          format: cyclonedx
+          output: sbom.cdx.json
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: sbom
+          path: sbom.cdx.json
+          retention-days: 90

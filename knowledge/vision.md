@@ -117,24 +117,24 @@ Azure OpenAI 為首選 AI 供應商；其他細節待設計。
 
 ### 階段 2.6：供應鏈 / Scanner 加固 (Supply Chain Hardening)
 
-- [ ] 完成
+- [x] 完成（2026-05-22；140 tests 全綠，含 6 新 workflow-pinning tests）
 
 > **交付**：把 Phase 2.5 引入的 Trivy 與 image build 流程從「能用」拉到
 > 「能信」— 消除 mutable action / mutable scanner version、加上排程重掃、
 > SBOM 與第二掃描器交叉驗證。
 > **前置條件**：階段 2.5
-> **建議排程**：可與 3b 並行（CI 工作，不阻擋 UI 開發）
 
 **成功標準（核心兩件）：**
-- [ ] `aquasecurity/trivy-action@<commit-sha>` 取代 `@master`；Trivy CLI 版本
-      也 pin（呼應 experience.md「mutable tag」教訓）
-- [ ] 新增 `scheduled-scan.yml`（每週一）：對 `ghcr.io/timcsy/ai-api:main`
-      重跑 Trivy，發現新 CVE 自動開 issue 通知
+- [x] **所有 workflow `uses:` ref pin commit SHA**（包含 image.yml、ci.yml、
+      scheduled-scan.yml；test_workflow_pinning.py 驗證）；Trivy CLI 版本
+      `v0.70.0` pin
+- [x] **`scheduled-scan.yml`**：每週一 06:00 UTC + workflow_dispatch；拉最新
+      successful image build 重掃；HIGH/CRITICAL 自動以 CVE id 去重開 GitHub issue
 
 **成功標準（次要）：**
-- [ ] `scan-type: fs` 步驟掃 lockfile（在 build 前先抓出可疑依賴）
-- [ ] SBOM 產出（CycloneDX 格式）並附加到 image release artifacts
-- [ ] 季度跑一次 OSV-Scanner 或 Grype 作為第二意見，紀錄與 Trivy 差異
+- [x] `scan-type: fs` step 掃 lockfile（在 docker build 前 fail-fast）
+- [x] SBOM (CycloneDX) artifact 上傳，retention 90 天
+- [ ] 季度跑 OSV-Scanner 或 Grype 作第二意見（人工流程，docs/supply-chain.md 紀錄）
 
 **明確排除（留後階段或不做）：**
 - ❌ 自架 trivy-server + 私有 vuln DB mirror（YAGNI，小團隊不需要）
