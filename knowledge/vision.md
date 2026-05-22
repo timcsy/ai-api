@@ -84,12 +84,40 @@ Azure OpenAI 為首選 AI 供應商；其他細節待設計。
 - [x] 管理員可由 admin API 建立、查看、撤回成員的分配（UI 留階段 3）
 - [x] 一般成員登入後可看到自己的憑證與用量
 
+### 階段 2.5：安全加固 (Hardening)
+
+- [ ] 完成
+
+> **交付**：把 Phase 1 + 2 的已知攻擊面收緊到「可放心對組織內部開放」的水準，
+> 不引入新功能
+> **前置條件**：階段 2
+
+**成功標準（核心三件）：**
+- [ ] **應用層 provider allowlist**：`Settings` 加 `allowed_providers` 清單；
+      未列出的供應商即使 LiteLLM 能 route 也拒絕（雙層 allowlist 的第一層）
+- [ ] **K8s NetworkPolicy（粗粒度）**：deny-all egress + allow {DNS,
+      Postgres CIDR, 443/TCP, **明確封鎖 cloud metadata 169.254.169.254**}
+- [ ] CI 整合 **Trivy** 掃 container image：HIGH 以上 CVE 自動擋下 PR
+- [ ] **per-allocation quota + 異常用量警報**：CallRecord 上加背景 job，
+      若某分配 1 小時內用量超過自定義 N 倍即自動降級＋通知擁有者
+
+**成功標準（次要）：**
+- [ ] Pod `securityContext` 強化：`readOnlyRootFilesystem`、
+      `allowPrivilegeEscalation: false`、`capabilities.drop: [ALL]`
+- [ ] 失敗登入額外加 **per-IP** rate limit（補強現有 per-email 維度）
+- [ ] 切換 base image 為 **distroless**（無 shell，攻擊者 RCE 後無工具可用）
+
+**明確排除（留更後階段）：**
+- ❌ FQDN-aware egress (Cilium / Envoy sidecar) — 文件記錄為候選升級
+- ❌ cosign image 簽章 + admission controller（需建立簽章基建）
+- ❌ external-secrets + Vault/KMS 接通（需挑選 KMS 供應商）
+
 ### 階段 3：管理員介面、用量觀測與費用計算
 
 - [ ] 完成
 
 > **交付**：管理員介面可看流量、用量、配額狀況，並依官方價目精算費用
-> **前置條件**：階段 2
+> **前置條件**：階段 2.5
 
 **成功標準：**
 - [ ] 可按分配對象切分查看用量（每人／每服務／每團隊）
