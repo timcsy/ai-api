@@ -119,3 +119,58 @@
 - **教訓**：mutable tag (`main` / `latest`) 適合宣告「想要某個流」，不適合
   「想要這個版本」。任何「為什麼跑舊版？」的除錯都從 image digest 開始查。
 - **來源**：2026-05-21 k3s-tew 部署驗證
+
+### TypeScript composite project reference 與 `noEmit` 衝突
+
+- **理論說**：用 `references: [{ path: "./tsconfig.node.json" }]` 把 `vite.config.ts`
+  獨立成子專案是 Vite 官方範本的標配。
+- **實際發生**：`tsc --noEmit` 在 root tsconfig 報
+  `TS6305: Output file 'vite.config.d.ts' has not been built from source file 'vite.config.ts'`。
+  Composite project **必須** emit `.d.ts`，但 root 設 `noEmit: true`，兩者互斥。
+- **解決方式**：對小型前端（單一 src 樹），**刪掉 composite reference**，把
+  vite.config.ts 直接放進 root tsconfig 的 include 即可。如真的需要分層，
+  改用 `tsBuildInfoFile` 或多個獨立 tsconfig 並分次跑 tsc。
+- **教訓**：composite project 不是「免費的好做法」— 為了一個設定檔分層會把整
+  個 typecheck 流程綁定到 emit 模式。
+- **來源**：`frontend/tsconfig.json`，3b.0 scaffold
+
+### Vitest 自帶 Vite 副本導致 plugin 型別衝突
+
+- **理論說**：`vitest.config.ts` 用 `defineConfig` from `vite` 加上 React plugin，
+  在 `test:` 欄位填 Vitest 設定即可。
+- **實際發生**：tsc 抱怨 `Type 'PluginOption' is not assignable to type 'PluginOption'`
+  —— 兩個型別字面相同但來自不同路徑：`node_modules/vite/...` vs
+  `node_modules/vitest/node_modules/vite/...`。Vitest 為了鎖版本自帶一份 Vite。
+- **解決方式**：選一條 — `// @ts-expect-error - vitest extends Vite config`
+  在 `test:` 上頭蓋章；或拆分 `vite.config.ts` 與 `vitest.config.ts` 並用
+  `mergeConfig` 從 vitest/config 來合併。
+- **教訓**：tool ecosystem 嵌套 dep 是常態（vitest / next.js / remix 都自帶
+  vite）；遇到「兩個看起來一樣的型別不相容」第一反應就是 grep `node_modules`
+  找重複包。
+- **來源**：`frontend/vitest.config.ts`
+
+### ESLint 在 TS 檔對 DOM 全域類型誤報 `no-undef`
+
+- **理論說**：`eslint:recommended` 的 `no-undef` 規則加上 browser globals 設定
+  足以涵蓋 TS 檔。
+- **實際發生**：在 .ts/.tsx 寫 `RequestInit`、`React`（JSX runtime 自動引入）
+  時 ESLint 都報 `'X' is not defined no-undef` — 因為 ESLint 不解析 TS 型別
+  系統，只看 JS scope。
+- **解決方式**：在 flat config 對 TS 檔**關掉 `no-undef`**
+  （`"no-undef": "off"`）— TypeScript 自己會 catch 真正的 undefined。
+- **教訓**：lint 規則該由「規則來源能看到的資訊」決定 — ESLint 看不到 TS 型別，
+  就讓 TS 自己處理。重複交叉執法只會誤報。
+- **來源**：`frontend/eslint.config.js`
+
+### Alpine 基底 image 的 CVE 要主動 `apk upgrade` 補
+
+- **理論說**：用官方 `nginx:1.27-alpine` 即可享受 Docker Hub 的安全維護。
+- **實際發生**：Trivy 對 fresh-pulled `nginx:1.27-alpine` 報兩個 HIGH CVE
+  （nghttp2-libs CVE-2026-27135 + zlib CVE-2026-22184）— 上游 Alpine 已有
+  patched 版本，但 nginx 官方 image 重建頻率落後。
+- **解決方式**：Dockerfile 在 `FROM nginx:1.27-alpine` 之後加
+  `RUN apk upgrade --no-cache` 拉最新 patch；不增加 image 體積、不需 ignore CVE。
+- **教訓**：固定上游 `:tag` 給的是「軟體版本」承諾，不是「最新 OS patch」承諾。
+  alpine-based image 一律加 apk upgrade 是建議做法；distroless 或 wolfi 才
+  能避開這層責任。
+- **來源**：`deploy/docker/Dockerfile.frontend`，PR #8 Trivy scan
