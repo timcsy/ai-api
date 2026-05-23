@@ -20,13 +20,37 @@ service:
 
 ingress:
   enabled: false
-  className: ""
-  hosts:
-    - host: ai-api.local
-      paths:
-        - path: /
-          pathType: Prefix
-  tls: []
+  className: "nginx"
+  host: "aiapi.example.com"
+  annotations: {}
+  # Backend path prefixes — order matters (longest-prefix wins via ingress controller).
+  # Must match src/ai_api/main.py router prefixes (Phase 3b.0 routing contract).
+  backendPaths:
+    - /health
+    - /auth/
+    - /me/
+    - /admin/
+    - /catalog/
+    - /v1/
+  tls:
+    enabled: false
+    secretName: ""
+
+# Phase 3b.0: frontend SPA (nginx pod)
+frontend:
+  enabled: false
+  replicaCount: 2
+  image:
+    repository: ghcr.io/timcsy/ai-api-frontend
+    tag: "main"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
 
 resources:
   requests:

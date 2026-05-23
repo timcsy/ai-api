@@ -21,9 +21,9 @@
 
 ## 現狀
 
-**2026-05-23：除階段 3b（管理員 SPA）外，所有階段已完成並上線。** 主分支
-有 194 tests（unit + contract + integration）全綠；image 經 Trivy + SBOM
-gate；K8s manifest 已交付（Helm + NetworkPolicy + CronJob ×2）。
+**2026-05-24：階段 3b.0 完成（SPA 骨架可登入）；3b.1~3b.7 待開。** 後端
+195 tests + 前端 21 tests 全綠；2 個 image 經 Trivy + SBOM gate；Helm chart
+單一管理（backend + frontend deployment + Ingress 路徑路由）。
 詳細狀態見下方〈路線圖〉每個階段標記。
 
 ## 架構
@@ -160,11 +160,20 @@ gate；K8s manifest 已交付（Helm + NetworkPolicy + CronJob ×2）。
 - [x] CSV / JSON 匯出
 - [x] CORS 預備（為 3b SPA 鋪路；cors_origins 非空時 SameSite=None+Secure）
 
-#### 階段 3b — 管理員 Web UI ⏳
-- [ ] 完成
+#### 階段 3b — 管理員 Web UI ⏳（拆 3b.0~3b.7）
 
-> **交付**：消費 3a API 的 SPA；視覺化用量、配額管理、價目查看
-> **前置條件**：3a
+> 階段拆為小子階段，每個 1 PR：
+> - **3b.0 Stack + 基礎建設** ✅ — React 19 + Vite + shadcn/ui + Helm Ingress 分流 + 5 unit tests + login/home/404
+> - 3b.1 Member view（/me + /me/allocations + catalog browse）⏳
+> - 3b.2 Admin: members + allocation CRUD ⏳
+> - 3b.3 Admin: usage dashboard + CSV/JSON export ⏳
+> - 3b.4 Admin: quota-pool monitor + manual trigger ⏳
+> - 3b.5 Admin: catalog 預覽（內部 admin 編輯 hint）⏳
+> - 3b.6 Admin: RebalanceLog viewer ⏳
+> - 3b.7 Playwright E2E + final polish ⏳
+
+> **3b.0 交付**：可登入的 SPA 骨架；2 個 image + Ingress 路徑路由；backend 195 tests + frontend 21 tests 全綠
+> **前置條件**：3a / 3c / 4 後端皆已完成
 
 #### 階段 3c — 自適應配額池（馬太效應 + 能量守恆）✅
 - [x] 完成（2026-05-22；167 tests 全綠，含 11 unit + 8 integration + 7 contract + 1 proxy 即時性）

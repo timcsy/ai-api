@@ -5,27 +5,40 @@ metadata:
   name: {{ include "ai-api.fullname" . }}
   labels:
     {{- include "ai-api.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   {{- with .Values.ingress.className }}
   ingressClassName: {{ . }}
   {{- end }}
   rules:
-    {{- range .Values.ingress.hosts }}
-    - host: {{ .host | quote }}
+    - host: {{ .Values.ingress.host | quote }}
       http:
         paths:
-          {{- range .paths }}
-          - path: {{ .path }}
-            pathType: {{ .pathType }}
+          # Backend API paths (Phase 3b.0 routing contract)
+          {{- range $p := .Values.ingress.backendPaths }}
+          - path: {{ $p }}
+            pathType: Prefix
             backend:
               service:
                 name: {{ include "ai-api.fullname" $ }}
                 port:
                   name: http
           {{- end }}
-    {{- end }}
-  {{- with .Values.ingress.tls }}
+          # Frontend SPA (catch-all; must come last)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "ai-api.fullname" . }}-frontend
+                port:
+                  number: 80
+  {{- if .Values.ingress.tls.enabled }}
   tls:
-    {{- toYaml . | nindent 4 }}
+    - hosts:
+        - {{ .Values.ingress.host | quote }}
+      secretName: {{ .Values.ingress.tls.secretName | quote }}
   {{- end }}
 {{- end }}
