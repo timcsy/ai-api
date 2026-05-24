@@ -54,7 +54,7 @@ describe("<AppShell />", () => {
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByTestId("dash")).toBeInTheDocument());
 
-    await user.click(screen.getByText("Catalog"));
+    await user.click(screen.getByText("模型目錄"));
     expect(screen.getByTestId("cat")).toBeInTheDocument();
   });
 
@@ -70,7 +70,7 @@ describe("<AppShell />", () => {
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByTestId("dash")).toBeInTheDocument());
 
-    await user.click(screen.getByRole("button", { name: "Logout" }));
+    await user.click(screen.getByRole("button", { name: "登出" }));
     await waitFor(() => expect(queryClient.getQueryData(["dummy"])).toBeUndefined());
 
     const logoutCall = fetchMock.mock.calls[1];

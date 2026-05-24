@@ -22,14 +22,14 @@ export function AppShell() {
           </div>
           <nav className="flex items-center space-x-6">
             <NavLink to="/dashboard" className={navLinkClass}>
-              Dashboard
+              我的儀表板
             </NavLink>
             <NavLink to="/catalog" className={navLinkClass}>
-              Catalog
+              模型目錄
             </NavLink>
             {member?.is_admin === true && (
               <NavLink to="/admin" className={navLinkClass}>
-                Admin
+                管理員
               </NavLink>
             )}
           </nav>
@@ -39,7 +39,7 @@ export function AppShell() {
             </span>
             <Separator orientation="vertical" className="h-6" />
             <Button variant="outline" size="sm" onClick={() => void logout()}>
-              Logout
+              登出
             </Button>
           </div>
         </div>

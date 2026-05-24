@@ -41,12 +41,31 @@ export function DashboardPage() {
   return (
     <div className="container mx-auto py-8 space-y-6">
       <section>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <h1 className="text-3xl font-bold tracking-tight">我的儀表板</h1>
         <p className="text-muted-foreground mt-1">歡迎，{member?.email}</p>
         <div className="mt-2 flex gap-2 text-sm text-muted-foreground">
-          <span>Provider: {member?.provider}</span>
-          {query.data && <span>· Active allocations: {filtered.length}</span>}
+          <span>登入方式：{member?.provider}</span>
+          {query.data && <span>· 啟用中分配：{filtered.length}</span>}
         </div>
+        <Card className="mt-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">API 端點</CardTitle>
+            <CardDescription>
+              呼叫時將 token 放於 <code className="text-xs">Authorization: Bearer</code> 標頭
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <code className="text-sm bg-muted px-2 py-1 rounded">
+              {window.location.origin}/v1
+            </code>
+          </CardContent>
+        </Card>
+        <Alert className="mt-3">
+          <AlertDescription>
+            您的 API token 在管理員建立分配時一次性顯示；系統僅保存雜湊。如需取得新 token，
+            請進入單筆分配後點「重新產生 token」（舊 token 立即失效）。
+          </AlertDescription>
+        </Alert>
       </section>
 
       <section className="space-y-4">

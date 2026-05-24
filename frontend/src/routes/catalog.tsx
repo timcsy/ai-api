@@ -101,7 +101,7 @@ export function CatalogPage() {
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Filter</CardTitle>
+              <CardTitle className="text-base">篩選</CardTitle>
               <button onClick={clear} className="text-xs text-muted-foreground hover:underline">
                 清除
               </button>
@@ -125,28 +125,28 @@ export function CatalogPage() {
                 {facetsQuery.data && (
                   <>
                     <FacetSection
-                      title="Modality Input"
+                      title="輸入模態"
                       values={facetsQuery.data.modality_input}
                       selected={filters.modality_input}
                       onToggle={toggleList}
                       filterKey="modality_input"
                     />
                     <FacetSection
-                      title="Modality Output"
+                      title="輸出模態"
                       values={facetsQuery.data.modality_output}
                       selected={filters.modality_output}
                       onToggle={toggleList}
                       filterKey="modality_output"
                     />
                     <FacetSection
-                      title="Capability"
+                      title="能力"
                       values={facetsQuery.data.capabilities}
                       selected={filters.capability}
                       onToggle={toggleList}
                       filterKey="capability"
                     />
                     <div className="space-y-1.5">
-                      <h3 className="text-sm font-semibold">Cost Tier</h3>
+                      <h3 className="text-sm font-semibold">成本等級</h3>
                       {Object.entries(facetsQuery.data.cost_tier)
                         .sort((a, b) => b[1] - a[1])
                         .map(([tier, count]) => {
@@ -168,7 +168,7 @@ export function CatalogPage() {
                         })}
                     </div>
                     <FacetSection
-                      title="Recommended For"
+                      title="適用情境"
                       values={facetsQuery.data.recommended_for}
                       selected={filters.recommended_for}
                       onToggle={toggleList}

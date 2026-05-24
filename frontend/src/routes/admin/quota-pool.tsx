@@ -100,9 +100,9 @@ export function AdminQuotaPoolPage() {
   return (
     <div className="container mx-auto py-8 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Quota Pool</h1>
+        <h1 className="text-3xl font-bold">配額池監控</h1>
         <Button onClick={() => setConfirmOpen(true)} disabled={disabled || rebalanceMut.isPending}>
-          {rebalanceMut.isPending ? "Rebalancing…" : "手動 Rebalance"}
+          {rebalanceMut.isPending ? "執行中…" : "手動執行再分配"}
         </Button>
       </div>
 
@@ -121,25 +121,25 @@ export function AdminQuotaPoolPage() {
       {status && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">T (total)</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">總配額 T</CardTitle></CardHeader>
             <CardContent className="text-2xl font-bold">{status.total_T.toLocaleString()}</CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Reserved</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">預留</CardTitle></CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{(status.reserved.service + status.reserved.locked).toLocaleString()}</div>
-              <div className="text-xs text-muted-foreground">service: {status.reserved.service} · locked: {status.reserved.locked}</div>
+              <div className="text-xs text-muted-foreground">服務型：{status.reserved.service} · 鎖定型：{status.reserved.locked}</div>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Distributable</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">可分配</CardTitle></CardHeader>
             <CardContent className="text-2xl font-bold">{status.distributable.toLocaleString()}</CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Pool members</CardTitle></CardHeader>
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">池內成員</CardTitle></CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{status.pool_member_count}</div>
-              <div className="text-xs text-muted-foreground">floor: {status.floor}</div>
+              <div className="text-xs text-muted-foreground">保底：{status.floor}</div>
             </CardContent>
           </Card>
         </div>
@@ -152,18 +152,18 @@ export function AdminQuotaPoolPage() {
       )}
 
       <section>
-        <h2 className="text-xl font-semibold mb-3">Rebalance log</h2>
+        <h2 className="text-xl font-semibold mb-3">再分配紀錄</h2>
         {logQuery.data && (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>時間</TableHead>
-                <TableHead>Period</TableHead>
-                <TableHead>Trigger</TableHead>
-                <TableHead className="text-right">Scanned</TableHead>
-                <TableHead className="text-right">Changed</TableHead>
-                <TableHead className="text-right">T</TableHead>
-                <TableHead>Version</TableHead>
+                <TableHead>期間</TableHead>
+                <TableHead>觸發</TableHead>
+                <TableHead className="text-right">掃描</TableHead>
+                <TableHead className="text-right">變更</TableHead>
+                <TableHead className="text-right">T 值</TableHead>
+                <TableHead>演算法版本</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -204,7 +204,7 @@ export function AdminQuotaPoolPage() {
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>確認手動 Rebalance？</AlertDialogTitle>
+            <AlertDialogTitle>確認手動執行再分配？</AlertDialogTitle>
             <AlertDialogDescription>
               這會立即重新分配所有池內 allocation 的 quota，並寫入 RebalanceLog。
             </AlertDialogDescription>

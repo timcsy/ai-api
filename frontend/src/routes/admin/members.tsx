@@ -133,8 +133,8 @@ export function AdminMembersPage() {
   return (
     <div className="container mx-auto py-8 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Members</h1>
-        <Button onClick={() => setCreateOpen(true)}>新建 Member</Button>
+        <h1 className="text-3xl font-bold">成員管理</h1>
+        <Button onClick={() => setCreateOpen(true)}>新增成員</Button>
       </div>
 
       {query.isLoading && <p className="text-muted-foreground">載入中…</p>}
@@ -149,9 +149,9 @@ export function AdminMembersPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Email</TableHead>
-              <TableHead>Provider</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Admin</TableHead>
+              <TableHead>登入方式</TableHead>
+              <TableHead>狀態</TableHead>
+              <TableHead>管理員</TableHead>
               <TableHead>建立時間</TableHead>
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
@@ -182,13 +182,13 @@ export function AdminMembersPage() {
                         <DropdownMenuItem
                           onClick={() => setConfirm({ kind: "demote", member: m })}
                         >
-                          降 admin
+                          降為一般成員
                         </DropdownMenuItem>
                       ) : (
                         <DropdownMenuItem
                           onClick={() => setConfirm({ kind: "promote", member: m })}
                         >
-                          升 admin
+                          升為管理員
                         </DropdownMenuItem>
                       )}
                       {m.status === "active" ? (
@@ -291,8 +291,8 @@ function CreateMemberDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>新建 Member</DialogTitle>
-          <DialogDescription>建立後可在列表升 admin / 停用</DialogDescription>
+          <DialogTitle>新增成員</DialogTitle>
+          <DialogDescription>建立後可在列表升管理員 / 停用</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={onSubmit} className="space-y-4">
@@ -314,7 +314,7 @@ function CreateMemberDialog({
               name="provider"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Provider</FormLabel>
+                  <FormLabel>登入方式</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
                       <SelectTrigger>
@@ -337,7 +337,7 @@ function CreateMemberDialog({
                 name="initial_password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Initial password</FormLabel>
+                    <FormLabel>初始密碼</FormLabel>
                     <FormControl>
                       <Input type="password" {...field} />
                     </FormControl>

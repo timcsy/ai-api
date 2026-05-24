@@ -2,7 +2,8 @@ import path from "node:path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-const BACKEND = "http://localhost:8000";
+// Backend dev server URL. Override at runtime: `BACKEND_URL=http://localhost:47821 npm run dev`
+const BACKEND = process.env.BACKEND_URL ?? "http://localhost:8000";
 
 export default defineConfig({
   plugins: [react()],

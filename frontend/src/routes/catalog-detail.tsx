@@ -126,10 +126,44 @@ export function CatalogDetailPage() {
           <Tabs defaultValue="curl">
             <TabsList>
               <TabsTrigger value="curl">curl</TabsTrigger>
+              <TabsTrigger value="python">Python</TabsTrigger>
+              <TabsTrigger value="javascript">JavaScript</TabsTrigger>
               <TabsTrigger value="json">JSON body</TabsTrigger>
             </TabsList>
             <TabsContent value="curl">
               <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">{curl}</pre>
+            </TabsContent>
+            <TabsContent value="python">
+              <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">
+{`from openai import OpenAI
+
+client = OpenAI(
+    base_url="${window.location.origin}/v1",
+    api_key="$YOUR_TOKEN",
+)
+resp = client.chat.completions.create(
+    model="${m.slug.split("/").pop() ?? m.slug}",
+    messages=[{"role": "user", "content": "你好"}],
+)
+print(resp.choices[0].message.content)`}
+              </pre>
+            </TabsContent>
+            <TabsContent value="javascript">
+              <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">
+{`const res = await fetch("${window.location.origin}/v1/chat/completions", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer " + process.env.YOUR_TOKEN,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    model: "${m.slug.split("/").pop() ?? m.slug}",
+    messages: [{ role: "user", content: "你好" }],
+  }),
+});
+const data = await res.json();
+console.log(data.choices[0].message.content);`}
+              </pre>
             </TabsContent>
             <TabsContent value="json">
               <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">{body}</pre>

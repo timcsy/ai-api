@@ -41,7 +41,7 @@ export function AdminRebalanceLogListPage() {
 
   return (
     <div className="container mx-auto py-8 space-y-6">
-      <h1 className="text-3xl font-bold">RebalanceLog</h1>
+      <h1 className="text-3xl font-bold">再分配紀錄</h1>
 
       {query.error && (
         <Alert variant="destructive">
@@ -54,10 +54,10 @@ export function AdminRebalanceLogListPage() {
           <TableHeader>
             <TableRow>
               <TableHead>時間</TableHead>
-              <TableHead>Period</TableHead>
-              <TableHead>Trigger</TableHead>
-              <TableHead className="text-right">Scanned/Changed</TableHead>
-              <TableHead className="text-right">T</TableHead>
+              <TableHead>期間</TableHead>
+              <TableHead>觸發</TableHead>
+              <TableHead className="text-right">掃描 / 變更</TableHead>
+              <TableHead className="text-right">T 值</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
