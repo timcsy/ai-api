@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -55,9 +55,12 @@ async def list_my_allocations(
 @router.get("/me/allocations/{allocation_id}/calls")
 async def list_my_allocation_calls(
     allocation_id: str,
+    limit: int = Query(default=20, ge=1, le=100),
+    before_id: str | None = Query(default=None),
     member: Member = Depends(current_member),
     db: AsyncSession = Depends(get_db_session),
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
+    """Cursor-paginated CallRecord history for the member's own allocation."""
     allocation = await AllocationService(db).get(allocation_id)
     if allocation is None:
         raise HTTPException(
@@ -69,21 +72,30 @@ async def list_my_allocation_calls(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"error": {"code": "forbidden", "message": "not your allocation"}},
         )
-    records = await RecordsService(db).list_for_allocation(allocation_id)
-    return [
-        {
-            "id": r.id,
-            "request_id": r.request_id,
-            "started_at": r.started_at.isoformat(),
-            "finished_at": r.finished_at.isoformat(),
-            "status_code": r.status_code,
-            "outcome": r.outcome,
-            "prompt_tokens": r.prompt_tokens,
-            "completion_tokens": r.completion_tokens,
-            "total_tokens": r.total_tokens,
-        }
-        for r in records
-    ]
+    # Fetch limit+1 to detect whether there's a next page.
+    records = await RecordsService(db).list_for_allocation(
+        allocation_id, limit=limit + 1, before=before_id
+    )
+    has_more = len(records) > limit
+    items = records[:limit]
+    next_before_id = items[-1].id if has_more and items else None
+    return {
+        "items": [
+            {
+                "id": r.id,
+                "request_id": r.request_id,
+                "started_at": r.started_at.isoformat(),
+                "finished_at": r.finished_at.isoformat(),
+                "status_code": r.status_code,
+                "outcome": r.outcome,
+                "prompt_tokens": r.prompt_tokens,
+                "completion_tokens": r.completion_tokens,
+                "total_tokens": r.total_tokens,
+            }
+            for r in items
+        ],
+        "next_before_id": next_before_id,
+    }
 
 
 class ChangePasswordRequest(BaseModel):

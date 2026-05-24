@@ -1,9 +1,14 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
+import { AppShell } from "@/components/app-shell";
 import { ProtectedRoute } from "@/components/protected-route";
+import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/auth";
-import { HomePage } from "@/routes/home";
+import { AllocationDetailPage } from "@/routes/allocation-detail";
+import { CatalogPage } from "@/routes/catalog";
+import { CatalogDetailPage } from "@/routes/catalog-detail";
+import { DashboardPage } from "@/routes/dashboard";
 import { LoginPage } from "@/routes/login";
 import { NotFoundPage } from "@/routes/not-found";
 
@@ -11,10 +16,9 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error) => {
-        // never retry auth errors — let AuthContext handle redirect
         if (error instanceof Error && error.name === "ApiError") {
-          const status = (error as { status?: number }).status;
-          if (status === 401 || status === 403) return false;
+          const s = (error as { status?: number }).status;
+          if (s === 401 || s === 403 || s === 404) return false;
         }
         return failureCount < 1;
       },
@@ -27,20 +31,19 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <AuthProvider>
+        <AuthProvider queryClient={queryClient}>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <HomePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/index.html" element={<Navigate to="/" replace />} />
+            <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/dashboard/allocations/:id" element={<AllocationDetailPage />} />
+              <Route path="/catalog" element={<CatalogPage />} />
+              <Route path="/catalog/*" element={<CatalogDetailPage />} />
+            </Route>
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
+          <Toaster />
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
