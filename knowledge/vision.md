@@ -8,7 +8,7 @@
 
 ## 核心想法
 
-以 **LiteLLM** 為核心，建立組織內 AI API 的**單一分流入口**：
+自製 OpenAI 相容的組織內 AI API gateway，作為**單一分流入口**：
 
 - 開發者透過分配到的憑證直接呼叫 API
 - 不會寫程式的成員透過外部的「行政輔助服務」間接享受 AI——這些服務以
@@ -28,13 +28,12 @@ additive，274 既有測試零回歸）；2 個 image 經 Trivy + SBOM gate。
 
 ## 架構
 
-- **底層**：LiteLLM（OSS）負責多供應商抽象、配額、速率限制、計費追蹤
+- **底層**：自製 FastAPI gateway + 官方 `openai` SDK（Azure mode）；未來
+  新增 provider 採用各家官方 SDK 接入（避免單一 wrapper 套件的 CVE 集中風險）
 - **部署**：以 Kubernetes 為部署目標；資源以宣告式（Helm chart 或 Kustomize）
-  管理。本機開發走輕量路線（docker-compose 或直接執行 LiteLLM），不要求
-  本機跑 K8s。
-- **LiteLLM 自動更新**：LiteLLM 鏡像版本以自動化方式定期更新（例：Renovate
-  /Dependabot 監看 + GitOps 套用），確保安全性修補不滯後。更新流程必須有
-  「快速回滾」機制——任何一次更新若失敗或行為異常，可在分鐘內回到上一版。
+  管理。本機開發走輕量路線（直接執行 uvicorn + Vite），不要求本機跑 K8s。
+- **相依套件追蹤**：以 Renovate / Dependabot 自動監看 `openai` SDK 等關鍵
+  上游，安全性修補不滯後；任何更新若行為異常，可透過容器映像 tag 在分鐘內回滾。
 - **首選供應商**：Azure OpenAI（其他供應商日後再加）
 - **認證**：彈性身份驗證，預設提供 Google Workspace SSO（最低摩擦），
   同時支援：
@@ -59,13 +58,13 @@ additive，274 既有測試零回歸）；2 個 image 經 Trivy + SBOM gate。
 
 - [x] 完成（2026-05-21：本機 + k3s-tew 叢集全部 SC 達標）
 
-> **交付**：LiteLLM 跑起來、可代理 Azure OpenAI、可發行可撤回的憑證
+> **交付**：自製 gateway 跑起來、可代理 Azure OpenAI、可發行可撤回的憑證
 > **前置條件**：無
 
 **成功標準：**
-- [x] LiteLLM 本機可運作（docker-compose 或直接執行）
+- [x] 自製 FastAPI gateway 本機可運作（uvicorn）
 - [x] K8s 部署以宣告式定義（Helm/Kustomize）並可在開發叢集驗證
-- [x] LiteLLM 鏡像版本以自動化方式追蹤上游，且有回滾路徑
+- [x] 相依套件版本以自動化方式追蹤上游，且有回滾路徑
 - [x] Azure OpenAI 串接成功，可代理至少一個模型
 - [x] 可手動建立一筆「分配」並取得獨立憑證
 - [x] 該憑證的呼叫可追溯到分配 ID
@@ -96,7 +95,7 @@ additive，274 既有測試零回歸）；2 個 image 經 Trivy + SBOM gate。
 
 **成功標準（核心三件）：**
 - [x] **應用層 provider allowlist**：`Settings.allowed_providers`；未列出的
-      供應商即使 LiteLLM 能 route 也拒絕（FR-001~003 + 4 contract tests 通過）
+      供應商即使配置存在也拒絕（FR-001~003 + 4 contract tests 通過）
 - [x] **K8s NetworkPolicy（粗粒度）**：Helm template 已交付，deny-all egress
       + allow {DNS, Postgres podSelector, 443/TCP}，封 169.254.0.0/16
       （5 個 helm-template 結構測試通過；叢集生效需 CNI 支援）
@@ -229,5 +228,5 @@ additive，274 既有測試零回歸）；2 個 image 經 Trivy + SBOM gate。
 **明確排除（留 3b 或後階段）：**
 - ❌ UI / 視覺呈現（留 3b SPA）
 - ❌ 整合到「建立 allocation」流程作為 model picker（留 3b）
-- ❌ 從 Azure / LiteLLM 自動同步 model 清單（YAGNI）
+- ❌ 從 Azure 自動同步 model 清單（YAGNI）
 - ❌ 即時定價（cost_tier 而非絕對價；docs/model-catalog.md 記載未來整合 SOP）
