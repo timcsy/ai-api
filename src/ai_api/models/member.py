@@ -5,7 +5,7 @@ import enum
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, Index, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai_api.db import Base
@@ -45,6 +45,8 @@ class Member(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    # Phase 3b.2: admin role flag (c-β additive — session-based admin OR X-Admin-Token)
+    is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     allocations: Mapped[list[Allocation]] = relationship(back_populates="member")
     sessions: Mapped[list[Session]] = relationship(

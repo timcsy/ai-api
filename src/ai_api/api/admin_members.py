@@ -12,6 +12,7 @@ from ai_api.api.deps import get_db_session, require_admin_token
 from ai_api.auth.sessions import revoke_all_for_member
 from ai_api.models import Member, MemberProvider, MemberStatus, Session
 from ai_api.services.members import (
+    LastAdminCannotDemoteError,
     MemberAlreadyExists,
     MemberHasActiveAllocations,
     MemberService,
@@ -32,6 +33,7 @@ class CreateMemberRequest(BaseModel):
 class UpdateMemberRequest(BaseModel):
     display_name: str | None = None
     status: MemberStatus | None = None
+    is_admin: bool | None = None
 
 
 def _member_admin(m: Member) -> dict[str, Any]:
@@ -46,6 +48,7 @@ def _member_admin(m: Member) -> dict[str, Any]:
         "disabled_at": m.disabled_at.isoformat() if m.disabled_at else None,
         "created_by": m.created_by,
         "has_password": m.password_hash is not None,
+        "is_admin": m.is_admin,
     }
 
 
@@ -114,7 +117,8 @@ async def update_member(
     payload: UpdateMemberRequest,
     session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
-    member = await MemberService(session).update(
+    service = MemberService(session)
+    member = await service.update(
         member_id, display_name=payload.display_name, status=payload.status
     )
     if member is None:
@@ -122,6 +126,24 @@ async def update_member(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": {"code": "not_found", "message": "member not found"}},
         )
+    if payload.is_admin is not None:
+        try:
+            member = await service.set_is_admin(member_id, payload.is_admin)
+        except LastAdminCannotDemoteError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": {
+                        "code": "last_admin_cannot_demote",
+                        "message": "at least one active admin must remain",
+                    }
+                },
+            ) from exc
+        if member is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": {"code": "not_found", "message": "member not found"}},
+            )
     return _member_admin(member)
 
 

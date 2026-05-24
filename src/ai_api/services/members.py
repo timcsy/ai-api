@@ -29,6 +29,10 @@ class MemberAlreadyExists(Exception):
     pass
 
 
+class LastAdminCannotDemoteError(Exception):
+    """Raised when demoting the only remaining active admin."""
+
+
 class MemberHasActiveAllocations(Exception):
     pass
 
@@ -145,6 +149,52 @@ class MemberService:
                     self._db, member.id, reason="member_disabled"
                 )
         await self._db.flush()
+        return member
+
+    async def set_is_admin(
+        self,
+        member_id: str,
+        is_admin: bool,
+        actor: str = "admin",
+    ) -> Member | None:
+        """Promote/demote a member to/from admin role.
+
+        Refuses to demote the last remaining active admin (raises
+        :class:`LastAdminCannotDemoteError`).
+        """
+        from sqlalchemy import func as sa_func
+
+        from ai_api.auth import audit
+        from ai_api.models import ActorType, AuditEventType
+
+        member = await self.get(member_id)
+        if member is None:
+            return None
+        if member.is_admin == is_admin:
+            return member  # no-op
+        if not is_admin and member.is_admin:
+            # Count other active admins
+            count = await self._db.scalar(
+                select(sa_func.count()).select_from(Member).where(
+                    Member.is_admin.is_(True),
+                    Member.status == MemberStatus.active,
+                )
+            )
+            if (count or 0) <= 1:
+                raise LastAdminCannotDemoteError(member_id)
+        member.is_admin = is_admin
+        await self._db.flush()
+        event = (
+            AuditEventType.member_promoted if is_admin else AuditEventType.member_demoted
+        )
+        await audit.record(
+            self._db,
+            event_type=event,
+            actor_type=ActorType.admin,
+            actor_id=actor,
+            target_type="member",
+            target_id=member.id,
+        )
         return member
 
     async def delete(self, member_id: str) -> bool:

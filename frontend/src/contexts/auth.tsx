@@ -8,6 +8,8 @@ export type Member = {
   email: string;
   display_name?: string | null;
   provider?: string;
+  status?: string;
+  is_admin?: boolean;
 };
 
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated";

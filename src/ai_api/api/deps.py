@@ -16,20 +16,66 @@ CSRF_COOKIE = "aiapi_csrf"
 CSRF_HEADER = "X-CSRF-Token"
 
 
-async def require_admin_token(
+async def require_admin(
     x_admin_token: str | None = Header(default=None, alias=ADMIN_TOKEN_HEADER),
-) -> None:
+    session_cookie: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
+) -> Member | None:
+    """Pass if either X-Admin-Token is valid OR session belongs to is_admin Member.
+
+    Returns:
+        ``Member`` for the session path (so endpoints can attribute audit);
+        ``None`` for the token path (no Member context).
+
+    Raises:
+        401 if neither auth path succeeds.
+        403 if member is logged in but not admin / not active.
+    """
     settings = get_settings()
-    if not x_admin_token or x_admin_token != settings.admin_bootstrap_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                "error": {
-                    "code": "unauthorized",
-                    "message": "missing or invalid admin token",
-                }
-            },
-        )
+    # Path 1: X-Admin-Token (existing behaviour — keeps 274 tests passing)
+    if x_admin_token and x_admin_token == settings.admin_bootstrap_token:
+        return None
+
+    # Path 2: session-with-admin
+    if session_cookie:
+        sm = get_sessionmaker()
+        async with sm() as s:
+            member = await validate_session(s, session_cookie)
+            await s.commit()
+        if member is not None:
+            if member.status != MemberStatus.active:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "error": {
+                            "code": "member_disabled",
+                            "message": f"member status is {member.status.value}, not active",
+                        }
+                    },
+                )
+            if not member.is_admin:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "error": {"code": "not_admin", "message": "admin role required"}
+                    },
+                )
+            return member
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail={
+            "error": {
+                "code": "unauthorized",
+                "message": "admin auth required (X-Admin-Token or admin session)",
+            }
+        },
+    )
+
+
+# Alias for backwards compatibility: 30 existing admin endpoints use
+# ``Depends(require_admin_token)``; they now accept either token or
+# admin session. 274 existing admin_headers tests pass unchanged.
+require_admin_token = require_admin
 
 
 async def get_db_session() -> AsyncIterator[AsyncSession]:

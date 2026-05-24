@@ -23,6 +23,7 @@ def _member_public(m: Member) -> dict[str, Any]:
         "provider": m.provider,
         "display_name": m.display_name,
         "status": m.status,
+        "is_admin": m.is_admin,
     }
 
 

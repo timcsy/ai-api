@@ -35,6 +35,9 @@ class AuditEventType(enum.StrEnum):
     rebalance_failed = "rebalance_failed"
     pool_exhausted_by_reserved = "pool_exhausted_by_reserved"
     pool_idle = "pool_idle"
+    # Phase 3b.2
+    member_promoted = "member_promoted"
+    member_demoted = "member_demoted"
 
 
 class ActorType(enum.StrEnum):

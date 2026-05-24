@@ -1,10 +1,19 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
+import { AdminRoute } from "@/components/admin-route";
 import { AppShell } from "@/components/app-shell";
 import { ProtectedRoute } from "@/components/protected-route";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/auth";
+import { AdminAllocationsPage } from "@/routes/admin/allocations";
+import { AdminMembersPage } from "@/routes/admin/members";
+import { AdminQuotaPoolPage } from "@/routes/admin/quota-pool";
+import {
+  AdminRebalanceLogDetailPage,
+  AdminRebalanceLogListPage,
+} from "@/routes/admin/rebalance-log";
+import { AdminUsagePage } from "@/routes/admin/usage";
 import { AllocationDetailPage } from "@/routes/allocation-detail";
 import { CatalogPage } from "@/routes/catalog";
 import { CatalogDetailPage } from "@/routes/catalog-detail";
@@ -40,6 +49,19 @@ export function App() {
               <Route path="/dashboard/allocations/:id" element={<AllocationDetailPage />} />
               <Route path="/catalog" element={<CatalogPage />} />
               <Route path="/catalog/*" element={<CatalogDetailPage />} />
+
+              {/* Admin routes (Phase 3b.2) */}
+              <Route element={<AdminRoute />}>
+                <Route path="/admin" element={<Navigate to="/admin/members" replace />} />
+                <Route path="/admin/members" element={<AdminMembersPage />} />
+                <Route path="/admin/allocations" element={<AdminAllocationsPage />} />
+                <Route path="/admin/usage" element={<AdminUsagePage />} />
+                <Route path="/admin/quota-pool" element={<AdminQuotaPoolPage />} />
+                <Route path="/admin/rebalance-log" element={<AdminRebalanceLogListPage />} />
+                <Route path="/admin/rebalance-log/:id" element={<AdminRebalanceLogDetailPage />} />
+                <Route path="/admin/catalog" element={<CatalogPage />} />
+                <Route path="/admin/catalog/*" element={<CatalogDetailPage />} />
+              </Route>
             </Route>
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
