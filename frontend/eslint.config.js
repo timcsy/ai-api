@@ -37,6 +37,7 @@ export default [
             "badgeVariants",
             "toast",
             "useToast",
+            "useFormField",
             "reducer",
           ],
         },

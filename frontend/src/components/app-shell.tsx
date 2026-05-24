@@ -27,6 +27,11 @@ export function AppShell() {
             <NavLink to="/catalog" className={navLinkClass}>
               Catalog
             </NavLink>
+            {member?.is_admin === true && (
+              <NavLink to="/admin" className={navLinkClass}>
+                Admin
+              </NavLink>
+            )}
           </nav>
           <div className="ml-auto flex items-center space-x-3">
             <span className="text-sm text-muted-foreground" data-testid="member-email">
