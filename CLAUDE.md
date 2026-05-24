@@ -14,6 +14,7 @@ Auto-generated from all feature plans. Last updated: 2026-05-24
 - 無（前端不直接接 DB） (008-frontend-scaffold)
 - 同 3b.0（前端 TS 5.x / React 19 / Vite 6）+ Python 3.11+ 後端 (009-member-view)
 - 無；後端不動 schema (009-member-view)
+- 同 3b.1 (010-admin-suite)
 
 - Python 3.11+ + LiteLLM（proxy core）、FastAPI（admin API）、 (001-gateway-core)
 
@@ -34,9 +35,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 010-admin-suite: Added 同 3b.1
 - 009-member-view: Added 同 3b.0（前端 TS 5.x / React 19 / Vite 6）+ Python 3.11+ 後端
 - 008-frontend-scaffold: Added TypeScript（strict） + Python 3.11+（既有，不變）
-- 007-model-catalog: Added Python 3.11+
 
 
 <!-- MANUAL ADDITIONS START -->
