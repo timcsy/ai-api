@@ -79,6 +79,28 @@ class AllocationService:
         await self._s.flush()
         return AllocationCreated(allocation=allocation, token=token)
 
+    async def rotate_token(
+        self, allocation_id: str
+    ) -> tuple[Allocation, GeneratedToken] | None:
+        """Issue a new token for an existing allocation. Old token immediately invalid."""
+        stmt = (
+            select(Allocation)
+            .options(selectinload(Allocation.credential))
+            .where(Allocation.id == allocation_id)
+        )
+        allocation = (await self._s.execute(stmt)).scalar_one_or_none()
+        if allocation is None:
+            return None
+        if allocation.status != AllocationStatus.active:
+            raise ValueError("only active allocations can rotate token")
+        token = generate_token()
+        cred = allocation.credential
+        cred.token_fingerprint = token.fingerprint
+        cred.token_prefix = token.prefix
+        cred.created_at = datetime.now(UTC)
+        await self._s.flush()
+        return allocation, token
+
     async def revoke(self, allocation_id: str) -> Allocation | None:
         stmt = (
             select(Allocation)
