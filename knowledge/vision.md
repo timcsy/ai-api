@@ -21,9 +21,9 @@
 
 ## 現狀
 
-**2026-05-24：階段 3b.0 完成（SPA 骨架可登入）；3b.1~3b.7 待開。** 後端
-195 tests + 前端 21 tests 全綠；2 個 image 經 Trivy + SBOM gate；Helm chart
-單一管理（backend + frontend deployment + Ingress 路徑路由）。
+**2026-05-24：階段 3b.0 + 3b.1 完成（SPA 含登入 + dashboard + catalog 可運作）；
+3b.2~3b.7 待開。** 後端 199 tests + 前端 43 tests 全綠；2 個 image 經 Trivy +
+SBOM gate；Helm chart 單一管理（backend + frontend deployment + Ingress 路徑路由）。
 詳細狀態見下方〈路線圖〉每個階段標記。
 
 ## 架構
@@ -164,7 +164,7 @@
 
 > 階段拆為小子階段，每個 1 PR：
 > - **3b.0 Stack + 基礎建設** ✅ — React 19 + Vite + shadcn/ui + Helm Ingress 分流 + 5 unit tests + login/home/404
-> - 3b.1 Member view（/me + /me/allocations + catalog browse）⏳
+> - **3b.1 Member view** ✅ — dashboard + allocation detail (cursor pagination) + catalog browse + catalog detail + copy curl；backend 199 tests + frontend 43 tests
 > - 3b.2 Admin: members + allocation CRUD ⏳
 > - 3b.3 Admin: usage dashboard + CSV/JSON export ⏳
 > - 3b.4 Admin: quota-pool monitor + manual trigger ⏳

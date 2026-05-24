@@ -28,7 +28,18 @@ export default [
       "no-undef": "off",
       "react-refresh/only-export-components": [
         "warn",
-        { allowConstantExport: true, allowExportNames: ["sanitizeNext", "useAuth", "buttonVariants"] },
+        {
+          allowConstantExport: true,
+          allowExportNames: [
+            "sanitizeNext",
+            "useAuth",
+            "buttonVariants",
+            "badgeVariants",
+            "toast",
+            "useToast",
+            "reducer",
+          ],
+        },
       ],
       "@typescript-eslint/no-unused-vars": [
         "error",

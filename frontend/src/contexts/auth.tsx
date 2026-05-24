@@ -1,4 +1,6 @@
 import * as React from "react";
+import type { QueryClient } from "@tanstack/react-query";
+
 import { api, UNAUTHORIZED_EVENT } from "@/lib/api-client";
 
 export type Member = {
@@ -21,7 +23,13 @@ interface AuthContextValue {
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({
+  children,
+  queryClient,
+}: {
+  children: React.ReactNode;
+  queryClient?: QueryClient;
+}) {
   const [status, setStatus] = React.useState<AuthStatus>("loading");
   const [member, setMember] = React.useState<Member | null>(null);
 
@@ -66,10 +74,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await api<unknown>("/auth/logout", { method: "POST" });
     } finally {
+      // Clear TanStack Query cache so the next member won't see the prior
+      // member's data (FR-027).
+      queryClient?.clear();
       setMember(null);
       setStatus("unauthenticated");
     }
-  }, []);
+  }, [queryClient]);
 
   const value = React.useMemo<AuthContextValue>(
     () => ({ status, member, login, loginGoogle, logout, refresh }),
