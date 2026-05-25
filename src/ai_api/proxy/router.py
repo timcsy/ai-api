@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import get_db_session
@@ -175,6 +176,28 @@ async def proxy_chat_completions(
             exc.detail["error"]["message"],  # type: ignore[index]
             exc.status_code,
         )
+
+    # 4.5 Phase 5 access policy: defensive secondary check (catalog filter is
+    # primary; proxy here defends against direct curl bypassing the UI).
+    from ai_api.models import Member as MemberModel
+    from ai_api.models import ModelCatalog
+    from ai_api.services.model_access import ModelAccessService
+
+    model_row = (
+        await session.execute(
+            select(ModelCatalog).where(ModelCatalog.slug == requested_model)
+        )
+    ).scalar_one_or_none()
+    if model_row is not None:
+        member_row = await session.get(MemberModel, allocation.member_id)
+        if member_row is not None and not await ModelAccessService(session).is_accessible(
+            member_row, model_row
+        ):
+            return await record_and_respond(
+                "model_forbidden",
+                f"model '{requested_model}' is not accessible to this member",
+                403,
+            )
 
     # 5. Resolve provider credential (Phase 5): DB first, env fallback for azure during
     # US4 transitional release. Builds the upstream model id with provider prefix.

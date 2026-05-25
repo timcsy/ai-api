@@ -66,6 +66,10 @@ azureOpenAI:
   apiBase: ""
   apiKey: ""
   apiVersion: "2024-06-01"
+# Phase 5: Fernet 32-byte url-safe base64 key for ProviderCredential encryption.
+# REQUIRED. Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Pod will refuse to start without this (SC-006).
+providerKeyEncKey: ""
 
 database:
   # External Postgres URL (asyncpg). e.g. postgresql+asyncpg://user:pass@host:5432/db

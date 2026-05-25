@@ -15,8 +15,9 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
+from ai_api.config import get_settings
 from ai_api.db import dispose_engine, get_sessionmaker
-from ai_api.models import ModelCatalog
+from ai_api.models import DefaultAccess, ModelCatalog
 from ai_api.observability.logging import setup_logging
 from ai_api.services.model_catalog import CatalogYAML
 
@@ -42,6 +43,17 @@ async def _load(path: Path) -> tuple[int, int]:
             )
             raise SystemExit(1)
         seen.add(entry.slug)
+
+    # Phase 5: enforce provider allowlist at load-time.
+    allowed = set(get_settings().allowed_providers)
+    for entry in doc.models:
+        if entry.provider not in allowed:
+            print(
+                f"load_models: provider {entry.provider!r} for slug {entry.slug!r} "
+                f"is not in ALLOWED_PROVIDERS={sorted(allowed)}",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
 
     sm = get_sessionmaker()
     now = datetime.now(UTC)
@@ -69,6 +81,9 @@ async def _load(path: Path) -> tuple[int, int]:
                         official_doc_url=entry.official_doc_url,
                         status=entry.status.lower(),
                         deprecation_note=entry.deprecation_note,
+                        default_access=DefaultAccess(entry.default_access),
+                        allowed_tags=list(entry.allowed_tags),
+                        denied_tags=list(entry.denied_tags),
                         created_at=now,
                         updated_at=now,
                     )
@@ -90,6 +105,9 @@ async def _load(path: Path) -> tuple[int, int]:
                 existing.official_doc_url = entry.official_doc_url
                 existing.status = entry.status.lower()
                 existing.deprecation_note = entry.deprecation_note
+                existing.default_access = DefaultAccess(entry.default_access)
+                existing.allowed_tags = list(entry.allowed_tags)
+                existing.denied_tags = list(entry.denied_tags)
                 existing.updated_at = now
                 updated += 1
         await s.commit()

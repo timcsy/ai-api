@@ -4,6 +4,7 @@
 models:
   - slug: azure/gpt-4o
     provider: azure
+    default_access: open
     display_name: GPT-4o
     family: gpt-4
     description: |
@@ -32,6 +33,7 @@ models:
 
   - slug: azure/gpt-4o-mini
     provider: azure
+    default_access: open
     display_name: GPT-4o mini
     family: gpt-4
     description: |
@@ -60,6 +62,7 @@ models:
 
   - slug: azure/o1-mini
     provider: azure
+    default_access: open
     display_name: o1-mini
     family: o-series
     description: |
@@ -87,6 +90,7 @@ models:
 
   - slug: azure/o3-mini
     provider: azure
+    default_access: open
     display_name: o3-mini
     family: o-series
     description: |
@@ -113,6 +117,7 @@ models:
 
   - slug: azure/text-embedding-3-small
     provider: azure
+    default_access: open
     display_name: Text Embedding 3 Small
     family: embedding
     description: |
@@ -138,6 +143,7 @@ models:
 
   - slug: azure/text-embedding-3-large
     provider: azure
+    default_access: open
     display_name: Text Embedding 3 Large
     family: embedding
     description: |
@@ -163,6 +169,7 @@ models:
 
   - slug: azure/dall-e-3
     provider: azure
+    default_access: open
     display_name: DALL·E 3
     family: dall-e
     description: |
@@ -189,6 +196,7 @@ models:
 
   - slug: azure/whisper-1
     provider: azure
+    default_access: open
     display_name: Whisper
     family: whisper
     description: |
@@ -214,6 +222,7 @@ models:
 
   - slug: azure/tts-1
     provider: azure
+    default_access: open
     display_name: TTS
     family: tts
     description: |
