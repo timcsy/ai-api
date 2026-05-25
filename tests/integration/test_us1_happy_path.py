@@ -35,22 +35,16 @@ async def test_create_then_proxy_call_succeeds(
         "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
     }
 
-    # Patch the AsyncAzureOpenAI client factory; the wrapper builds it from
-    # settings, so the mock confirms request never carries upstream credentials.
+    # Phase 5: upstream is a litellm wrapper; router resolves credentials
+    # (DB-first, env fallback for Azure) and passes them in. Confirm the
+    # wrapper relays the env-fallback api_key from settings, not the request.
     captured: dict[str, object] = {}
 
-    class FakeCompletions:
-        async def create(self, **kwargs):
-            captured.update(kwargs)
-            return stub
+    async def fake(**kwargs):
+        captured.update(kwargs)
+        return stub
 
-    class FakeChat:
-        completions = FakeCompletions()
-
-    class FakeClient:
-        chat = FakeChat()
-
-    with patch("ai_api.proxy.upstream._client", return_value=FakeClient()):
+    with patch("litellm.acompletion", side_effect=fake):
         proxy_resp = await app_client.post(
             "/v1/chat/completions",
             headers={"Authorization": f"Bearer {alloc['token']}"},
@@ -62,6 +56,7 @@ async def test_create_then_proxy_call_succeeds(
     assert proxy_resp.status_code == 200
     assert proxy_resp.json()["choices"][0]["message"]["content"] == "pong"
 
-    # azure/ prefix stripped to bare deployment name; credentials never came
-    # from the request payload.
-    assert captured["model"] == "gpt-4o-mini"
+    # Credentials came from settings (Azure env fallback), not the request.
+    # Model gets normalized with provider prefix for litellm routing.
+    assert captured["api_key"] == "test-azure-key-DO-NOT-LEAK"
+    assert captured["model"] == "azure/gpt-4o-mini"

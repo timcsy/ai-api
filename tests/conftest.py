@@ -18,3 +18,7 @@ os.environ.setdefault("AZURE_OPENAI_API_BASE", "https://test.openai.azure.com")
 os.environ.setdefault("AZURE_OPENAI_API_KEY", "test-azure-key-DO-NOT-LEAK")
 os.environ.setdefault("AZURE_OPENAI_API_VERSION", "2024-06-01")
 os.environ.setdefault("AZURE_OPENAI_TEST_MODEL", "gpt-test")
+# Phase 5: deterministic Fernet key for ProviderCredential encryption tests.
+os.environ.setdefault(
+    "PROVIDER_KEY_ENC_KEY", "wG4iqV3qxGqQfp_8ARDqVU93G8YzxBOFnHTL98_3l9I="
+)

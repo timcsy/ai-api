@@ -5,7 +5,8 @@ description = "AI API Manager — Gateway Core (Phase 1)"
 requires-python = ">=3.11"
 readme = "README.md"
 dependencies = [
-    "openai>=1.54.0",
+    "litellm>=1.55,<2",
+    "cryptography>=43.0.0",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
     "sqlalchemy[asyncio]>=2.0.36",
@@ -65,7 +66,7 @@ strict = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["testcontainers.*", "schemathesis.*", "authlib.*", "argon2.*", "yaml.*"]
+module = ["litellm.*", "testcontainers.*", "schemathesis.*", "authlib.*", "argon2.*", "yaml.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

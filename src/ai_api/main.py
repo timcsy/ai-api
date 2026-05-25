@@ -67,6 +67,12 @@ def create_app() -> FastAPI:
 
     # touch settings to fail-fast on misconfiguration
     _ = settings.admin_bootstrap_token
+    # Phase 5 FR-011 / SC-006: validate Fernet key at app construction so a
+    # missing/malformed PROVIDER_KEY_ENC_KEY causes pod to refuse to start
+    # (CrashLoopBackOff) rather than failing at first credential operation.
+    from ai_api.services.crypto import get_fernet
+
+    get_fernet()
     # Phase 2.5 FR-003: empty provider allowlist is a config error.
     if not settings.allowed_providers:
         raise RuntimeError(

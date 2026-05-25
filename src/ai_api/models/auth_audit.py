@@ -38,7 +38,17 @@ class AuditEventType(enum.StrEnum):
     # Phase 3b.2
     member_promoted = "member_promoted"
     member_demoted = "member_demoted"
+    # Phase 011 hotfix — self-service token rotation
     allocation_token_rotated = "allocation_token_rotated"
+    # Phase 5 — multi-provider + tag access
+    provider_credential_created = "provider_credential_created"
+    provider_credential_rotated = "provider_credential_rotated"
+    provider_credential_disabled = "provider_credential_disabled"
+    provider_credential_used_first_time = "provider_credential_used_first_time"
+    member_tag_added = "member_tag_added"
+    member_tag_removed = "member_tag_removed"
+    member_tag_bulk_added = "member_tag_bulk_added"
+    model_access_policy_updated = "model_access_policy_updated"
 
 
 class ActorType(enum.StrEnum):

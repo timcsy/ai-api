@@ -5,13 +5,19 @@ Describes one AI model entry. list-valued fields stored as JSON columns
 """
 from __future__ import annotations
 
+import enum
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Index, Integer, String, Text
+from sqlalchemy import JSON, DateTime, Enum, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai_api.db import Base
+
+
+class DefaultAccess(enum.StrEnum):
+    open = "open"
+    restricted = "restricted"
 
 
 class ModelCatalog(Base):
@@ -36,4 +42,16 @@ class ModelCatalog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
-    __table_args__ = (Index("idx_model_catalog_status", "status"),)
+    # Phase 5: access policy
+    default_access: Mapped[DefaultAccess] = mapped_column(
+        Enum(DefaultAccess, native_enum=False, length=16),
+        nullable=False,
+        default=DefaultAccess.open,
+    )
+    allowed_tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    denied_tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+
+    __table_args__ = (
+        Index("idx_model_catalog_status", "status"),
+        Index("idx_model_catalog_provider", "provider"),
+    )

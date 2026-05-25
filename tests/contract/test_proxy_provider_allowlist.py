@@ -52,14 +52,15 @@ async def test_disallowed_provider_rejected_403(
     app_client: AsyncClient, admin_headers: dict[str, str]
 ) -> None:
     alloc = await _make_allocation(
-        app_client, admin_headers, resource_model="anthropic/claude-3"
+        app_client, admin_headers, resource_model="bogusprov/some-model"
     )
-    # Default allowed_providers = ["azure"]; "anthropic" not in list
+    # Phase 5 expanded default allowed_providers to {azure, openai, anthropic, gemini};
+    # use an obviously non-existent provider id to exercise the deny path.
     r = await app_client.post(
         "/v1/chat/completions",
         headers={"Authorization": f"Bearer {alloc['token']}"},
         json={
-            "model": "anthropic/claude-3",
+            "model": "bogusprov/some-model",
             "messages": [{"role": "user", "content": "hi"}],
         },
     )

@@ -20,11 +20,36 @@ from ai_api.proxy.auth import parse_bearer_token
 from ai_api.proxy.guard import enforce_model_binding
 from ai_api.services.allocations import AllocationService
 from ai_api.services.pricing import calculate_cost, lookup_price_for_call
+from ai_api.services.provider_credentials import (
+    ProviderCredentialService,
+    ProviderUnavailableError,
+    ResolvedCredential,
+)
 from ai_api.services.quota import current_month_usage, is_over_quota
 from ai_api.services.records import RecordsService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+async def _resolve_credential(
+    service: ProviderCredentialService, provider: str, settings: Any
+) -> ResolvedCredential:
+    """DB-first credential lookup with Azure env fallback for transitional release."""
+    cred = await service.get_next(provider)
+    if cred is not None:
+        return cred
+    # US4 transitional: legacy Azure env still works while migration is pending.
+    if provider == "azure" and settings.azure_openai_api_key:
+        return ResolvedCredential(
+            id="env-fallback",
+            provider="azure",
+            label="env-fallback",
+            api_key=settings.azure_openai_api_key,
+            base_url=settings.azure_openai_api_base or None,
+            extra_config={"api_version": settings.azure_openai_api_version},
+        )
+    raise ProviderUnavailableError(provider)
 
 
 def _error_payload(code: str, message: str) -> dict[str, Any]:
@@ -151,9 +176,31 @@ async def proxy_chat_completions(
             exc.status_code,
         )
 
-    # 5. Upstream
+    # 5. Resolve provider credential (Phase 5): DB first, env fallback for azure during
+    # US4 transitional release. Builds the upstream model id with provider prefix.
+    cred_service = ProviderCredentialService(session)
     try:
-        result = await upstream.acompletion(model=requested_model, messages=messages)
+        resolved = await _resolve_credential(cred_service, provider, settings)
+    except ProviderUnavailableError:
+        return await record_and_respond(
+            "provider_unavailable",
+            f"no active credential for provider '{provider}'",
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    upstream_model = (
+        requested_model if "/" in requested_model else f"{provider}/{requested_model}"
+    )
+
+    # 6. Upstream
+    try:
+        result = await upstream.acompletion(
+            model=upstream_model,
+            messages=messages,
+            api_key=resolved.api_key,
+            api_base=resolved.base_url,
+            api_version=(resolved.extra_config or {}).get("api_version"),
+        )
     except Exception as e:
         logger.exception("upstream call failed")
         return await record_and_respond(

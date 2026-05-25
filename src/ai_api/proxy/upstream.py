@@ -1,36 +1,33 @@
-"""Thin wrapper around the OpenAI SDK (Azure mode) for the upstream call.
+"""Phase 5: thin litellm wrapper. Caller (router) resolves credential & passes params.
 
-Uses the official `openai` Python SDK in AsyncAzureOpenAI mode. Auth and
-quota are enforced upstream of this call (proxy.router); this module owns
-only the actual HTTP round-trip to Azure OpenAI.
+Multi-provider routing happens in `router.py` (which has the session); this module
+only translates the resolved credential into a litellm.acompletion call.
 """
 from __future__ import annotations
 
 from typing import Any
 
-from openai import AsyncAzureOpenAI
-
-from ai_api.config import get_settings
+import litellm
 
 
-def _client() -> AsyncAzureOpenAI:
-    settings = get_settings()
-    return AsyncAzureOpenAI(
-        api_key=settings.azure_openai_api_key,
-        azure_endpoint=settings.azure_openai_api_base,
-        api_version=settings.azure_openai_api_version,
-    )
+async def acompletion(
+    *,
+    model: str,
+    messages: list[dict[str, Any]],
+    api_key: str,
+    api_base: str | None = None,
+    api_version: str | None = None,
+    **kwargs: Any,
+) -> Any:
+    """Call upstream LLM via litellm.
 
-
-async def acompletion(*, model: str, messages: list[dict[str, Any]], **kwargs: Any) -> Any:
-    """Call Azure OpenAI chat completions with internally-managed credentials.
-
-    `model` is the Azure deployment name; the `azure/` prefix (legacy litellm
-    convention) is stripped if present so callers can keep passing either form.
+    `model` must include provider prefix (e.g. `azure/gpt-4o-mini`,
+    `anthropic/claude-3-5-sonnet`, `openai/gpt-4o`, `gemini/gemini-1.5-pro`).
     """
-    deployment = model.removeprefix("azure/")
-    return await _client().chat.completions.create(
-        model=deployment,
-        messages=messages,  # type: ignore[arg-type]
-        **kwargs,
-    )
+    extra: dict[str, Any] = {"api_key": api_key}
+    if api_base:
+        extra["api_base"] = api_base
+    if api_version:
+        extra["api_version"] = api_version
+    extra.update(kwargs)
+    return await litellm.acompletion(model=model, messages=messages, **extra)

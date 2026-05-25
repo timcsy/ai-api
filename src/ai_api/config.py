@@ -46,7 +46,10 @@ class Settings(BaseSettings):
     )
 
     # Phase 2.5: hardening
-    allowed_providers: list[str] = Field(default=["azure"], alias="ALLOWED_PROVIDERS")
+    allowed_providers: list[str] = Field(
+        default=["azure", "openai", "anthropic", "gemini"],
+        alias="ALLOWED_PROVIDERS",
+    )
     anomaly_check_interval_min: int = Field(default=5, alias="ANOMALY_CHECK_INTERVAL_MIN")
     anomaly_threshold_multiplier: float = Field(
         default=10.0, alias="ANOMALY_THRESHOLD_MULTIPLIER"
@@ -63,6 +66,12 @@ class Settings(BaseSettings):
     # Phase 3c: adaptive quota pool
     pool_total_tokens_per_month: int = Field(default=0, alias="POOL_TOTAL_TOKENS_PER_MONTH")
     pool_floor_per_allocation: int = Field(default=1000, alias="POOL_FLOOR_PER_ALLOCATION")
+
+    # Phase 5: provider credential encryption
+    # 32-byte url-safe base64 Fernet key (e.g., Fernet.generate_key()).
+    # In production this MUST come from a K8s Secret; empty value triggers
+    # startup failure when ProviderCredential code paths run.
+    provider_key_enc_key: str = Field(default="", alias="PROVIDER_KEY_ENC_KEY")
 
 
 @lru_cache

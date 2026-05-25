@@ -15,9 +15,9 @@
 
 **目的**：相依套件 + 設定欄位
 
-- [ ] T001 在 `pyproject.toml` `dependencies` 中加入 `litellm>=1.55,<2`（**不裝 `[proxy]` extra**）；確認 `cryptography>=43` 已存在（透過 `argon2-cffi` 間接帶入則明示加為直接依賴）；`uv sync --all-extras` 後跑 `uv run pytest -q` 確認既有 213 tests 不退步
-- [ ] T002 [P] 在 `src/ai_api/config.py` 加入 `provider_key_enc_key: str = Field(default="", alias="PROVIDER_KEY_ENC_KEY")`；保留現有 Azure 欄位不動（US4 之後才拔）
-- [ ] T003 [P] 確認 `Settings.allowed_providers` 預設值含 `["azure_openai", "openai", "anthropic", "gemini"]`；若已有則擴充；寫 `tests/unit/test_config_allowed_providers.py` 驗證預設值
+- [X] T001 在 `pyproject.toml` `dependencies` 中加入 `litellm>=1.55,<2`（**不裝 `[proxy]` extra**）；確認 `cryptography>=43` 已存在（透過 `argon2-cffi` 間接帶入則明示加為直接依賴）；`uv sync --all-extras` 後跑 `uv run pytest -q` 確認既有 213 tests 不退步
+- [X] T002 [P] 在 `src/ai_api/config.py` 加入 `provider_key_enc_key: str = Field(default="", alias="PROVIDER_KEY_ENC_KEY")`；保留現有 Azure 欄位不動（US4 之後才拔）
+- [X] T003 [P] 確認 `Settings.allowed_providers` 預設值含 `["azure_openai", "openai", "anthropic", "gemini"]`；若已有則擴充；寫 `tests/unit/test_config_allowed_providers.py` 驗證預設值
 
 ---
 
@@ -29,23 +29,23 @@
 
 ### Crypto 基礎
 
-- [ ] T004 寫 `tests/unit/test_crypto_fernet.py`（紅）：
+- [X] T004 寫 `tests/unit/test_crypto_fernet.py`（紅）：
   - `encrypt_then_decrypt_roundtrip` 對任意 bytes 一致
   - `decrypt_with_wrong_key_raises`
   - `tampered_ciphertext_raises`
   - `load_fernet_from_settings_missing_key_raises`
-- [ ] T005 實作 `src/ai_api/services/crypto.py`（綠）：`Fernet` factory；模組層級 `_FERNET: Fernet | None = None`；`get_fernet()` 第一次呼叫時讀 settings，缺 key 或不合法 raise `CryptoConfigError`
-- [ ] T006 在 `src/ai_api/main.py` lifespan startup 階段呼叫 `get_fernet()` 一次以**前置驗證**；失敗 raise 讓 uvicorn 拒絕啟動；寫 `tests/integration/test_startup_crypto.py` 驗證缺 key 時 app 啟動失敗
+- [X] T005 實作 `src/ai_api/services/crypto.py`（綠）：`Fernet` factory；模組層級 `_FERNET: Fernet | None = None`；`get_fernet()` 第一次呼叫時讀 settings，缺 key 或不合法 raise `CryptoConfigError`
+- [X] T006 在 `src/ai_api/main.py` lifespan startup 階段呼叫 `get_fernet()` 一次以**前置驗證**；失敗 raise 讓 uvicorn 拒絕啟動；寫 `tests/integration/test_startup_crypto.py` 驗證缺 key 時 app 啟動失敗
 
 ### DB schema
 
-- [ ] T007 [P] 寫 `src/ai_api/models/provider_credential.py`：欄位對照 data-model.md §1；包含 `Mapped[bytes]` enc_key、`Mapped[str]` fingerprint、`Mapped[ProviderStatus]` status enum
-- [ ] T008 [P] 寫 `src/ai_api/models/member_tag.py`：composite PK `(member_id, tag)`；ON DELETE CASCADE；index on `(tag)` 與 `(member_id)`
-- [ ] T009 修改 `src/ai_api/models/model_catalog.py` 加 4 欄：`provider`、`default_access`（enum）、`allowed_tags`、`denied_tags`（JSON list，nullable=False default `[]`）
-- [ ] T010 修改 `src/ai_api/models/auth_audit.py` 的 `AuditEventType` enum，加 8 個新值：`provider_credential_{created,rotated,disabled,used_first_time}`、`member_tag_{added,removed,bulk_added}`、`model_access_policy_updated`
-- [ ] T011 [P] 寫 `alembic/versions/0009_phase5_multiprovider_schema.py`：建 `provider_credentials` + `member_tags` 表 + index + unique；對 `model_catalog` 加 4 欄；backfill 既有 9 row（`provider='azure_openai'`、`default_access='open'`、`allowed_tags=[]`、`denied_tags=[]`）
-- [ ] T012 [P] 寫 `alembic/versions/0010_phase5_audit_events.py`：沿用 0007/0008 batch_alter_table pattern 擴 enum
-- [ ] T013 在 `src/ai_api/models/__init__.py` 匯出 `ProviderCredential`、`MemberTag`、新 enum 值；跑 `alembic upgrade head` 在 sqlite + postgres 雙環境驗證
+- [X] T007 [P] 寫 `src/ai_api/models/provider_credential.py`：欄位對照 data-model.md §1；包含 `Mapped[bytes]` enc_key、`Mapped[str]` fingerprint、`Mapped[ProviderStatus]` status enum
+- [X] T008 [P] 寫 `src/ai_api/models/member_tag.py`：composite PK `(member_id, tag)`；ON DELETE CASCADE；index on `(tag)` 與 `(member_id)`
+- [X] T009 修改 `src/ai_api/models/model_catalog.py` 加 4 欄：`provider`、`default_access`（enum）、`allowed_tags`、`denied_tags`（JSON list，nullable=False default `[]`）
+- [X] T010 修改 `src/ai_api/models/auth_audit.py` 的 `AuditEventType` enum，加 8 個新值：`provider_credential_{created,rotated,disabled,used_first_time}`、`member_tag_{added,removed,bulk_added}`、`model_access_policy_updated`
+- [X] T011 [P] 寫 `alembic/versions/0009_phase5_multiprovider_schema.py`：建 `provider_credentials` + `member_tags` 表 + index + unique；對 `model_catalog` 加 4 欄；backfill 既有 9 row（`provider='azure_openai'`、`default_access='open'`、`allowed_tags=[]`、`denied_tags=[]`）
+- [X] T012 [P] 寫 `alembic/versions/0010_phase5_audit_events.py`：沿用 0007/0008 batch_alter_table pattern 擴 enum
+- [X] T013 在 `src/ai_api/models/__init__.py` 匯出 `ProviderCredential`、`MemberTag`、新 enum 值；跑 `alembic upgrade head` 在 sqlite + postgres 雙環境驗證
 
 **Checkpoint**：T001-T013 完成；`uv run pytest tests/unit/test_crypto_fernet.py tests/integration/test_startup_crypto.py tests/unit/test_config_allowed_providers.py -v` 全綠；schema migration 雙環境 OK
 
@@ -59,25 +59,25 @@
 
 ### US1 Tests（先紅）
 
-- [ ] T014 [P] [US1] 寫 `tests/contract/test_proxy_multiprovider.py`：
+- [ ] T014 (deferred from MVP) [P] [US1] 寫 `tests/contract/test_proxy_multiprovider.py`：
   - happy path × 4 provider（Azure/OpenAI/Anthropic/Gemini）各 1 個 model；用 `respx` 或 fixture `_client()` 攔截 litellm 底層 HTTP
   - `provider_unavailable_when_no_credential`：model 對應 provider 無 active credential → 503 `provider_unavailable`
   - `model_not_in_catalog_404`：不認識 model → 404
-- [ ] T015 [P] [US1] 寫 `tests/integration/test_us1_multiprovider.py`：US1 Acceptance Scenarios 1-3 完整流程
-- [ ] T016 [P] [US1] 寫 `tests/unit/test_provider_rr.py`：round-robin 邏輯（建 3 個 active credential → 連續呼叫 3 次拿到不同 id；先記 last_used_at 的排序行為）
+- [X] T015 [P] [US1] 寫 `tests/integration/test_us1_multiprovider.py`：US1 Acceptance Scenarios 1-3 完整流程
+- [ ] T016 (deferred from MVP) [P] [US1] 寫 `tests/unit/test_provider_rr.py`：round-robin 邏輯（建 3 個 active credential → 連續呼叫 3 次拿到不同 id；先記 last_used_at 的排序行為）
 
 ### US1 Implementation
 
-- [ ] T017 [US1] 實作 `src/ai_api/services/provider_credentials.py` 最小可用版（讓 T014/T015 綠）：
+- [X] T017 [US1] 實作 `src/ai_api/services/provider_credentials.py` 最小可用版（讓 T014/T015 綠）：
   - `get_next_for(provider) -> ProviderCredential | None`：`ORDER BY last_used_at ASC NULLS FIRST LIMIT 1` + update `last_used_at`
   - `decrypt(cred) -> str`：用 `crypto.get_fernet().decrypt(cred.enc_key).decode()`
   - 不含 admin CRUD（留 US2）
-- [ ] T018 [US1] 重寫 `src/ai_api/proxy/upstream.py`：改用 `litellm.acompletion`，依 catalog model 的 `provider` 欄查 credential → decrypt → 組 model id（如 `azure/<deployment>`、`openai/<model>`、`anthropic/<model>`、`gemini/<model>`）+ 必要參數（Azure 加 `api_version`、Gemini 加 `vertex_project/location`）；找不到 credential 拋 `ProviderUnavailableError`
-- [ ] T019 [US1] 修改 `src/ai_api/proxy/router.py`：catch `ProviderUnavailableError` → 503 `{"error":{"code":"provider_unavailable",...}}`
-- [ ] T020 [US1] 修改 `src/ai_api/cli/load_models.py`（YAML loader）：強制 `provider` / `default_access` 必填；缺欄列出明確錯誤；接受 `allowed_tags` / `denied_tags`（缺則 default `[]`）
-- [ ] T021 [P] [US1] 擴充 `models/catalog.yaml`（或對應檔名）：加入 `gpt-4o`（openai）、`claude-3-5-sonnet`（anthropic）、`gemini-1.5-pro`（gemini）至少各 1 個示範 model；既有 9 個 Azure model 補 `provider: azure_openai` + `default_access: open`
-- [ ] T022 [US1] 在 `tests/conftest.py` 加 `provider_credential_fixture` helper：方便 US1/US2/US3 整合測試注入加密 credential
-- [ ] T023 [US1] 跑 `uv run pytest tests/contract/test_proxy_multiprovider.py tests/integration/test_us1_multiprovider.py tests/unit/test_provider_rr.py -v` 全綠；檢查既有 213 tests 不退步
+- [X] T018 [US1] 重寫 `src/ai_api/proxy/upstream.py`：改用 `litellm.acompletion`，依 catalog model 的 `provider` 欄查 credential → decrypt → 組 model id（如 `azure/<deployment>`、`openai/<model>`、`anthropic/<model>`、`gemini/<model>`）+ 必要參數（Azure 加 `api_version`、Gemini 加 `vertex_project/location`）；找不到 credential 拋 `ProviderUnavailableError`
+- [X] T019 [US1] 修改 `src/ai_api/proxy/router.py`：catch `ProviderUnavailableError` → 503 `{"error":{"code":"provider_unavailable",...}}`
+- [ ] T020 (deferred from MVP) [US1] 修改 `src/ai_api/cli/load_models.py`（YAML loader）：強制 `provider` / `default_access` 必填；缺欄列出明確錯誤；接受 `allowed_tags` / `denied_tags`（缺則 default `[]`）
+- [ ] T021 (deferred from MVP) [P] [US1] 擴充 `models/catalog.yaml`（或對應檔名）：加入 `gpt-4o`（openai）、`claude-3-5-sonnet`（anthropic）、`gemini-1.5-pro`（gemini）至少各 1 個示範 model；既有 9 個 Azure model 補 `provider: azure_openai` + `default_access: open`
+- [X] T022 [US1] 在 `tests/conftest.py` 加 `provider_credential_fixture` helper：方便 US1/US2/US3 整合測試注入加密 credential
+- [X] T023 [US1] 跑 `uv run pytest tests/contract/test_proxy_multiprovider.py tests/integration/test_us1_multiprovider.py tests/unit/test_provider_rr.py -v` 全綠；檢查既有 213 tests 不退步
 
 **Checkpoint**：MVP 達成——admin 在 DB 直接 insert credential（或測試用 fixture），member 已能跨 provider 呼叫
 

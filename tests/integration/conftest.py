@@ -80,3 +80,39 @@ async def make_member():
             return await create_external_member(s, email)
 
     return _make
+
+
+@pytest_asyncio.fixture
+async def make_provider_credential():
+    """Phase 5: helper to inject a ProviderCredential row for tests.
+
+    Usage:
+        cred = await make_provider_credential(
+            provider="anthropic", label="test", api_key="sk-ant-test",
+        )
+    """
+    from ai_api.db import get_sessionmaker
+    from ai_api.services.provider_credentials import ProviderCredentialService
+
+    sm = get_sessionmaker()
+
+    async def _make(
+        *,
+        provider: str,
+        label: str = "test",
+        api_key: str = "test-key-1234",
+        base_url: str | None = None,
+        extra_config: dict | None = None,
+    ):
+        async with sm() as s:
+            cred = await ProviderCredentialService(s).create(
+                provider=provider,
+                label=label,
+                api_key=api_key,
+                base_url=base_url,
+                extra_config=extra_config,
+            )
+            await s.commit()
+            return cred
+
+    return _make

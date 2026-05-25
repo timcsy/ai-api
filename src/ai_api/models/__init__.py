@@ -13,10 +13,12 @@ from ai_api.models.call_record import CallOutcome, CallRecord
 from ai_api.models.credential import Credential
 from ai_api.models.invitation import InvitationToken
 from ai_api.models.member import Member, MemberProvider, MemberStatus
-from ai_api.models.model_catalog import ModelCatalog
+from ai_api.models.member_tag import MemberTag
+from ai_api.models.model_catalog import DefaultAccess, ModelCatalog
 from ai_api.models.oidc_state import OidcState
 from ai_api.models.password_attempt import AttemptOutcome, PasswordAttempt
 from ai_api.models.price_list import PriceList
+from ai_api.models.provider_credential import ProviderCredential, ProviderCredentialStatus
 from ai_api.models.rebalance_log import RebalanceLog
 from ai_api.models.session import Session, SessionStatus
 
@@ -31,15 +33,19 @@ __all__ = [
     "CallOutcome",
     "CallRecord",
     "Credential",
+    "DefaultAccess",
     "EmailWhitelist",
     "InvitationToken",
     "Member",
     "MemberProvider",
     "MemberStatus",
+    "MemberTag",
     "ModelCatalog",
     "OidcState",
     "PasswordAttempt",
     "PriceList",
+    "ProviderCredential",
+    "ProviderCredentialStatus",
     "RebalanceLog",
     "RuleType",
     "Session",
