@@ -30,6 +30,9 @@ interface CatalogModel {
   slug: string;
   display_name: string;
   provider: string;
+  default_access: "open" | "restricted";
+  allowed_tags: string[];
+  denied_tags: string[];
 }
 
 interface AccessPolicy {
@@ -141,10 +144,19 @@ export function AdminModelAccessPage() {
             value={selectedSlug}
             onValueChange={(v) => {
               setSelectedSlug(v);
-              // Reset edits — admin must explicitly set; system has no default.
-              setDefaultAccess("open");
-              setAllowedTags([]);
-              setDeniedTags([]);
+              // Seed form from CURRENT policy of the chosen model so admin
+              // edits from the live state, not from system defaults (which
+              // would silently overwrite real settings on 套用).
+              const cur = modelsQuery.data?.find((m) => m.slug === v);
+              if (cur) {
+                setDefaultAccess(cur.default_access);
+                setAllowedTags([...cur.allowed_tags]);
+                setDeniedTags([...cur.denied_tags]);
+              } else {
+                setDefaultAccess("open");
+                setAllowedTags([]);
+                setDeniedTags([]);
+              }
             }}
           >
             <SelectTrigger>

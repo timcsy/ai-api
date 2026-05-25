@@ -81,6 +81,15 @@ export function AdminAllocationsPage() {
     queryKey: ["admin", "members"],
     queryFn: () => api<AdminMember[]>("/admin/members"),
   });
+  // Pull catalog slugs to detect orphan allocations (resource_model not in catalog)
+  const catalogSlugs = useQuery<Array<{ slug: string }>, ApiError>({
+    queryKey: ["admin", "catalog-models-admin"],
+    queryFn: () => api<Array<{ slug: string }>>("/admin/catalog/models"),
+  });
+  const knownSlugs = React.useMemo(
+    () => new Set((catalogSlugs.data ?? []).map((m) => m.slug)),
+    [catalogSlugs.data],
+  );
 
   const memberById = React.useMemo(() => {
     const map = new Map<string, AdminMember>();
@@ -148,7 +157,14 @@ export function AdminAllocationsPage() {
                 <TableCell className="font-medium">
                   {memberById.get(a.member_id)?.email ?? a.subject_snapshot}
                 </TableCell>
-                <TableCell>{a.resource_model}</TableCell>
+                <TableCell>
+                  <span className="font-mono text-xs">{a.resource_model}</span>
+                  {catalogSlugs.data && !knownSlugs.has(a.resource_model) && (
+                    <Badge variant="outline" className="ml-2 text-amber-700 border-amber-500">
+                      ⚠ 已不在 catalog
+                    </Badge>
+                  )}
+                </TableCell>
                 <TableCell>
                   <Badge variant={a.status === "active" ? "default" : "secondary"}>
                     {a.status}
