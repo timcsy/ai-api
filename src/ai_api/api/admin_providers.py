@@ -151,3 +151,80 @@ async def disable_provider(
     if cred is None:
         raise HTTPException(status_code=404, detail=_err("not_found", "credential not found"))
     return _public(cred)
+
+
+# Default 1-token-ping model per provider for test-connection.
+_DEFAULT_TEST_MODELS = {
+    "openai": "gpt-4o-mini",
+    "anthropic": "claude-3-5-haiku-20241022",
+    "gemini": "gemini-1.5-flash",
+}
+
+
+@router.post("/providers/{credential_id}/test-connection")
+async def test_provider_connection(
+    credential_id: str,
+    model: str | None = Query(default=None, description="Override default per-provider test model"),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Issue a minimal chat completion via this credential to verify it works.
+
+    Returns `{ok: true, model, latency_ms}` on success, or
+    `{ok: false, error_type, message}` on failure. NEVER raises 5xx for
+    upstream errors — the test result IS the response.
+    """
+    import time
+
+    from ai_api.proxy import upstream
+    from ai_api.services.crypto import decrypt_str
+
+    cred = await ProviderCredentialService(session).get(credential_id)
+    if cred is None:
+        raise HTTPException(status_code=404, detail=_err("not_found", "credential not found"))
+    if cred.status != ProviderCredentialStatus.active:
+        raise HTTPException(
+            status_code=409,
+            detail=_err("not_active", f"credential is {cred.status.value}"),
+        )
+
+    settings = get_settings()
+    if model is None:
+        if cred.provider == "azure":
+            model = settings.azure_openai_test_model or "gpt-4o-mini"
+        else:
+            model = _DEFAULT_TEST_MODELS.get(cred.provider, "")
+        if not model:
+            raise HTTPException(
+                status_code=422,
+                detail=_err(
+                    "no_default_model",
+                    f"no default test model for provider {cred.provider!r}; pass ?model=...",
+                ),
+            )
+
+    upstream_model = f"{cred.provider}/{model}" if "/" not in model else model
+    api_key = decrypt_str(cred.enc_key)
+    extra = cred.extra_config or {}
+    started = time.perf_counter()
+    try:
+        await upstream.acompletion(
+            model=upstream_model,
+            messages=[{"role": "user", "content": "ping"}],
+            api_key=api_key,
+            api_base=cred.base_url,
+            api_version=extra.get("api_version"),
+            max_tokens=16,
+        )
+    except Exception as exc:
+        return {
+            "ok": False,
+            "model": upstream_model,
+            "error_type": type(exc).__name__,
+            "message": str(exc)[:512],
+        }
+    latency_ms = int((time.perf_counter() - started) * 1000)
+    return {
+        "ok": True,
+        "model": upstream_model,
+        "latency_ms": latency_ms,
+    }

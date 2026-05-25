@@ -145,6 +145,36 @@ export function AdminProvidersPage() {
     onError: (e) => toast({ title: "停用失敗", description: e.message, variant: "destructive" }),
   });
 
+  interface TestResult {
+    ok: boolean;
+    model: string;
+    latency_ms?: number;
+    error_type?: string;
+    message?: string;
+  }
+
+  const testMut = useMutation<TestResult, ApiError, string>({
+    mutationFn: (id) =>
+      api<TestResult>(`/admin/providers/${id}/test-connection`, { method: "POST" }),
+    onSuccess: (r) => {
+      if (r.ok) {
+        toast({
+          title: `✓ 連線成功（${r.latency_ms} ms）`,
+          description: `model: ${r.model}`,
+        });
+      } else {
+        toast({
+          title: `✗ 連線失敗`,
+          description: `${r.error_type}: ${r.message}`,
+          variant: "destructive",
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["admin", "providers"] });
+    },
+    onError: (e) =>
+      toast({ title: "測試失敗", description: e.message, variant: "destructive" }),
+  });
+
   return (
     <div className="container mx-auto py-8 max-w-6xl space-y-6">
       <div className="flex items-center justify-between">
@@ -198,6 +228,14 @@ export function AdminProvidersPage() {
               <TableCell className="text-right space-x-2">
                 {c.status === "active" && (
                   <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={testMut.isPending && testMut.variables === c.id}
+                      onClick={() => testMut.mutate(c.id)}
+                    >
+                      {testMut.isPending && testMut.variables === c.id ? "測試中…" : "測試連線"}
+                    </Button>
                     <Button size="sm" variant="outline" onClick={() => setRotateOpenFor(c)}>
                       Rotate
                     </Button>

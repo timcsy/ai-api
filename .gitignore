@@ -43,3 +43,7 @@ Thumbs.db
 
 # uv / pip
 uv.lock.local
+
+# Dev SQLite database
+ai_api.db
+*.db

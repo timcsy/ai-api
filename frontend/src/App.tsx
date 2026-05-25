@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/auth";
 import { AdminAllocationsPage } from "@/routes/admin/allocations";
+import { AdminCatalogManagePage } from "@/routes/admin/catalog-manage";
 import { AdminMembersPage } from "@/routes/admin/members";
 import { AdminModelAccessPage } from "@/routes/admin/model-access";
 import { AdminProvidersPage } from "@/routes/admin/providers";
@@ -68,6 +69,7 @@ export function App() {
                 <Route path="/admin/providers" element={<AdminProvidersPage />} />
                 <Route path="/admin/tags" element={<AdminTagsPage />} />
                 <Route path="/admin/model-access" element={<AdminModelAccessPage />} />
+                <Route path="/admin/catalog-manage" element={<AdminCatalogManagePage />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFoundPage />} />
