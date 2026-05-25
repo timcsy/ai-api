@@ -8,7 +8,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/auth";
 import { AdminAllocationsPage } from "@/routes/admin/allocations";
 import { AdminMembersPage } from "@/routes/admin/members";
+import { AdminModelAccessPage } from "@/routes/admin/model-access";
+import { AdminProvidersPage } from "@/routes/admin/providers";
 import { AdminQuotaPoolPage } from "@/routes/admin/quota-pool";
+import { AdminTagsPage } from "@/routes/admin/tags";
 import {
   AdminRebalanceLogDetailPage,
   AdminRebalanceLogListPage,
@@ -61,6 +64,10 @@ export function App() {
                 <Route path="/admin/rebalance-log/:id" element={<AdminRebalanceLogDetailPage />} />
                 <Route path="/admin/catalog" element={<CatalogPage />} />
                 <Route path="/admin/catalog/*" element={<CatalogDetailPage />} />
+                {/* Phase 5 — multi-provider */}
+                <Route path="/admin/providers" element={<AdminProvidersPage />} />
+                <Route path="/admin/tags" element={<AdminTagsPage />} />
+                <Route path="/admin/model-access" element={<AdminModelAccessPage />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFoundPage />} />
