@@ -153,7 +153,7 @@
 **成功標準（次要）：**
 - [x] `scan-type: fs` step 掃 lockfile（在 docker build 前 fail-fast）
 - [x] SBOM (CycloneDX) artifact 上傳，retention 90 天
-- [ ] 季度跑 OSV-Scanner 或 Grype 作第二意見（人工流程，docs/supply-chain.md 紀錄）
+- [ ] 季度跑 OSV-Scanner 或 Grype 作第二意見（人工流程，knowledge/design/supply-chain.md 紀錄）
 
 **明確排除（留後階段或不做）：**
 - ❌ 自架 trivy-server + 私有 vuln DB mirror（YAGNI，小團隊不需要）
@@ -247,7 +247,7 @@
 - ❌ UI / 視覺呈現（留 3b SPA）
 - ❌ 整合到「建立 allocation」流程作為 model picker（留 3b）
 - ❌ 從 Azure 自動同步 model 清單（YAGNI）
-- ❌ 即時定價（cost_tier 而非絕對價；docs/model-catalog.md 記載未來整合 SOP）
+- ❌ 即時定價（cost_tier 而非絕對價；knowledge/design/model-catalog.md 記載未來整合 SOP）
 
 ### 階段 5：多 Provider + Credential 管理 + Tag-based 存取規則 ✅
 - [x] 完成（2026-05-25；320 backend tests + 56 frontend tests 全綠；PR #12）

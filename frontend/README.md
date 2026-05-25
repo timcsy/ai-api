@@ -61,4 +61,4 @@ src/
 
 獨立 nginx pod；image 由 `deploy/docker/Dockerfile.frontend` build。Helm 走
 `frontend.enabled=true`；Ingress 路徑路由將 backend prefix 導向 backend service，
-其他導向 frontend service。詳見 `docs/frontend.md`。
+其他導向 frontend service。詳見 `knowledge/design/frontend.md`。
