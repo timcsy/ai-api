@@ -56,7 +56,7 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <code className="text-sm bg-muted px-2 py-1 rounded">
-              {window.location.origin}/v1
+              {(member?.gateway_base_url ?? window.location.origin)}/v1
             </code>
           </CardContent>
         </Card>

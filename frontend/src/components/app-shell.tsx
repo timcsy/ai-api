@@ -33,7 +33,10 @@ const ADMIN_SUBNAV = [
 export function AppShell() {
   const { member, logout } = useAuth();
   const location = useLocation();
-  const inAdmin = location.pathname.startsWith("/admin");
+  // Show admin sub-nav whenever the current user is admin, not only inside
+  // /admin/* — admins jumping in from /dashboard or /catalog still need quick
+  // access to admin pages.
+  void location;
   return (
     <div className="min-h-screen flex flex-col bg-muted/30">
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -64,7 +67,7 @@ export function AppShell() {
             </Button>
           </div>
         </div>
-        {inAdmin && member?.is_admin === true && (
+        {member?.is_admin === true && (
           <div className="border-t bg-background/60">
             <div className="container mx-auto flex h-10 items-center gap-5 overflow-x-auto">
               {ADMIN_SUBNAV.map((item) => (

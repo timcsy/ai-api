@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import current_member, get_db_session, require_csrf
 from ai_api.auth import local
+from ai_api.config import get_settings
 from ai_api.models import Member, MemberProvider
 from ai_api.services.allocations import AllocationService
 from ai_api.services.records import RecordsService
@@ -24,6 +25,10 @@ def _member_public(m: Member) -> dict[str, Any]:
         "display_name": m.display_name,
         "status": m.status,
         "is_admin": m.is_admin,
+        # Phase 5+: surface the canonical gateway base URL so the dashboard
+        # can show the correct endpoint instead of guessing window.location.origin
+        # (which on dev resolves to the Vite port, not the backend).
+        "gateway_base_url": get_settings().base_url.rstrip("/"),
     }
 
 

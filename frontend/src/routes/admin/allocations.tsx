@@ -268,7 +268,18 @@ function CreateAllocationDialog({
   const { toast } = useToast();
   const form = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
-    defaultValues: { resource_model: "gpt-4o-mini", is_service_allocation: false },
+    defaultValues: { resource_model: "", is_service_allocation: false },
+  });
+
+  // Phase 5: pull catalog models from admin endpoint (unfiltered) so admin
+  // sees every slug they can allocate, regardless of own tag membership.
+  const catalogQuery = useQuery<Array<{ slug: string; display_name: string; provider: string }>, ApiError>({
+    queryKey: ["admin", "catalog-models-admin"],
+    queryFn: () =>
+      api<Array<{ slug: string; display_name: string; provider: string }>>(
+        "/admin/catalog/models",
+      ),
+    enabled: open,
   });
 
   const onSubmit = form.handleSubmit(async (values) => {
@@ -334,9 +345,29 @@ function CreateAllocationDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>模型</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
+                  <Select onValueChange={field.onChange} value={field.value || undefined}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={
+                          catalogQuery.isLoading
+                            ? "載入 catalog…"
+                            : (catalogQuery.data?.length ?? 0) === 0
+                              ? "catalog 是空的；先去「Catalog 管理」加入"
+                              : "選擇 model"
+                        } />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {catalogQuery.data?.map((m) => (
+                        <SelectItem key={m.slug} value={m.slug}>
+                          {m.slug}
+                          <span className="text-muted-foreground ml-1">
+                            （{m.display_name}）
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

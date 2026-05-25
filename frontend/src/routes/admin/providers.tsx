@@ -35,6 +35,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -54,6 +56,11 @@ interface ProviderCredential {
 
 interface ProviderCredentialWithKey extends ProviderCredential {
   api_key?: string;
+  warning?: {
+    code: string;
+    message: string;
+    existing_label?: string;
+  };
 }
 
 const PROVIDERS = ["azure", "openai", "anthropic", "gemini"] as const;
@@ -63,6 +70,7 @@ const createSchema = z.object({
   label: z.string().min(1).max(64),
   api_key: z.string().min(8, "key 至少 8 字元"),
   base_url: z.string().optional(),
+  api_version: z.string().optional(),
 });
 
 const rotateSchema = z.object({
@@ -79,18 +87,25 @@ export function AdminProvidersPage() {
   const [rotateOpenFor, setRotateOpenFor] = React.useState<ProviderCredential | null>(null);
   const [disableConfirmFor, setDisableConfirmFor] = React.useState<ProviderCredential | null>(null);
   const [plaintextDialog, setPlaintextDialog] = React.useState<
-    { title: string; api_key: string; fingerprint: string } | null
+    { title: string; api_key: string; fingerprint: string; warning?: string } | null
   >(null);
+  const [showDisabled, setShowDisabled] = React.useState(false);
 
   const query = useQuery<ProviderCredential[], ApiError>({
     queryKey: ["admin", "providers"],
     queryFn: () => api<ProviderCredential[]>("/admin/providers"),
   });
 
+  const visibleRows = React.useMemo(() => {
+    if (!query.data) return [];
+    return showDisabled ? query.data : query.data.filter((c) => c.status === "active");
+  }, [query.data, showDisabled]);
+
   const createForm = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
-    defaultValues: { provider: "anthropic", label: "", api_key: "", base_url: "" },
+    defaultValues: { provider: "anthropic", label: "", api_key: "", base_url: "", api_version: "" },
   });
+  const selectedProvider = createForm.watch("provider");
   const rotateForm = useForm<RotateForm>({
     resolver: zodResolver(rotateSchema),
     defaultValues: { api_key: "" },
@@ -100,7 +115,13 @@ export function AdminProvidersPage() {
     mutationFn: (data) =>
       api<ProviderCredentialWithKey>("/admin/providers", {
         method: "POST",
-        body: JSON.stringify({ ...data, base_url: data.base_url || null }),
+        body: JSON.stringify({
+          provider: data.provider,
+          label: data.label,
+          api_key: data.api_key,
+          base_url: data.base_url || null,
+          extra_config: data.api_version ? { api_version: data.api_version } : null,
+        }),
       }),
     onSuccess: (cred) => {
       setCreateOpen(false);
@@ -109,6 +130,9 @@ export function AdminProvidersPage() {
         title: "Credential 已建立 — 一次性顯示明文",
         api_key: cred.api_key!,
         fingerprint: cred.fingerprint,
+        warning: cred.warning
+          ? `⚠ ${cred.warning.message}（既有：${cred.warning.existing_label ?? "?"}）`
+          : undefined,
       });
       queryClient.invalidateQueries({ queryKey: ["admin", "providers"] });
     },
@@ -179,15 +203,25 @@ export function AdminProvidersPage() {
     <div className="container mx-auto py-8 max-w-6xl space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Provider 憑證</h1>
-        <Button onClick={() => setCreateOpen(true)}>新增</Button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="show-disabled"
+              checked={showDisabled}
+              onCheckedChange={setShowDisabled}
+            />
+            <Label htmlFor="show-disabled" className="text-sm">含已停用</Label>
+          </div>
+          <Button onClick={() => setCreateOpen(true)}>新增</Button>
+        </div>
       </div>
 
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Provider</TableHead>
-            <TableHead>Label</TableHead>
-            <TableHead>Fingerprint</TableHead>
+            <TableHead>供應商</TableHead>
+            <TableHead>標記</TableHead>
+            <TableHead>指紋</TableHead>
             <TableHead>狀態</TableHead>
             <TableHead>最後使用</TableHead>
             <TableHead>建立時間</TableHead>
@@ -200,14 +234,16 @@ export function AdminProvidersPage() {
               <TableCell colSpan={7} className="text-muted-foreground">載入中…</TableCell>
             </TableRow>
           )}
-          {query.data?.length === 0 && (
+          {visibleRows.length === 0 && !query.isLoading && (
             <TableRow>
               <TableCell colSpan={7} className="text-muted-foreground">
-                尚未加入任何 provider 憑證；按「新增」開始。
+                {query.data && query.data.length > 0
+                  ? "目前無 active credential；勾「含已停用」可看 disabled。"
+                  : "尚未加入任何 provider 憑證；按「新增」開始。"}
               </TableCell>
             </TableRow>
           )}
-          {query.data?.map((c) => (
+          {visibleRows.map((c) => (
             <TableRow key={c.id}>
               <TableCell>{c.provider}</TableCell>
               <TableCell>{c.label}</TableCell>
@@ -239,7 +275,7 @@ export function AdminProvidersPage() {
                     <Button size="sm" variant="outline" onClick={() => setRotateOpenFor(c)}>
                       Rotate
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={() => setDisableConfirmFor(c)}>
+                    <Button size="sm" variant="outline" onClick={() => setDisableConfirmFor(c)}>
                       停用
                     </Button>
                   </>
@@ -315,7 +351,7 @@ export function AdminProvidersPage() {
                 name="base_url"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Base URL（選填，Azure 必填）</FormLabel>
+                    <FormLabel>Base URL（{selectedProvider === "azure" ? "Azure 必填" : "選填"}）</FormLabel>
                     <FormControl>
                       <Input placeholder="https://your.openai.azure.com" {...field} />
                     </FormControl>
@@ -323,6 +359,21 @@ export function AdminProvidersPage() {
                   </FormItem>
                 )}
               />
+              {selectedProvider === "azure" && (
+                <FormField
+                  control={createForm.control}
+                  name="api_version"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>API Version（Azure，留空走 2024-06-01）</FormLabel>
+                      <FormControl>
+                        <Input placeholder="2025-04-01-preview" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
                   取消
@@ -416,6 +467,11 @@ export function AdminProvidersPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            {plaintextDialog?.warning && (
+              <div className="rounded-md border border-amber-500 bg-amber-50 p-2 text-xs text-amber-900">
+                {plaintextDialog.warning}
+              </div>
+            )}
             <div>
               <div className="text-xs text-muted-foreground mb-1">Fingerprint</div>
               <code className="text-xs">{plaintextDialog?.fingerprint}</code>

@@ -49,9 +49,13 @@ export function AdminModelAccessPage() {
   const { toast } = useToast();
   const [selectedSlug, setSelectedSlug] = React.useState<string>("");
 
+  // Use admin endpoint (unfiltered) so admin can set policy on ANY model,
+  // including ones currently restricted from themselves. Was using the
+  // member-facing /catalog/models which applied access policy → dead-lock
+  // for restricted models.
   const modelsQuery = useQuery<CatalogModel[], ApiError>({
-    queryKey: ["admin", "catalog-models-for-access"],
-    queryFn: () => api<CatalogModel[]>("/catalog/models?include_deprecated=true"),
+    queryKey: ["admin", "catalog-models-admin"],
+    queryFn: () => api<CatalogModel[]>("/admin/catalog/models"),
   });
 
   const tagsQuery = useQuery<TagSummary[], ApiError>({

@@ -49,6 +49,8 @@ export function AdminTagsPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [bulkOpen, setBulkOpen] = React.useState(false);
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [newTag, setNewTag] = React.useState("");
   const [deleteConfirm, setDeleteConfirm] = React.useState<TagSummary | null>(null);
 
   const tagsQuery = useQuery<TagSummary[], ApiError>({
@@ -85,6 +87,18 @@ export function AdminTagsPage() {
     onError: (e) => toast({ title: "批次套用失敗", description: e.message, variant: "destructive" }),
   });
 
+  const createMut = useMutation<TagSummary, ApiError, string>({
+    mutationFn: (tag) =>
+      api<TagSummary>("/admin/tags", { method: "POST", body: JSON.stringify({ tag }) }),
+    onSuccess: (r) => {
+      toast({ title: `已建立 tag「${r.tag}」`, description: "現在可在 Model 存取頁套用此 tag" });
+      setCreateOpen(false);
+      setNewTag("");
+      queryClient.invalidateQueries({ queryKey: ["admin", "tags"] });
+    },
+    onError: (e) => toast({ title: "建立失敗", description: e.message, variant: "destructive" }),
+  });
+
   const deleteMut = useMutation<void, ApiError, string>({
     mutationFn: (tag) =>
       api(`/admin/tags/${encodeURIComponent(tag)}`, { method: "DELETE" }),
@@ -100,7 +114,10 @@ export function AdminTagsPage() {
     <div className="container mx-auto py-8 max-w-4xl space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Tag 管理</h1>
-        <Button onClick={() => setBulkOpen(true)}>批次貼標</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setCreateOpen(true)}>建立 Tag</Button>
+          <Button onClick={() => setBulkOpen(true)}>批次貼標</Button>
+        </div>
       </div>
 
       <p className="text-sm text-muted-foreground">
@@ -203,6 +220,40 @@ export function AdminTagsPage() {
               }
             >
               套用
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create empty tag dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>建立 Tag</DialogTitle>
+            <DialogDescription>
+              先定義 tag 名稱（之後可在 Model 存取頁設定哪些 model 允許 / 禁止此 tag）。
+              成員可在批次貼標 dialog 套用此 tag。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="new-tag">Tag 名稱</Label>
+            <Input
+              id="new-tag"
+              placeholder="eng / pm / contractor ..."
+              value={newTag}
+              onChange={(e) => setNewTag(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              格式：小寫字母開頭，後接小寫字母 / 數字 / dash / underscore
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>取消</Button>
+            <Button
+              disabled={!newTag || createMut.isPending}
+              onClick={() => createMut.mutate(newTag.trim())}
+            >
+              建立
             </Button>
           </DialogFooter>
         </DialogContent>

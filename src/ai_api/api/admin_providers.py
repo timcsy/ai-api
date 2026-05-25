@@ -93,6 +93,9 @@ async def create_provider(
     payload: CreateProviderRequest = Body(...),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
+    from sqlalchemy import select as _select
+    from ai_api.services.provider_credentials import _fingerprint
+
     settings = get_settings()
     if payload.provider not in settings.allowed_providers:
         raise HTTPException(
@@ -103,6 +106,15 @@ async def create_provider(
             ),
         )
     service = ProviderCredentialService(session)
+    # Pre-check: same fingerprint already exists for this provider → warn (still
+    # allowed because admin might intentionally duplicate, but signal it back).
+    target_fp = _fingerprint(payload.api_key)
+    dup = (await session.execute(
+        _select(ProviderCredential).where(
+            ProviderCredential.provider == payload.provider,
+            ProviderCredential.fingerprint == target_fp,
+        )
+    )).scalar_one_or_none()
     try:
         cred = await service.create(
             provider=payload.provider,
@@ -115,6 +127,13 @@ async def create_provider(
         raise HTTPException(status_code=409, detail=_err("duplicate_label", str(exc))) from exc
     body = _public(cred)
     body["api_key"] = payload.api_key  # one-time plaintext echo
+    if dup is not None:
+        body["warning"] = {
+            "code": "duplicate_fingerprint",
+            "message": f"another credential ({dup.label}) already uses this key",
+            "existing_id": dup.id,
+            "existing_label": dup.label,
+        }
     return body
 
 
@@ -202,6 +221,8 @@ async def test_provider_connection(
                 ),
             )
 
+    from datetime import UTC, datetime as _dt
+
     upstream_model = f"{cred.provider}/{model}" if "/" not in model else model
     api_key = decrypt_str(cred.enc_key)
     extra = cred.extra_config or {}
@@ -216,6 +237,11 @@ async def test_provider_connection(
             max_tokens=16,
         )
     except Exception as exc:
+        # Test that successfully connected (any non-network error counts as
+        # "we reached the upstream") still updates last_used_at so admins can
+        # see when they last verified each credential.
+        cred.last_used_at = _dt.now(UTC)
+        await session.flush()
         return {
             "ok": False,
             "model": upstream_model,
@@ -223,6 +249,8 @@ async def test_provider_connection(
             "message": str(exc)[:512],
         }
     latency_ms = int((time.perf_counter() - started) * 1000)
+    cred.last_used_at = _dt.now(UTC)
+    await session.flush()
     return {
         "ok": True,
         "model": upstream_model,

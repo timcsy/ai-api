@@ -29,10 +29,36 @@ def _err(code: str, message: str) -> dict[str, Any]:
     return {"error": {"code": code, "message": message}}
 
 
+_KNOWN_TAGS: set[str] = set()
+# NOTE: in-memory registry — lost on restart and not shared across replicas.
+# For org-internal single-replica deployments this is acceptable. If multi-
+# replica or persistent vocabulary becomes required, persist via a dedicated
+# `Tag` table (experience.md tag-design lesson covers the upgrade path).
+
+
 @router.get("/tags")
 async def list_tags(session: AsyncSession = Depends(get_db_session)) -> list[dict[str, Any]]:
     rows = await MemberTagService(session).list_distinct()
-    return [{"tag": r.tag, "member_count": r.member_count} for r in rows]
+    used = {r.tag: r.member_count for r in rows}
+    # Merge with admin-registered empty tags (member_count=0)
+    for empty_tag in _KNOWN_TAGS - used.keys():
+        used[empty_tag] = 0
+    return sorted(
+        ({"tag": tag, "member_count": cnt} for tag, cnt in used.items()),
+        key=lambda x: x["tag"],
+    )
+
+
+class CreateTagRequest(BaseModel):
+    tag: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,63}$")
+
+
+@router.post("/tags", status_code=status.HTTP_201_CREATED)
+async def create_tag(payload: CreateTagRequest = Body(...)) -> dict[str, Any]:
+    """Register a tag without assigning to any member yet (useful for tag-first
+    workflow: define vocabulary → set model access → then assign to members)."""
+    _KNOWN_TAGS.add(payload.tag)
+    return {"tag": payload.tag, "member_count": 0}
 
 
 @router.delete("/tags/{tag}", status_code=status.HTTP_204_NO_CONTENT)

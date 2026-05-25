@@ -244,8 +244,14 @@ export function AdminCatalogManagePage() {
                   <FormItem>
                     <FormLabel>Model / Deployment 名稱</FormLabel>
                     <FormControl>
-                      <Input placeholder="gpt-5.4-mini（Azure deployment）" {...field} />
+                      <Input placeholder="例：gpt-5.4-mini" {...field} />
                     </FormControl>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      <strong>Azure</strong>：填你的 deployment 名稱（不是 OpenAI 公版名稱；每個訂閱不同）。<br />
+                      <strong>OpenAI / Anthropic / Gemini</strong>：填官方 model id（例：
+                      <code>claude-3-5-sonnet-20241022</code>、<code>gpt-4o-mini</code>、
+                      <code>gemini-1.5-flash</code>）。
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}
