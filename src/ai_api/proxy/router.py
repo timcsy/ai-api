@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import get_db_session
@@ -20,11 +21,36 @@ from ai_api.proxy.auth import parse_bearer_token
 from ai_api.proxy.guard import enforce_model_binding
 from ai_api.services.allocations import AllocationService
 from ai_api.services.pricing import calculate_cost, lookup_price_for_call
+from ai_api.services.provider_credentials import (
+    ProviderCredentialService,
+    ProviderUnavailableError,
+    ResolvedCredential,
+)
 from ai_api.services.quota import current_month_usage, is_over_quota
 from ai_api.services.records import RecordsService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+async def _resolve_credential(
+    service: ProviderCredentialService, provider: str, settings: Any
+) -> ResolvedCredential:
+    """DB-first credential lookup with Azure env fallback for transitional release."""
+    cred = await service.get_next(provider)
+    if cred is not None:
+        return cred
+    # US4 transitional: legacy Azure env still works while migration is pending.
+    if provider == "azure" and settings.azure_openai_api_key:
+        return ResolvedCredential(
+            id="env-fallback",
+            provider="azure",
+            label="env-fallback",
+            api_key=settings.azure_openai_api_key,
+            base_url=settings.azure_openai_api_base or None,
+            extra_config={"api_version": settings.azure_openai_api_version},
+        )
+    raise ProviderUnavailableError(provider)
 
 
 def _error_payload(code: str, message: str) -> dict[str, Any]:
@@ -151,9 +177,53 @@ async def proxy_chat_completions(
             exc.status_code,
         )
 
-    # 5. Upstream
+    # 4.5 Phase 5 access policy: defensive secondary check (catalog filter is
+    # primary; proxy here defends against direct curl bypassing the UI).
+    from ai_api.models import Member as MemberModel
+    from ai_api.models import ModelCatalog
+    from ai_api.services.model_access import ModelAccessService
+
+    model_row = (
+        await session.execute(
+            select(ModelCatalog).where(ModelCatalog.slug == requested_model)
+        )
+    ).scalar_one_or_none()
+    if model_row is not None:
+        member_row = await session.get(MemberModel, allocation.member_id)
+        if member_row is not None and not await ModelAccessService(session).is_accessible(
+            member_row, model_row
+        ):
+            return await record_and_respond(
+                "model_forbidden",
+                f"model '{requested_model}' is not accessible to this member",
+                403,
+            )
+
+    # 5. Resolve provider credential (Phase 5): DB first, env fallback for azure during
+    # US4 transitional release. Builds the upstream model id with provider prefix.
+    cred_service = ProviderCredentialService(session)
     try:
-        result = await upstream.acompletion(model=requested_model, messages=messages)
+        resolved = await _resolve_credential(cred_service, provider, settings)
+    except ProviderUnavailableError:
+        return await record_and_respond(
+            "provider_unavailable",
+            f"no active credential for provider '{provider}'",
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    upstream_model = (
+        requested_model if "/" in requested_model else f"{provider}/{requested_model}"
+    )
+
+    # 6. Upstream
+    try:
+        result = await upstream.acompletion(
+            model=upstream_model,
+            messages=messages,
+            api_key=resolved.api_key,
+            api_base=resolved.base_url,
+            api_version=(resolved.extra_config or {}).get("api_version"),
+        )
     except Exception as e:
         logger.exception("upstream call failed")
         return await record_and_respond(

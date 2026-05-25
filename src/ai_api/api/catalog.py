@@ -11,7 +11,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import get_db_session, require_active_member
-from ai_api.models import ModelCatalog
+from ai_api.models import Member, ModelCatalog
+from ai_api.services.model_access import ModelAccessService
 from ai_api.services.model_catalog import compute_facets, filter_models
 
 router = APIRouter(dependencies=[Depends(require_active_member)])
@@ -62,13 +63,16 @@ async def list_models(
     min_context_window: int | None = Query(default=None, ge=0),
     include_deprecated: bool = Query(default=False),
     session: AsyncSession = Depends(get_db_session),
+    member: Member = Depends(require_active_member),
 ) -> list[dict[str, Any]]:
     stmt = select(ModelCatalog).order_by(ModelCatalog.slug)
     if not include_deprecated:
         stmt = stmt.where(ModelCatalog.status != "deprecated")
     models = list((await session.execute(stmt)).scalars().all())
+    # Phase 5: apply two-stage filter (credential gate ∩ access policy)
+    visible = await ModelAccessService(session).visible_to_member(member, models)
     filtered = filter_models(
-        models,
+        visible,
         capabilities=capability,
         modality_input=modality_input,
         modality_output=modality_output,
@@ -86,6 +90,7 @@ async def list_models(
 async def get_model(
     slug: str,
     session: AsyncSession = Depends(get_db_session),
+    member: Member = Depends(require_active_member),
 ) -> dict[str, Any]:
     model = (
         await session.execute(
@@ -93,6 +98,12 @@ async def get_model(
         )
     ).scalar_one_or_none()
     if model is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_err("not_found", f"model {slug} not found"),
+        )
+    # Phase 5: filter — return 404 (not 403) on policy deny to avoid leaking existence
+    if not await ModelAccessService(session).is_accessible(member, model):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=_err("not_found", f"model {slug} not found"),

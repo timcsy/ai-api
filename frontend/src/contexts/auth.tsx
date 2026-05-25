@@ -10,6 +10,7 @@ export type Member = {
   provider?: string;
   status?: string;
   is_admin?: boolean;
+  gateway_base_url?: string;
 };
 
 export type AuthStatus = "loading" | "authenticated" | "unauthenticated";

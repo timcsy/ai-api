@@ -152,6 +152,7 @@ export function AdminMembersPage() {
               <TableHead>登入方式</TableHead>
               <TableHead>狀態</TableHead>
               <TableHead>管理員</TableHead>
+              <TableHead>Tag</TableHead>
               <TableHead>建立時間</TableHead>
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
@@ -166,6 +167,9 @@ export function AdminMembersPage() {
                 </TableCell>
                 <TableCell>
                   {m.is_admin && <Badge>admin</Badge>}
+                </TableCell>
+                <TableCell>
+                  <MemberTagsCell memberId={m.id} />
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
                   {new Date(m.created_at).toLocaleDateString("zh-TW")}
@@ -218,7 +222,7 @@ export function AdminMembersPage() {
             ))}
             {query.data.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   尚無 Member
                 </TableCell>
               </TableRow>
@@ -243,6 +247,100 @@ export function AdminMembersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+function MemberTagsCell({ memberId }: { memberId: string }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [open, setOpen] = React.useState(false);
+  const [newTag, setNewTag] = React.useState("");
+
+  const tagsQuery = useQuery<string[], ApiError>({
+    queryKey: ["admin", "members", memberId, "tags"],
+    queryFn: () => api<string[]>(`/admin/members/${memberId}/tags`),
+  });
+
+  const addMut = useMutation<string[], ApiError, string>({
+    mutationFn: (tag) =>
+      api<string[]>(`/admin/members/${memberId}/tags`, {
+        method: "POST",
+        body: JSON.stringify({ tags: [tag] }),
+      }),
+    onSuccess: () => {
+      setNewTag("");
+      queryClient.invalidateQueries({ queryKey: ["admin", "members", memberId, "tags"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "tags"] });
+    },
+    onError: (e) => toast({ title: "加 tag 失敗", description: e.message, variant: "destructive" }),
+  });
+
+  const removeMut = useMutation<void, ApiError, string>({
+    mutationFn: (tag) =>
+      api<void>(`/admin/members/${memberId}/tags?tag=${encodeURIComponent(tag)}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "members", memberId, "tags"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "tags"] });
+    },
+    onError: (e) => toast({ title: "移除 tag 失敗", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      {tagsQuery.data?.map((tag) => (
+        <Badge
+          key={tag}
+          variant="secondary"
+          className="cursor-pointer text-xs"
+          title="點擊移除"
+          onClick={() => removeMut.mutate(tag)}
+        >
+          {tag} <span className="ml-1 text-muted-foreground">×</span>
+        </Badge>
+      ))}
+      {!open ? (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-6 w-6 text-muted-foreground"
+          title="加 tag"
+          onClick={() => setOpen(true)}
+        >
+          +
+        </Button>
+      ) : (
+        <div className="flex items-center gap-1">
+          <Input
+            value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                const t = newTag.trim().toLowerCase();
+                if (t) addMut.mutate(t);
+              }
+              if (e.key === "Escape") {
+                setOpen(false);
+                setNewTag("");
+              }
+            }}
+            onBlur={() => {
+              const t = newTag.trim().toLowerCase();
+              if (t) {
+                addMut.mutate(t);
+              } else {
+                setOpen(false);
+              }
+            }}
+            autoFocus
+            className="h-7 w-24 text-xs"
+            placeholder="tag"
+          />
+        </div>
+      )}
     </div>
   );
 }

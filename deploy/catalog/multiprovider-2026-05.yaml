@@ -1,0 +1,87 @@
+# Phase 5 example: 3 non-Azure models, one per new provider.
+# Load: python -m ai_api.cli.load_models deploy/catalog/multiprovider-2026-05.yaml
+
+models:
+  - slug: openai/gpt-4o
+    provider: openai
+    default_access: open
+    display_name: OpenAI GPT-4o (cloud)
+    family: gpt-4
+    description: |
+      OpenAI 雲端版 GPT-4o；與 Azure 部署同模型族，計費走 OpenAI 帳號。
+    modality_input: [text, image]
+    modality_output: [text]
+    capabilities: [chat, vision, function-calling, json-mode, tool-use, streaming]
+    context_window: 128000
+    cost_tier: high
+    recommended_for: [chat, agent, code]
+    tags: [multimodal]
+    example_request:
+      curl: |
+        curl https://YOUR_GATEWAY/v1/chat/completions \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{"model":"openai/gpt-4o","messages":[{"role":"user","content":"hi"}]}'
+      body:
+        model: openai/gpt-4o
+        messages:
+          - role: user
+            content: hi
+    allowed_tags: []
+    denied_tags: []
+
+  - slug: anthropic/claude-3-5-sonnet
+    provider: anthropic
+    default_access: open
+    display_name: Claude 3.5 Sonnet
+    family: claude-3
+    description: |
+      Anthropic 旗艦對話模型，長 context、複雜推理、tool use。
+    modality_input: [text, image]
+    modality_output: [text]
+    capabilities: [chat, vision, tool-use, streaming]
+    context_window: 200000
+    cost_tier: high
+    recommended_for: [chat, agent, summarization]
+    tags: [long-context]
+    example_request:
+      curl: |
+        curl https://YOUR_GATEWAY/v1/chat/completions \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{"model":"anthropic/claude-3-5-sonnet","messages":[{"role":"user","content":"hi"}]}'
+      body:
+        model: anthropic/claude-3-5-sonnet
+        messages:
+          - role: user
+            content: hi
+    allowed_tags: []
+    denied_tags: []
+
+  - slug: gemini/gemini-1.5-pro
+    provider: gemini
+    default_access: open
+    display_name: Gemini 1.5 Pro
+    family: gemini
+    description: |
+      Google Gemini 1.5 Pro；超長 context、多模態。
+    modality_input: [text, image, audio]
+    modality_output: [text]
+    capabilities: [chat, vision, function-calling, streaming]
+    context_window: 1000000
+    cost_tier: high
+    recommended_for: [chat, summarization, agent]
+    tags: [long-context, multimodal]
+    example_request:
+      curl: |
+        curl https://YOUR_GATEWAY/v1/chat/completions \
+          -H "Authorization: Bearer $TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{"model":"gemini/gemini-1.5-pro","messages":[{"role":"user","content":"hi"}]}'
+      body:
+        model: gemini/gemini-1.5-pro
+        messages:
+          - role: user
+            content: hi
+    allowed_tags: []
+    denied_tags: []

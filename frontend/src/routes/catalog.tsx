@@ -55,7 +55,9 @@ function FacetSection({
   filterKey: ListFilter;
 }) {
   const entries = Object.entries(values).sort((a, b) => b[1] - a[1]);
-  if (entries.length === 0) return null;
+  // Hide facet group when there's nothing to choose between: 0 values, or a
+  // single value (which would just echo "this is the only option").
+  if (entries.length <= 1) return null;
   return (
     <div className="space-y-1.5">
       <h3 className="text-sm font-semibold">{title}</h3>
@@ -145,6 +147,7 @@ export function CatalogPage() {
                       onToggle={toggleList}
                       filterKey="capability"
                     />
+                    {Object.keys(facetsQuery.data.cost_tier).length > 1 && (
                     <div className="space-y-1.5">
                       <h3 className="text-sm font-semibold">成本等級</h3>
                       {Object.entries(facetsQuery.data.cost_tier)
@@ -167,6 +170,7 @@ export function CatalogPage() {
                           );
                         })}
                     </div>
+                    )}
                     <FacetSection
                       title="適用情境"
                       values={facetsQuery.data.recommended_for}

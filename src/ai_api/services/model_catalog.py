@@ -52,6 +52,9 @@ CostTier = Literal["low", "medium", "high"]
 Status = Literal["active", "preview", "deprecated"]
 
 
+DefaultAccessLit = Literal["open", "restricted"]
+
+
 class ModelEntry(BaseModel):
     """YAML schema for one model entry (research.md §4)."""
 
@@ -73,6 +76,10 @@ class ModelEntry(BaseModel):
     official_doc_url: str | None = None
     status: Status = "active"
     deprecation_note: str | None = None
+    # Phase 5: access policy — default_access REQUIRED, tag lists default to [].
+    default_access: DefaultAccessLit
+    allowed_tags: list[str] = Field(default_factory=list)
+    denied_tags: list[str] = Field(default_factory=list)
 
 
 class CatalogYAML(BaseModel):

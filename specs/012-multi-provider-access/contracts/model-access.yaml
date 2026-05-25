@@ -1,0 +1,198 @@
+openapi: 3.0.3
+info:
+  title: Model Access Policy + Catalog Filtering
+  version: 0.1.0
+  description: |
+    Two endpoints exposed:
+    1. Admin PATCH `/admin/catalog/models/{slug}/access` — set model's access policy.
+    2. (Existing) `/catalog/models` and `/catalog/models/{slug}` for members now apply
+       two-stage filtering: credential gate ∩ access policy.
+    Proxy `/v1/chat/completions` also re-checks access policy (defensive).
+paths:
+  /admin/catalog/models/{slug}/access:
+    patch:
+      summary: Update a model's access policy
+      security:
+        - sessionCookie: []
+        - adminToken: []
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccessPolicyUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccessPolicySnapshot" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: Invalid policy (e.g., unknown tag format)
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+  /catalog/models:
+    get:
+      summary: List models visible to current member (after two-stage filter)
+      description: |
+        Members only see models where:
+        (a) provider has ≥1 active credential, AND
+        (b) member's tags satisfy the model's access policy
+        (deny > allow > default).
+      security:
+        - sessionCookie: []
+      parameters:
+        - in: query
+          name: provider
+          schema: { type: string }
+        - in: query
+          name: capability
+          schema:
+            type: array
+            items: { type: string }
+          style: form
+          explode: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ModelPublic" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: Disabled member
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+  /catalog/models/{slug}:
+    get:
+      summary: Get a model detail (subject to same two-stage filter)
+      security:
+        - sessionCookie: []
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModelDetail" }
+        "404":
+          description: Not visible (either credential gate or access policy denied)
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+  /v1/chat/completions:
+    post:
+      summary: Proxy chat completion (defensive access check applies)
+      description: |
+        Existing OpenAI-compatible endpoint. Phase 5 adds: after model lookup,
+        before upstream call, re-evaluate access policy for the member behind
+        the allocation token. If denied, return 403 `model_forbidden`.
+      security:
+        - allocationToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model, messages]
+              properties:
+                model: { type: string }
+                messages:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        "200":
+          description: OpenAI-compatible completion
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: |
+            - `model_forbidden`: access policy denies this member
+            - other existing 403 codes unchanged
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+        "503":
+          description: |
+            - `provider_unavailable`: no active credential for this model's provider
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+components:
+  securitySchemes:
+    sessionCookie: { type: apiKey, in: cookie, name: session }
+    adminToken: { type: apiKey, in: header, name: X-Admin-Token }
+    allocationToken:
+      type: http
+      scheme: bearer
+  schemas:
+    AccessPolicyUpdate:
+      type: object
+      properties:
+        default_access:
+          type: string
+          enum: [open, restricted]
+        allowed_tags:
+          type: array
+          items: { type: string, pattern: "^[a-z][a-z0-9_-]{0,63}$" }
+        denied_tags:
+          type: array
+          items: { type: string, pattern: "^[a-z][a-z0-9_-]{0,63}$" }
+    AccessPolicySnapshot:
+      type: object
+      required: [slug, default_access, allowed_tags, denied_tags]
+      properties:
+        slug: { type: string }
+        default_access: { type: string, enum: [open, restricted] }
+        allowed_tags:
+          type: array
+          items: { type: string }
+        denied_tags:
+          type: array
+          items: { type: string }
+    ModelPublic:
+      type: object
+      description: |
+        Subset of model_catalog row, post-filter. `default_access` and tag fields
+        are NOT exposed to members (admin-only).
+      required: [slug, display_name, provider, family]
+      properties:
+        slug: { type: string }
+        display_name: { type: string }
+        provider: { type: string }
+        family: { type: string }
+        capabilities:
+          type: array
+          items: { type: string }
+        cost_tier: { type: string }
+        context_window: { type: integer }
+    ModelDetail:
+      allOf:
+        - $ref: "#/components/schemas/ModelPublic"
+        - type: object
+          properties:
+            description: { type: string }
+            example_request:
+              type: object
+              additionalProperties: true
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+  responses:
+    Unauthorized:
+      description: Not authenticated
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+    NotFound:
+      description: Not found
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }

@@ -32,6 +32,8 @@ def _render() -> list[dict]:
             "azureOpenAI.apiKey=test-key-DO-NOT-LEAK",
             "--set",
             "database.url=postgresql+asyncpg://u:p@h:5432/db",
+            "--set",
+            "providerKeyEncKey=wG4iqV3qxGqQfp_8ARDqVU93G8YzxBOFnHTL98_3l9I=",
         ],
         capture_output=True,
         text=True,
@@ -87,3 +89,28 @@ def test_rendered_secret_value_does_not_leak_into_other_resources() -> None:
         if d["kind"] == "Secret":
             continue
         assert leaky not in yaml.safe_dump(d), f"key leaked into {d['kind']}"
+
+
+def test_phase5_missing_provider_key_enc_key_fails_template() -> None:
+    """Phase 5 T064: helm template MUST fail when providerKeyEncKey is empty."""
+    result = subprocess.run(
+        [
+            "helm", "template", "test", str(CHART_DIR),
+            "--set", "adminBootstrapToken=tok",
+            "--set", "azureOpenAI.apiBase=https://example.openai.azure.com",
+            "--set", "azureOpenAI.apiKey=test-key",
+            "--set", "database.url=postgresql+asyncpg://u:p@h:5432/db",
+            # providerKeyEncKey deliberately omitted
+        ],
+        capture_output=True, text=True,
+    )
+    assert result.returncode != 0
+    assert "providerKeyEncKey" in result.stderr or "providerKeyEncKey" in result.stdout
+
+
+def test_phase5_secret_contains_provider_key_enc_key() -> None:
+    """Phase 5: rendered Secret MUST expose PROVIDER_KEY_ENC_KEY."""
+    docs = _render()
+    secret = next(d for d in docs if d["kind"] == "Secret")
+    assert "PROVIDER_KEY_ENC_KEY" in secret["stringData"]
+    assert secret["stringData"]["PROVIDER_KEY_ENC_KEY"]

@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -11,8 +11,34 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     isActive ? "text-foreground" : "text-muted-foreground",
   );
 
+const subNavClass = ({ isActive }: { isActive: boolean }) =>
+  cn(
+    "text-sm transition-colors hover:text-foreground",
+    isActive ? "text-foreground font-semibold" : "text-muted-foreground",
+  );
+
+const ADMIN_SUBNAV = [
+  { to: "/admin", label: "首頁", end: true },
+  { to: "/admin/members", label: "成員" },
+  { to: "/admin/allocations", label: "分配" },
+  { to: "/admin/providers", label: "Provider 憑證" },
+  { to: "/admin/tags", label: "Tag" },
+  { to: "/admin/model-access", label: "Model 存取" },
+  { to: "/admin/catalog-manage", label: "Catalog 管理" },
+  { to: "/admin/catalog", label: "目錄（檢視）" },
+  { to: "/admin/usage", label: "用量" },
+  { to: "/admin/quota-pool", label: "配額池" },
+  { to: "/admin/rebalance-log", label: "Rebalance 記錄" },
+  { to: "/admin/audit", label: "稽核紀錄" },
+];
+
 export function AppShell() {
   const { member, logout } = useAuth();
+  const location = useLocation();
+  // Show admin sub-nav whenever the current user is admin, not only inside
+  // /admin/* — admins jumping in from /dashboard or /catalog still need quick
+  // access to admin pages.
+  void location;
   return (
     <div className="min-h-screen flex flex-col bg-muted/30">
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -43,6 +69,17 @@ export function AppShell() {
             </Button>
           </div>
         </div>
+        {member?.is_admin === true && (
+          <div className="border-t bg-background/60">
+            <div className="container mx-auto flex h-10 items-center gap-5 overflow-x-auto">
+              {ADMIN_SUBNAV.map((item) => (
+                <NavLink key={item.to} to={item.to} className={subNavClass} end={item.end}>
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        )}
       </header>
       <main className="flex-1">
         <Outlet />

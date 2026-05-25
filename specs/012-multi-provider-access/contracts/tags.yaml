@@ -1,0 +1,161 @@
+openapi: 3.0.3
+info:
+  title: Admin Tag & MemberTag API
+  version: 0.1.0
+  description: |
+    Admin manages tags (free-form strings) and assigns them to members
+    in bulk. Tag = `^[a-z][a-z0-9_-]{0,63}$`.
+servers:
+  - url: /admin
+security:
+  - sessionCookie: []
+  - adminToken: []
+paths:
+  /tags:
+    get:
+      summary: List all tags currently in use (distinct from member_tags)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [tag, member_count]
+                  properties:
+                    tag: { type: string }
+                    member_count: { type: integer }
+  /tags/{tag}:
+    delete:
+      summary: Remove a tag from all members
+      parameters:
+        - in: path
+          name: tag
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Removed }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /members/{member_id}/tags:
+    get:
+      summary: List a member's tags
+      parameters:
+        - in: path
+          name: member_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Add tags to a member (idempotent)
+      parameters:
+        - in: path
+          name: member_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tags]
+              properties:
+                tags:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: string
+                    pattern: "^[a-z][a-z0-9_-]{0,63}$"
+      responses:
+        "200":
+          description: Resulting tag list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: Invalid tag format
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+    delete:
+      summary: Remove tags from a member
+      parameters:
+        - in: path
+          name: member_id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: tag
+          required: true
+          schema:
+            type: array
+            items: { type: string }
+          style: form
+          explode: true
+      responses:
+        "204": { description: Removed }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /tags/bulk-apply:
+    post:
+      summary: Apply a tag to multiple members in one operation
+      description: Idempotent; writes a single batch audit event.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tag, member_ids]
+              properties:
+                tag:
+                  type: string
+                  pattern: "^[a-z][a-z0-9_-]{0,63}$"
+                member_ids:
+                  type: array
+                  minItems: 1
+                  items: { type: string }
+      responses:
+        "200":
+          description: Bulk apply result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tag, applied_count, skipped_count]
+                properties:
+                  tag: { type: string }
+                  applied_count: { type: integer, description: members newly tagged }
+                  skipped_count: { type: integer, description: already had the tag }
+        "422":
+          description: Invalid tag or member ids
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+components:
+  securitySchemes:
+    sessionCookie: { type: apiKey, in: cookie, name: session }
+    adminToken: { type: apiKey, in: header, name: X-Admin-Token }
+  schemas:
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+  responses:
+    NotFound:
+      description: Not found
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }

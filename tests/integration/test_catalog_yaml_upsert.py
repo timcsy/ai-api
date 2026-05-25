@@ -62,6 +62,7 @@ async def test_load_does_not_delete_unlisted_models(app_client, tmp_path) -> Non
 models:
   - slug: azure/gpt-4o-mini
     provider: azure
+    default_access: open
     display_name: GPT-4o mini
     family: gpt-4
     description: |
@@ -96,6 +97,7 @@ async def test_load_invalid_cost_tier_aborts(app_client, tmp_path) -> None:
 models:
   - slug: azure/bad
     provider: azure
+    default_access: open
     display_name: Bad
     family: gpt-4
     description: x
@@ -121,6 +123,7 @@ async def test_load_duplicate_slug_aborts(app_client, tmp_path) -> None:
 models:
   - slug: azure/x
     provider: azure
+    default_access: open
     display_name: X
     family: gpt-4
     description: x
@@ -132,6 +135,7 @@ models:
     example_request: {}
   - slug: azure/x
     provider: azure
+    default_access: open
     display_name: X dup
     family: gpt-4
     description: x

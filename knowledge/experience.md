@@ -2,6 +2,39 @@
 
 ## 教訓
 
+### 對稱加密金鑰要在 pod 啟動時就驗證，別等 runtime
+
+- **理論說**：app 沒人呼叫加密路徑時，金鑰存不存在不影響運行；惰性檢查就好。
+- **實際發生**：Phase 5 加 `ProviderCredential` 用 Fernet 加密 API key。一開始
+  把 `get_fernet()` 設成 lazy；偵錯時很快發現問題——pod 看似 healthy，第一次
+  admin 按「建立 credential」才炸 500，且訊息隱晦（`InvalidToken`）。
+- **解決方式**：`create_app()` 內無條件呼叫 `get_fernet()`，缺 key 或格式錯
+  立即 raise `CryptoConfigError`。K8s 偵測到 CrashLoopBackOff，event log
+  顯示明確訊息「PROVIDER_KEY_ENC_KEY is not set」。Helm chart 用
+  `required` 同步擋掉 deploy。tests 也補一份「缺 key → create_app 噴」的整合測試。
+- **教訓**：對安全相關的設定，「啟動時就拒絕」比「等到第一次使用才壞」CP
+  值高 10 倍——前者誤觸範圍是 0，後者可能造成資料半寫狀態或員工試半天搞不
+  懂為何按下去就 500。同樣原則套用 K8s Secret、外部 KMS、TLS 憑證。
+- **來源**：`src/ai_api/services/crypto.py` + `main.py` `create_app()` +
+  `tests/integration/test_startup_crypto.py`
+
+### Tag 設計：先用 distinct 推導，先別建 Tag 表
+
+- **理論說**：M:N 關聯通常需要 Tag entity + MemberTag join table，把 tag
+  metadata（color / description / created_at）放在 Tag 表。
+- **實際發生**：Phase 5 一開始想建 Tag 表，後來盤點需求：admin 只想知道「這
+  個 tag 有幾個 member」、「member 有哪些 tag」、「批次貼標」，**沒任何
+  metadata 需求**。建 Tag 表多一個 entity，每次新 tag 要先 INSERT Tag 再
+  INSERT MemberTag，加倍 race 條件。
+- **解決方式**：只有 `MemberTag(member_id, tag, added_by, added_at)`；
+  tag 名稱集合 = `SELECT DISTINCT tag FROM member_tags`。新增 tag = 直接
+  INSERT MemberTag；刪除 tag = `DELETE WHERE tag = ?`。零 race。
+- **教訓**：M:N 不一定要先建 entity——若一邊只是「字串集合」沒有 metadata，
+  直接讓 join table 自己當 source of truth；需要 metadata 時再加 entity，
+  也只是純 schema 增量。YAGNI 在 schema 設計階段很值得。
+- **來源**：`src/ai_api/models/member_tag.py`、`services/member_tags.py`
+  的 `list_distinct()`
+
 ### build vs adopt 評估要在 specify 之前做
 
 - **理論說**：vision 寫「以 LiteLLM 為核心」就代表會用 LiteLLM。

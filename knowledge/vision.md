@@ -29,13 +29,12 @@
 
 ## 現狀
 
-**2026-05-24：階段 3b.0 + 3b.1 + 3b.2~3b.6（合併）+ 011 hotfix 完成；
-3b.7 E2E 與多 provider（階段 5）待開。**
-後端 213 tests + 前端 50 tests 全綠；Member.is_admin 雙軌認證上線
-（c-β additive，274 既有測試零回歸）；2 個 image 經 Trivy + SBOM gate；
-upstream 已從 litellm 改為官方 `openai` SDK（Azure mode）以縮減 CVE
-攻擊面，多 provider 在階段 5 重新評估接入方式。詳細狀態見下方〈路線圖〉
-每個階段標記。
+**2026-05-25：階段 5（多 Provider + Credential 管理 + Tag-based 存取）完成。**
+後端 264 tests + 前端 56 tests 全綠；upstream 用 `litellm` library form 支援
+4 家 provider（Azure / OpenAI / Anthropic / Gemini）；admin UI 全套（providers
+/ tags / model-access / catalog-manage）已上線；ProviderCredential Fernet
+加密落 DB，K8s Secret 提供金鑰，pod 啟動時即驗證。3b.7 Playwright E2E 仍未開。
+詳細狀態見下方〈路線圖〉每個階段標記。
 
 ## 架構
 
@@ -154,7 +153,7 @@ upstream 已從 litellm 改為官方 `openai` SDK（Azure mode）以縮減 CVE
 **成功標準（次要）：**
 - [x] `scan-type: fs` step 掃 lockfile（在 docker build 前 fail-fast）
 - [x] SBOM (CycloneDX) artifact 上傳，retention 90 天
-- [ ] 季度跑 OSV-Scanner 或 Grype 作第二意見（人工流程，docs/supply-chain.md 紀錄）
+- [ ] 季度跑 OSV-Scanner 或 Grype 作第二意見（人工流程，knowledge/design/supply-chain.md 紀錄）
 
 **明確排除（留後階段或不做）：**
 - ❌ 自架 trivy-server + 私有 vuln DB mirror（YAGNI，小團隊不需要）
@@ -248,9 +247,10 @@ upstream 已從 litellm 改為官方 `openai` SDK（Azure mode）以縮減 CVE
 - ❌ UI / 視覺呈現（留 3b SPA）
 - ❌ 整合到「建立 allocation」流程作為 model picker（留 3b）
 - ❌ 從 Azure 自動同步 model 清單（YAGNI）
-- ❌ 即時定價（cost_tier 而非絕對價；docs/model-catalog.md 記載未來整合 SOP）
+- ❌ 即時定價（cost_tier 而非絕對價；knowledge/design/model-catalog.md 記載未來整合 SOP）
 
-### 階段 5：多 Provider + Credential 管理 + Tag-based 存取規則 ⏳
+### 階段 5：多 Provider + Credential 管理 + Tag-based 存取規則 ✅
+- [x] 完成（2026-05-25；320 backend tests + 56 frontend tests 全綠；PR #12）
 
 > **交付**：成員可使用多家 LLM 供應商（首批 4 家）；admin 在 UI 管理
 > provider API key 與成員存取規則；catalog 對成員的可見性 = credential
@@ -266,27 +266,32 @@ upstream 已從 litellm 改為官方 `openai` SDK（Azure mode）以縮減 CVE
   member 打 tag 即可批次授權，不需逐人指定
 
 **成功標準（核心五件）：**
-- [ ] **多 provider 接入**：`upstream.py` 改回 `litellm`（library only），
+- [x] **多 provider 接入**：`upstream.py` 用 `litellm`（library only），
       首批支援 Azure OpenAI / OpenAI cloud / Anthropic / Gemini；catalog
-      載入對應 model；至少 1 個 model / provider 過 happy-path contract test
-- [ ] **ProviderCredential 實體**：admin CRUD endpoints + Fernet 加密欄位
+      載入對應 model。Azure + Anthropic 有整合測試（`test_us1_multiprovider`）；
+      OpenAI / Gemini 已配置 catalog YAML 並走 routing fixture，完整 4-provider
+      contract matrix 留 T014 deferred
+- [x] **ProviderCredential 實體**：admin CRUD endpoints + Fernet 加密欄位
       + 建立時一次性顯示明文 + fingerprint + rotation + 停用 + 稽核事件
       （`provider_credential_created/rotated/disabled`）
-- [ ] **加密金鑰**：`PROVIDER_KEY_ENC_KEY` 由 K8s Secret 提供；Helm template
+- [x] **加密金鑰**：`PROVIDER_KEY_ENC_KEY` 由 K8s Secret 提供；Helm template
       標示 Secret 為必要、缺則 pod 拒啟動
-- [ ] **MemberTag 實體 + Model access policy**：`Member` ↔ `Tag` 多對多；
+- [x] **MemberTag join table（無獨立 Tag entity）+ Model access policy**：
+      `MemberTag(member_id, tag, ...)` composite-PK 表，tag 名稱集合由
+      `SELECT DISTINCT` 推導（YAGNI，未來需要 metadata 再升 Tag entity）；
       `ModelCatalog` 加 `default_access` (`open` / `restricted`) +
       `allowed_tags` + `denied_tags`；catalog list / detail endpoint
       套用過濾；proxy 呼叫時防禦性二次檢查
-- [ ] **Admin UI**：
-  - `/admin/providers`：list + 新增（一次性 banner 顯示明文）+ rotate + 停用
+- [x] **Admin UI**：
+  - `/admin/providers`：list + 新增（一次性 banner 顯示明文）+ rotate + 停用 + 測試連線
   - `/admin/tags`：tag CRUD + bulk 批次貼標（select members → apply tag）
-  - `/admin/models/{slug}/access`：設定 default_access + allow / deny tags
+  - `/admin/model-access`：選 model → 設定 default_access + allow / deny tags（後端 endpoint：`PATCH /admin/catalog/models/{slug}/access`）
+  - `/admin/catalog-manage`：列現有 catalog model + 新增 + 移除（後端 endpoints：`GET/POST/PATCH/DELETE /admin/catalog/models[/{slug:path}]`，含 audit）
 
 **成功標準（次要）：**
-- [ ] 既有 `AZURE_OPENAI_API_KEY` env 提供 migration script 灌入 DB 後可移除
-- [ ] Provider 加 `test-connection` endpoint（呼一次 `/models` 驗證）
-- [ ] 同 provider 多把 key 採 round-robin 或最少用量（首版 round-robin 即可）
+- [x] 既有 `AZURE_OPENAI_API_KEY` env 提供 migration script 灌入 DB 後可移除
+- [x] Provider 加 `test-connection` endpoint（`POST /admin/providers/{id}/test-connection`，回 `{ok, model, latency_ms}` 或 `{ok:false, error_type, message}`；UI 含「測試連線」按鈕）
+- [x] 同 provider 多把 key 採 round-robin 或最少用量（首版 round-robin 即可）
 
 **明確排除（留更後）：**
 - ❌ Self-hosted provider（Ollama / vLLM）UI 與 health-check 流程

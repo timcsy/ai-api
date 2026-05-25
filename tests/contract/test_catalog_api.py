@@ -31,9 +31,20 @@ async def _make_local_and_login(
 
 
 async def _seed_models() -> None:
-    """Insert 4 models covering the scenarios we need to test filtering."""
+    """Insert 4 models covering the scenarios we need to test filtering.
+
+    Phase 5: also inject an active 'azure' ProviderCredential so the catalog
+    credential gate doesn't hide the models from members.
+    """
+    from ai_api.services.provider_credentials import ProviderCredentialService
+
     sm = get_sessionmaker()
     now = datetime(2026, 5, 23, tzinfo=UTC)
+    async with sm() as s:
+        await ProviderCredentialService(s).create(
+            provider="azure", label="catalog-test", api_key="azure-test-key-12345"
+        )
+        await s.commit()
     async with sm() as s:
         s.add_all(
             [

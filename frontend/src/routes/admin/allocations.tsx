@@ -81,6 +81,15 @@ export function AdminAllocationsPage() {
     queryKey: ["admin", "members"],
     queryFn: () => api<AdminMember[]>("/admin/members"),
   });
+  // Pull catalog slugs to detect orphan allocations (resource_model not in catalog)
+  const catalogSlugs = useQuery<Array<{ slug: string }>, ApiError>({
+    queryKey: ["admin", "catalog-models-admin"],
+    queryFn: () => api<Array<{ slug: string }>>("/admin/catalog/models"),
+  });
+  const knownSlugs = React.useMemo(
+    () => new Set((catalogSlugs.data ?? []).map((m) => m.slug)),
+    [catalogSlugs.data],
+  );
 
   const memberById = React.useMemo(() => {
     const map = new Map<string, AdminMember>();
@@ -148,7 +157,14 @@ export function AdminAllocationsPage() {
                 <TableCell className="font-medium">
                   {memberById.get(a.member_id)?.email ?? a.subject_snapshot}
                 </TableCell>
-                <TableCell>{a.resource_model}</TableCell>
+                <TableCell>
+                  <span className="font-mono text-xs">{a.resource_model}</span>
+                  {catalogSlugs.data && !knownSlugs.has(a.resource_model) && (
+                    <Badge variant="outline" className="ml-2 text-amber-700 border-amber-500">
+                      ⚠ 已不在 catalog
+                    </Badge>
+                  )}
+                </TableCell>
                 <TableCell>
                   <Badge variant={a.status === "active" ? "default" : "secondary"}>
                     {a.status}
@@ -268,7 +284,18 @@ function CreateAllocationDialog({
   const { toast } = useToast();
   const form = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
-    defaultValues: { resource_model: "gpt-4o-mini", is_service_allocation: false },
+    defaultValues: { resource_model: "", is_service_allocation: false },
+  });
+
+  // Phase 5: pull catalog models from admin endpoint (unfiltered) so admin
+  // sees every slug they can allocate, regardless of own tag membership.
+  const catalogQuery = useQuery<Array<{ slug: string; display_name: string; provider: string }>, ApiError>({
+    queryKey: ["admin", "catalog-models-admin"],
+    queryFn: () =>
+      api<Array<{ slug: string; display_name: string; provider: string }>>(
+        "/admin/catalog/models",
+      ),
+    enabled: open,
   });
 
   const onSubmit = form.handleSubmit(async (values) => {
@@ -334,9 +361,29 @@ function CreateAllocationDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>模型</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
+                  <Select onValueChange={field.onChange} value={field.value || undefined}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={
+                          catalogQuery.isLoading
+                            ? "載入 catalog…"
+                            : (catalogQuery.data?.length ?? 0) === 0
+                              ? "catalog 是空的；先去「Catalog 管理」加入"
+                              : "選擇 model"
+                        } />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {catalogQuery.data?.map((m) => (
+                        <SelectItem key={m.slug} value={m.slug}>
+                          {m.slug}
+                          <span className="text-muted-foreground ml-1">
+                            （{m.display_name}）
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

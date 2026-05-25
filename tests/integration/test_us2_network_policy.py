@@ -24,6 +24,7 @@ def _render() -> list[dict]:
             "--set", "azureOpenAI.apiBase=https://example.openai.azure.com",
             "--set", "azureOpenAI.apiKey=test-key",
             "--set", "database.url=postgresql+asyncpg://u:p@h:5432/db",
+            "--set", "providerKeyEncKey=wG4iqV3qxGqQfp_8ARDqVU93G8YzxBOFnHTL98_3l9I=",
         ],
         capture_output=True, text=True, check=True,
     )
