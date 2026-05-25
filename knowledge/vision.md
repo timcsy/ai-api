@@ -30,10 +30,10 @@
 ## 現狀
 
 **2026-05-25：階段 5（多 Provider + Credential 管理 + Tag-based 存取）完成。**
-後端 320+ tests + 前端 56 tests 全綠；upstream 改回 `litellm` library form
-支援 4 家 provider（Azure / OpenAI / Anthropic / Gemini）；admin UI 全套
-（providers / tags / model-access）已上線；ProviderCredential Fernet 加密
-落 DB，K8s Secret 提供金鑰，pod 啟動時即驗證。3b.7 Playwright E2E 仍未開。
+後端 264 tests + 前端 56 tests 全綠；upstream 用 `litellm` library form 支援
+4 家 provider（Azure / OpenAI / Anthropic / Gemini）；admin UI 全套（providers
+/ tags / model-access / catalog-manage）已上線；ProviderCredential Fernet
+加密落 DB，K8s Secret 提供金鑰，pod 啟動時即驗證。3b.7 Playwright E2E 仍未開。
 詳細狀態見下方〈路線圖〉每個階段標記。
 
 ## 架構
@@ -283,13 +283,14 @@
       `allowed_tags` + `denied_tags`；catalog list / detail endpoint
       套用過濾；proxy 呼叫時防禦性二次檢查
 - [x] **Admin UI**：
-  - `/admin/providers`：list + 新增（一次性 banner 顯示明文）+ rotate + 停用
+  - `/admin/providers`：list + 新增（一次性 banner 顯示明文）+ rotate + 停用 + 測試連線
   - `/admin/tags`：tag CRUD + bulk 批次貼標（select members → apply tag）
   - `/admin/model-access`：選 model → 設定 default_access + allow / deny tags（後端 endpoint：`PATCH /admin/catalog/models/{slug}/access`）
+  - `/admin/catalog-manage`：列現有 catalog model + 新增 + 移除（後端 endpoints：`GET/POST/PATCH/DELETE /admin/catalog/models[/{slug:path}]`，含 audit）
 
 **成功標準（次要）：**
 - [x] 既有 `AZURE_OPENAI_API_KEY` env 提供 migration script 灌入 DB 後可移除
-- [ ] Provider 加 `test-connection` endpoint（呼一次 `/models` 驗證）
+- [x] Provider 加 `test-connection` endpoint（`POST /admin/providers/{id}/test-connection`，回 `{ok, model, latency_ms}` 或 `{ok:false, error_type, message}`；UI 含「測試連線」按鈕）
 - [x] 同 provider 多把 key 採 round-robin 或最少用量（首版 round-robin 即可）
 
 **明確排除（留更後）：**
