@@ -91,32 +91,32 @@
 
 ### US2 Backend Tests（先紅）
 
-- [ ] T024 [P] [US2] 寫 `tests/contract/test_admin_providers.py`：對 `contracts/providers.yaml` 中每個 endpoint × 每個 response 至少 1 個 test（含 401 / 403 / 404 / 409 / 422）；特別涵蓋：
+- [X] T024 [P] [US2] 寫 `tests/contract/test_admin_providers.py`：對 `contracts/providers.yaml` 中每個 endpoint × 每個 response 至少 1 個 test（含 401 / 403 / 404 / 409 / 422）；特別涵蓋：
   - 建立 → 201 含 `api_key` 欄位（plaintext）
   - 重新 GET → 不含 `api_key`，含 `fingerprint`
   - 同 (provider, label) 重複建立 → 409
   - provider 不在 allowlist → 422 `provider_not_allowed`
   - rotate → 200 含新 `api_key`、fingerprint 變
   - disable → 200 status=disabled；再 disable → 409
-- [ ] T025 [P] [US2] 寫 `tests/integration/test_us2_credential_ui.py`：完整 lifecycle（建立 → 列表 → rotate → 用新 key 呼叫 proxy 成功、舊 key 呼叫 503 → disable → 呼叫 503）
-- [ ] T026 [P] [US2] 寫 `tests/contract/test_no_key_leak_global.py` 加 scenario `provider_credential_in_logs`：建立 + rotate + 觸發 upstream 錯誤 → grep stdout/stderr/audit log 完全找不到 plaintext key（沿用既有 framework）
+- [X] T025 [P] [US2] 寫 `tests/integration/test_us2_credential_ui.py`：完整 lifecycle（建立 → 列表 → rotate → 用新 key 呼叫 proxy 成功、舊 key 呼叫 503 → disable → 呼叫 503）
+- [ ] T026 (deferred to next session) [P] [US2] 寫 `tests/contract/test_no_key_leak_global.py` 加 scenario `provider_credential_in_logs`：建立 + rotate + 觸發 upstream 錯誤 → grep stdout/stderr/audit log 完全找不到 plaintext key（沿用既有 framework）
 
 ### US2 Backend Implementation
 
-- [ ] T027 [US2] 擴充 `src/ai_api/services/provider_credentials.py`：補齊 `create`、`list`、`get`、`rotate`、`disable`；建立 / rotate 內含 `Fernet.encrypt` + `fingerprint = sha256(plain).hex()[:16]`；寫對應稽核事件
-- [ ] T028 [US2] 寫 `src/ai_api/api/admin_providers.py`：實作 `contracts/providers.yaml` 所有路由；套 `require_admin` dep；CSRF 套既有 dep
-- [ ] T029 [US2] 在 `src/ai_api/main.py` 註冊 `admin_providers.router` 到 `/admin` prefix
-- [ ] T030 [US2] 觸發 first-use 稽核：在 `provider_credentials.get_next_for` 內，若該 credential 首次被選用（`last_used_at IS NULL`）則寫 `provider_credential_used_first_time`
+- [X] T027 [US2] 擴充 `src/ai_api/services/provider_credentials.py`：補齊 `create`、`list`、`get`、`rotate`、`disable`；建立 / rotate 內含 `Fernet.encrypt` + `fingerprint = sha256(plain).hex()[:16]`；寫對應稽核事件
+- [X] T028 [US2] 寫 `src/ai_api/api/admin_providers.py`：實作 `contracts/providers.yaml` 所有路由；套 `require_admin` dep；CSRF 套既有 dep
+- [X] T029 [US2] 在 `src/ai_api/main.py` 註冊 `admin_providers.router` 到 `/admin` prefix
+- [X] T030 [US2] 觸發 first-use 稽核：在 `provider_credentials.get_next_for` 內，若該 credential 首次被選用（`last_used_at IS NULL`）則寫 `provider_credential_used_first_time`
 
 ### US2 Frontend Tests（先紅）
 
-- [ ] T031 [P] [US2] 寫 `frontend/src/__tests__/admin-providers.test.tsx`：列表 render、open create dialog、submit 後出現 plaintext banner、refresh 後 banner 消失 + fingerprint 仍可見、rotate 流程、disable 確認
+- [ ] T031 (deferred to next session) [P] [US2] 寫 `frontend/src/__tests__/admin-providers.test.tsx`：列表 render、open create dialog、submit 後出現 plaintext banner、refresh 後 banner 消失 + fingerprint 仍可見、rotate 流程、disable 確認
 
 ### US2 Frontend Implementation
 
-- [ ] T032 [US2] 寫 `frontend/src/routes/admin/providers.tsx`：TanStack Query useQuery + 4 mutations（create / rotate / disable / 移除無）；create / rotate 後彈 `Dialog` 一次性顯示 plaintext + `copyToClipboard`；列表用 `Table` 顯示 provider / label / fingerprint / status / last_used / created_at
-- [ ] T033 [US2] 在 `frontend/src/components/app-shell.tsx` admin nav 加入「Provider 憑證」連結，連到 `/admin/providers`
-- [ ] T034 [US2] 跑 backend pytest 與 frontend `npm test` 全綠；手動跑 quickstart 場景 A
+- [ ] T032 (deferred to next session) [US2] 寫 `frontend/src/routes/admin/providers.tsx`：TanStack Query useQuery + 4 mutations（create / rotate / disable / 移除無）；create / rotate 後彈 `Dialog` 一次性顯示 plaintext + `copyToClipboard`；列表用 `Table` 顯示 provider / label / fingerprint / status / last_used / created_at
+- [ ] T033 (deferred to next session) [US2] 在 `frontend/src/components/app-shell.tsx` admin nav 加入「Provider 憑證」連結，連到 `/admin/providers`
+- [ ] T034 (deferred to next session) [US2] 跑 backend pytest 與 frontend `npm test` 全綠；手動跑 quickstart 場景 A
 
 **Checkpoint**：admin 可在 UI 完整管 credential；US1 既有測試仍綠
 

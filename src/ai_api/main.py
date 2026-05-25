@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from ai_api.api import (
     admin_access,
     admin_members,
+    admin_providers,
     allocations,
     auth,
     catalog,
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(allocations.router, prefix="/admin", tags=["admin"])
     app.include_router(records.router, prefix="/admin", tags=["admin"])
     app.include_router(admin_members.router, prefix="/admin", tags=["admin-members"])
+    app.include_router(admin_providers.router, prefix="/admin", tags=["admin-providers"])
     app.include_router(admin_access.router, prefix="/admin", tags=["admin-access"])
     app.include_router(usage.router, prefix="/admin", tags=["admin-usage"])
     app.include_router(quota_pool.router, prefix="/admin", tags=["admin-quota-pool"])

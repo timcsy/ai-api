@@ -1,8 +1,4 @@
-"""Phase 5: ProviderCredential service.
-
-US1 MVP scope: get_next_credential (round-robin by last_used_at) + decrypt.
-Full admin CRUD lands in US2.
-"""
+"""Phase 5: ProviderCredential service — full admin CRUD + round-robin selection."""
 from __future__ import annotations
 
 import hashlib
@@ -14,7 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from ulid import ULID
 
-from ai_api.models import ProviderCredential, ProviderCredentialStatus
+from ai_api.auth.audit import record as audit_record
+from ai_api.models import ActorType, AuditEventType, ProviderCredential, ProviderCredentialStatus
 from ai_api.services.crypto import decrypt_str, encrypt_str
 
 
@@ -24,6 +21,18 @@ class ProviderUnavailableError(Exception):
     def __init__(self, provider: str) -> None:
         super().__init__(f"no active credential for provider {provider!r}")
         self.provider = provider
+
+
+class DuplicateLabelError(Exception):
+    """Raised when (provider, label) already exists."""
+
+
+class CannotRotateError(Exception):
+    """Raised when a non-active credential is asked to rotate."""
+
+
+class AlreadyDisabledError(Exception):
+    """Raised when an already-disabled credential is asked to disable."""
 
 
 @dataclass(frozen=True)
@@ -65,8 +74,18 @@ class ProviderCredentialService:
         cred = (await self._s.execute(stmt)).scalar_one_or_none()
         if cred is None:
             return None
+        first_use = cred.last_used_at is None
         cred.last_used_at = datetime.now(UTC)
         await self._s.flush()
+        if first_use:
+            await audit_record(
+                self._s,
+                event_type=AuditEventType.provider_credential_used_first_time,
+                actor_type=ActorType.system,
+                target_type="provider_credential",
+                target_id=cred.id,
+                details={"provider": cred.provider, "label": cred.label},
+            )
         plain = decrypt_str(cred.enc_key)
         return ResolvedCredential(
             id=cred.id,
@@ -89,6 +108,18 @@ class ProviderCredentialService:
     ) -> ProviderCredential:
         """Create a new credential. Plaintext is encrypted; caller may keep `api_key` for
         one-time display before discarding."""
+        # Pre-check (provider, label) uniqueness for a clean 409 instead of relying
+        # on DB UNIQUE constraint error parsing.
+        existing = await self._s.execute(
+            select(ProviderCredential).where(
+                ProviderCredential.provider == provider,
+                ProviderCredential.label == label,
+            )
+        )
+        if existing.scalar_one_or_none() is not None:
+            raise DuplicateLabelError(
+                f"credential with provider={provider!r} label={label!r} already exists"
+            )
         cred = ProviderCredential(
             id=str(ULID()),
             provider=provider,
@@ -103,4 +134,69 @@ class ProviderCredentialService:
         )
         self._s.add(cred)
         await self._s.flush()
+        await audit_record(
+            self._s,
+            event_type=AuditEventType.provider_credential_created,
+            actor_type=ActorType.admin,
+            actor_id=created_by,
+            target_type="provider_credential",
+            target_id=cred.id,
+            details={"provider": provider, "label": label, "fingerprint": cred.fingerprint},
+        )
+        return cred
+
+    async def list(
+        self,
+        provider: str | None = None,
+        status: ProviderCredentialStatus | None = None,
+    ) -> list[ProviderCredential]:
+        stmt = select(ProviderCredential).order_by(ProviderCredential.created_at.desc())
+        if provider is not None:
+            stmt = stmt.where(ProviderCredential.provider == provider)
+        if status is not None:
+            stmt = stmt.where(ProviderCredential.status == status)
+        return list((await self._s.execute(stmt)).scalars().all())
+
+    async def get(self, credential_id: str) -> ProviderCredential | None:
+        return await self._s.get(ProviderCredential, credential_id)
+
+    async def rotate(self, credential_id: str, new_api_key: str) -> ProviderCredential | None:
+        """Replace enc_key + fingerprint in place; old plaintext immediately invalid."""
+        cred = await self._s.get(ProviderCredential, credential_id)
+        if cred is None:
+            return None
+        if cred.status != ProviderCredentialStatus.active:
+            raise CannotRotateError(
+                f"credential {credential_id} is not active (status={cred.status.value})"
+            )
+        cred.enc_key = encrypt_str(new_api_key)
+        cred.fingerprint = _fingerprint(new_api_key)
+        await self._s.flush()
+        await audit_record(
+            self._s,
+            event_type=AuditEventType.provider_credential_rotated,
+            actor_type=ActorType.admin,
+            target_type="provider_credential",
+            target_id=cred.id,
+            details={"provider": cred.provider, "label": cred.label, "fingerprint": cred.fingerprint},
+        )
+        return cred
+
+    async def disable(self, credential_id: str) -> ProviderCredential | None:
+        cred = await self._s.get(ProviderCredential, credential_id)
+        if cred is None:
+            return None
+        if cred.status == ProviderCredentialStatus.disabled:
+            raise AlreadyDisabledError(f"credential {credential_id} is already disabled")
+        cred.status = ProviderCredentialStatus.disabled
+        cred.disabled_at = datetime.now(UTC)
+        await self._s.flush()
+        await audit_record(
+            self._s,
+            event_type=AuditEventType.provider_credential_disabled,
+            actor_type=ActorType.admin,
+            target_type="provider_credential",
+            target_id=cred.id,
+            details={"provider": cred.provider, "label": cred.label},
+        )
         return cred
