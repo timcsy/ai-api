@@ -58,5 +58,8 @@ async def test_create_then_proxy_call_succeeds(
 
     # Credentials came from settings (Azure env fallback), not the request.
     # Model gets normalized with provider prefix for litellm routing.
-    assert captured["api_key"] == "test-azure-key-DO-NOT-LEAK"
+    # api_key value comes from AZURE_OPENAI_API_KEY env (set differently in
+    # conftest vs CI) — assert it's truthy and not the request payload.
+    import os
+    assert captured["api_key"] == os.environ["AZURE_OPENAI_API_KEY"]
     assert captured["model"] == "azure/gpt-4o-mini"
