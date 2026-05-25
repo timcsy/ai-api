@@ -177,9 +177,12 @@ export function AdminProvidersPage() {
     message?: string;
   }
 
-  const testMut = useMutation<TestResult, ApiError, string>({
-    mutationFn: (id) =>
-      api<TestResult>(`/admin/providers/${id}/test-connection`, { method: "POST" }),
+  const testMut = useMutation<TestResult, ApiError, { id: string; model?: string }>({
+    mutationFn: ({ id, model }) =>
+      api<TestResult>(
+        `/admin/providers/${id}/test-connection${model ? `?model=${encodeURIComponent(model)}` : ""}`,
+        { method: "POST" },
+      ),
     onSuccess: (r) => {
       if (r.ok) {
         toast({
@@ -267,10 +270,17 @@ export function AdminProvidersPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={testMut.isPending && testMut.variables === c.id}
-                      onClick={() => testMut.mutate(c.id)}
+                      disabled={testMut.isPending && testMut.variables?.id === c.id}
+                      onClick={() => {
+                        const customModel = window.prompt(
+                          `測試 ${c.provider} credential（${c.label}）— 留空走預設 model；填入指定 model（Azure deployment 名稱 / OpenAI model id 等）`,
+                          "",
+                        );
+                        if (customModel === null) return;
+                        testMut.mutate({ id: c.id, model: customModel.trim() || undefined });
+                      }}
                     >
-                      {testMut.isPending && testMut.variables === c.id ? "測試中…" : "測試連線"}
+                      {testMut.isPending && testMut.variables?.id === c.id ? "測試中…" : "測試連線"}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => setRotateOpenFor(c)}>
                       Rotate

@@ -18,6 +18,7 @@ const subNavClass = ({ isActive }: { isActive: boolean }) =>
   );
 
 const ADMIN_SUBNAV = [
+  { to: "/admin", label: "首頁", end: true },
   { to: "/admin/members", label: "成員" },
   { to: "/admin/allocations", label: "分配" },
   { to: "/admin/providers", label: "Provider 憑證" },
@@ -28,6 +29,7 @@ const ADMIN_SUBNAV = [
   { to: "/admin/usage", label: "用量" },
   { to: "/admin/quota-pool", label: "配額池" },
   { to: "/admin/rebalance-log", label: "Rebalance 記錄" },
+  { to: "/admin/audit", label: "稽核紀錄" },
 ];
 
 export function AppShell() {
@@ -71,7 +73,7 @@ export function AppShell() {
           <div className="border-t bg-background/60">
             <div className="container mx-auto flex h-10 items-center gap-5 overflow-x-auto">
               {ADMIN_SUBNAV.map((item) => (
-                <NavLink key={item.to} to={item.to} className={subNavClass}>
+                <NavLink key={item.to} to={item.to} className={subNavClass} end={item.end}>
                   {item.label}
                 </NavLink>
               ))}

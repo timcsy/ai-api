@@ -7,7 +7,9 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/auth";
 import { AdminAllocationsPage } from "@/routes/admin/allocations";
+import { AdminAuditPage } from "@/routes/admin/audit";
 import { AdminCatalogManagePage } from "@/routes/admin/catalog-manage";
+import { AdminHomePage } from "@/routes/admin/home";
 import { AdminMembersPage } from "@/routes/admin/members";
 import { AdminModelAccessPage } from "@/routes/admin/model-access";
 import { AdminProvidersPage } from "@/routes/admin/providers";
@@ -56,7 +58,7 @@ export function App() {
 
               {/* Admin routes (Phase 3b.2) */}
               <Route element={<AdminRoute />}>
-                <Route path="/admin" element={<Navigate to="/admin/members" replace />} />
+                <Route path="/admin" element={<AdminHomePage />} />
                 <Route path="/admin/members" element={<AdminMembersPage />} />
                 <Route path="/admin/allocations" element={<AdminAllocationsPage />} />
                 <Route path="/admin/usage" element={<AdminUsagePage />} />
@@ -70,6 +72,7 @@ export function App() {
                 <Route path="/admin/tags" element={<AdminTagsPage />} />
                 <Route path="/admin/model-access" element={<AdminModelAccessPage />} />
                 <Route path="/admin/catalog-manage" element={<AdminCatalogManagePage />} />
+                <Route path="/admin/audit" element={<AdminAuditPage />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFoundPage />} />

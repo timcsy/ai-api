@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ai_api.api import (
     admin_access,
+    admin_audit,
     admin_catalog,
     admin_members,
     admin_model_access,
@@ -69,6 +70,7 @@ def create_app() -> FastAPI:
     # .../{slug}) so the more-specific /access route wins via order.
     app.include_router(admin_model_access.router, prefix="/admin", tags=["admin-model-access"])
     app.include_router(admin_catalog.router, prefix="/admin", tags=["admin-catalog"])
+    app.include_router(admin_audit.router, prefix="/admin", tags=["admin-audit"])
     app.include_router(admin_access.router, prefix="/admin", tags=["admin-access"])
     app.include_router(usage.router, prefix="/admin", tags=["admin-usage"])
     app.include_router(quota_pool.router, prefix="/admin", tags=["admin-quota-pool"])

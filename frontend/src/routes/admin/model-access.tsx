@@ -72,6 +72,25 @@ export function AdminModelAccessPage() {
   const [allowInput, setAllowInput] = React.useState("");
   const [denyInput, setDenyInput] = React.useState("");
 
+  // Live preview: how many members would see this model under the current
+  // (in-form) policy? Re-fetches on debounced changes.
+  const previewQuery = useQuery<
+    { slug: string; visible_member_count: number; total_active_members: number; provider_has_credential: boolean },
+    ApiError
+  >({
+    queryKey: ["admin", "access-preview", selectedSlug, defaultAccess, allowedTags, deniedTags],
+    queryFn: () =>
+      api(`/admin/catalog/models/${selectedSlug}/access-preview`, {
+        method: "POST",
+        body: JSON.stringify({
+          default_access: defaultAccess,
+          allowed_tags: allowedTags,
+          denied_tags: deniedTags,
+        }),
+      }),
+    enabled: !!selectedSlug,
+  });
+
   const patchMut = useMutation<AccessPolicy, ApiError, AccessPolicy>({
     mutationFn: (data) =>
       api(`/admin/catalog/models/${data.slug}/access`, {
@@ -259,19 +278,38 @@ export function AdminModelAccessPage() {
               </div>
             </div>
 
-            <Button
-              disabled={patchMut.isPending}
-              onClick={() =>
-                patchMut.mutate({
-                  slug: selectedSlug,
-                  default_access: defaultAccess,
-                  allowed_tags: allowedTags,
-                  denied_tags: deniedTags,
-                })
-              }
-            >
-              {patchMut.isPending ? "套用中…" : "套用"}
-            </Button>
+            <div className="flex items-center justify-between gap-3 border-t pt-4">
+              <div className="text-sm">
+                {previewQuery.isLoading && (
+                  <span className="text-muted-foreground">計算可見性中…</span>
+                )}
+                {previewQuery.data && !previewQuery.data.provider_has_credential && (
+                  <span className="text-amber-700">
+                    ⚠ 該 provider 沒有 active credential — 套用後 model 仍對所有 member 隱藏
+                  </span>
+                )}
+                {previewQuery.data && previewQuery.data.provider_has_credential && (
+                  <span>
+                    將影響{" "}
+                    <strong>{previewQuery.data.visible_member_count}</strong> /{" "}
+                    {previewQuery.data.total_active_members} 個 active member
+                  </span>
+                )}
+              </div>
+              <Button
+                disabled={patchMut.isPending}
+                onClick={() =>
+                  patchMut.mutate({
+                    slug: selectedSlug,
+                    default_access: defaultAccess,
+                    allowed_tags: allowedTags,
+                    denied_tags: deniedTags,
+                  })
+                }
+              >
+                {patchMut.isPending ? "套用中…" : "套用"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}

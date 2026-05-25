@@ -94,6 +94,7 @@ async def create_provider(
     session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     from sqlalchemy import select as _select
+
     from ai_api.services.provider_credentials import _fingerprint
 
     settings = get_settings()
@@ -221,7 +222,8 @@ async def test_provider_connection(
                 ),
             )
 
-    from datetime import UTC, datetime as _dt
+    from datetime import UTC
+    from datetime import datetime as _dt
 
     upstream_model = f"{cred.provider}/{model}" if "/" not in model else model
     api_key = decrypt_str(cred.enc_key)

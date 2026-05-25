@@ -91,11 +91,166 @@ def _to_dict(m: ModelCatalog) -> dict[str, Any]:
 async def admin_list_models(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict[str, Any]]:
-    """Admin sees ALL models (no credential gate / no access policy filter)."""
+    """Admin sees ALL models (no credential gate / no access policy filter).
+
+    Each row includes `visibility` derived metadata so admin can spot models
+    that are hidden from members despite being in the catalog:
+      - `provider_has_credential`: any active credential for this provider
+      - `visible_member_count`: how many active members can actually see it
+        (after both gates: credential + access policy)
+    """
+    from ai_api.models import (
+        Allocation,
+        Member,
+        MemberStatus,
+        MemberTag,
+        ProviderCredential,
+        ProviderCredentialStatus,
+    )
+    from ai_api.services.model_access import access_policy_allows
+
     rows = list((await session.execute(
         select(ModelCatalog).order_by(ModelCatalog.slug)
     )).scalars().all())
-    return [_to_dict(m) for m in rows]
+
+    # Which providers currently have an active credential?
+    active_providers_q = await session.execute(
+        select(ProviderCredential.provider)
+        .where(ProviderCredential.status == ProviderCredentialStatus.active)
+        .distinct()
+    )
+    active_providers = set(active_providers_q.scalars().all())
+
+    # All active members + their tag sets (small N for org-internal).
+    members_q = await session.execute(
+        select(Member).where(Member.status == MemberStatus.active)
+    )
+    members = list(members_q.scalars().all())
+    tags_q = await session.execute(select(MemberTag.member_id, MemberTag.tag))
+    tags_by_member: dict[str, set[str]] = {}
+    for mid, tag in tags_q.all():
+        tags_by_member.setdefault(mid, set()).add(tag)
+
+    # Count allocations bound to each slug (for D — orphan model hint).
+    alloc_q = await session.execute(
+        select(Allocation.resource_model)
+    )
+    alloc_counts: dict[str, int] = {}
+    for (rm,) in alloc_q.all():
+        alloc_counts[rm] = alloc_counts.get(rm, 0) + 1
+
+    out: list[dict[str, Any]] = []
+    for m in rows:
+        provider_has_cred = m.provider in active_providers
+        if not provider_has_cred:
+            visible = 0
+        else:
+            visible = sum(
+                1
+                for member in members
+                if access_policy_allows(m, tags_by_member.get(member.id, set()))
+            )
+        body = _to_dict(m)
+        body["visibility"] = {
+            "provider_has_credential": provider_has_cred,
+            "visible_member_count": visible,
+            "total_active_members": len(members),
+            "allocation_count": alloc_counts.get(m.slug, 0),
+        }
+        out.append(body)
+    return out
+
+
+class AccessPreviewRequest(BaseModel):
+    default_access: DefaultAccess
+    allowed_tags: list[str] = Field(default_factory=list)
+    denied_tags: list[str] = Field(default_factory=list)
+
+
+@router.post("/catalog/models/{slug:path}/access-preview")
+async def admin_preview_access(
+    slug: str,
+    payload: AccessPreviewRequest = Body(...),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Preview which active members would see this model under a hypothetical
+    policy — without writing changes."""
+    from types import SimpleNamespace
+
+    from ai_api.models import (
+        Member,
+        MemberStatus,
+        MemberTag,
+        ProviderCredential,
+        ProviderCredentialStatus,
+    )
+    from ai_api.services.model_access import access_policy_allows
+
+    m = await session.get(ModelCatalog, slug)
+    if m is None:
+        raise HTTPException(status_code=404, detail=_err("not_found", "model not found"))
+
+    has_cred_q = await session.execute(
+        select(ProviderCredential).where(
+            ProviderCredential.provider == m.provider,
+            ProviderCredential.status == ProviderCredentialStatus.active,
+        ).limit(1)
+    )
+    provider_has_cred = has_cred_q.scalar_one_or_none() is not None
+
+    members_q = await session.execute(
+        select(Member).where(Member.status == MemberStatus.active)
+    )
+    members = list(members_q.scalars().all())
+    tags_q = await session.execute(select(MemberTag.member_id, MemberTag.tag))
+    tags_by_member: dict[str, set[str]] = {}
+    for mid, tag in tags_q.all():
+        tags_by_member.setdefault(mid, set()).add(tag)
+
+    pretend = SimpleNamespace(
+        default_access=payload.default_access,
+        allowed_tags=payload.allowed_tags,
+        denied_tags=payload.denied_tags,
+    )
+    visible_ids = [
+        mb.id
+        for mb in members
+        if provider_has_cred
+        and access_policy_allows(pretend, tags_by_member.get(mb.id, set()))  # type: ignore[arg-type]
+    ]
+    return {
+        "slug": slug,
+        "provider_has_credential": provider_has_cred,
+        "visible_member_count": len(visible_ids),
+        "visible_member_ids": visible_ids[:50],  # cap for payload size
+        "total_active_members": len(members),
+    }
+
+
+@router.get("/catalog/models/{slug:path}/dependents")
+async def admin_list_dependents(
+    slug: str,
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """List allocations bound to this slug — admin sees what will break if model is deleted."""
+    from ai_api.models import Allocation
+    q = await session.execute(
+        select(Allocation).where(Allocation.resource_model == slug)
+    )
+    allocs = q.scalars().all()
+    return {
+        "slug": slug,
+        "allocation_count": len(allocs),
+        "allocations": [
+            {
+                "id": a.id,
+                "member_id": a.member_id,
+                "subject_snapshot": a.subject_snapshot,
+                "status": a.status.value,
+            }
+            for a in allocs[:50]
+        ],
+    }
 
 
 @router.post(

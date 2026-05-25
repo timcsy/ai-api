@@ -52,6 +52,22 @@ interface CatalogModel {
   default_access: "open" | "restricted";
   allowed_tags: string[];
   denied_tags: string[];
+  visibility?: {
+    provider_has_credential: boolean;
+    visible_member_count: number;
+    total_active_members: number;
+    allocation_count: number;
+  };
+}
+
+interface Dependents {
+  slug: string;
+  allocation_count: number;
+  allocations: Array<{
+    id: string;
+    subject_snapshot: string;
+    status: string;
+  }>;
 }
 
 const PROVIDERS = ["azure", "openai", "anthropic", "gemini"] as const;
@@ -66,6 +82,66 @@ const createSchema = z.object({
 });
 
 type CreateForm = z.infer<typeof createSchema>;
+
+function DeleteWithDependentsDialog({
+  target,
+  onCancel,
+  onConfirm,
+}: {
+  target: CatalogModel | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const depQuery = useQuery<Dependents, ApiError>({
+    queryKey: ["admin", "catalog-model-dependents", target?.slug],
+    queryFn: () =>
+      api<Dependents>(`/admin/catalog/models/${target!.slug}/dependents`),
+    enabled: target !== null,
+  });
+  return (
+    <AlertDialog open={target !== null} onOpenChange={(v) => !v && onCancel()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>從 catalog 移除？</AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-2">
+              {target && <code className="text-xs">{target.slug}</code>}
+              {depQuery.isLoading && <p className="text-xs">檢查依賴中…</p>}
+              {depQuery.data && depQuery.data.allocation_count > 0 ? (
+                <div className="rounded-md border border-destructive bg-destructive/10 p-2 text-xs space-y-1">
+                  <p className="font-semibold">
+                    ⚠ {depQuery.data.allocation_count} 筆 allocation 依賴此 model；
+                    移除後它們的呼叫會回 503 provider_unavailable。
+                  </p>
+                  <ul className="list-disc pl-4">
+                    {depQuery.data.allocations.slice(0, 5).map((a) => (
+                      <li key={a.id}>
+                        {a.subject_snapshot} <span className="text-muted-foreground">({a.status})</span>
+                      </li>
+                    ))}
+                    {depQuery.data.allocation_count > 5 && (
+                      <li className="text-muted-foreground">
+                        … 還有 {depQuery.data.allocation_count - 5} 筆
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              ) : (
+                depQuery.data && (
+                  <p className="text-xs text-muted-foreground">無 allocation 依賴此 model。</p>
+                )
+              )}
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>取消</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm}>確定移除</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 
 export function AdminCatalogManagePage() {
   const queryClient = useQueryClient();
@@ -143,10 +219,11 @@ export function AdminCatalogManagePage() {
           <TableRow>
             <TableHead>Slug</TableHead>
             <TableHead>顯示名稱</TableHead>
-            <TableHead>Provider</TableHead>
-            <TableHead>Cost Tier</TableHead>
-            <TableHead>Access</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead>供應商</TableHead>
+            <TableHead>成本</TableHead>
+            <TableHead>存取</TableHead>
+            <TableHead>對成員可見</TableHead>
+            <TableHead>狀態</TableHead>
             <TableHead className="text-right">動作</TableHead>
           </TableRow>
         </TableHeader>
@@ -158,12 +235,15 @@ export function AdminCatalogManagePage() {
           )}
           {query.data?.length === 0 && (
             <TableRow>
-              <TableCell colSpan={7} className="text-muted-foreground">
+              <TableCell colSpan={8} className="text-muted-foreground">
                 Catalog 是空的。按「加入 Model」開始。
               </TableCell>
             </TableRow>
           )}
-          {query.data?.map((m) => (
+          {query.data?.map((m) => {
+            const vis = m.visibility;
+            const hidden = vis && vis.visible_member_count === 0;
+            return (
             <TableRow key={m.slug}>
               <TableCell className="font-mono text-xs">{m.slug}</TableCell>
               <TableCell>{m.display_name}</TableCell>
@@ -179,6 +259,23 @@ export function AdminCatalogManagePage() {
                   <span className="ml-1 text-xs text-muted-foreground">
                     +{m.allowed_tags.length}/-{m.denied_tags.length}
                   </span>
+                )}
+              </TableCell>
+              <TableCell>
+                {!vis ? (
+                  <span className="text-xs text-muted-foreground">—</span>
+                ) : !vis.provider_has_credential ? (
+                  <Badge variant="outline" className="text-amber-700 border-amber-500">
+                    ⚠ 無 credential
+                  </Badge>
+                ) : hidden ? (
+                  <Badge variant="outline" className="text-amber-700 border-amber-500">
+                    ⚠ 0 / {vis.total_active_members}
+                  </Badge>
+                ) : (
+                  <Badge variant="default">
+                    {vis.visible_member_count} / {vis.total_active_members}
+                  </Badge>
                 )}
               </TableCell>
               <TableCell>
@@ -198,7 +295,7 @@ export function AdminCatalogManagePage() {
                 </Button>
               </TableCell>
             </TableRow>
-          ))}
+          );})}
         </TableBody>
       </Table>
 
@@ -330,32 +427,11 @@ export function AdminCatalogManagePage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog
-        open={deleteConfirm !== null}
-        onOpenChange={(v) => !v && setDeleteConfirm(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>從 catalog 移除？</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteConfirm && (
-                <code className="text-xs">{deleteConfirm.slug}</code>
-              )}
-              <span className="block mt-2">
-                移除後 member 將看不到、也呼叫不到此 model。既有 allocation 若綁定此 model 仍存在但會 503。
-              </span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteConfirm && deleteMut.mutate(deleteConfirm.slug)}
-            >
-              移除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteWithDependentsDialog
+        target={deleteConfirm}
+        onCancel={() => setDeleteConfirm(null)}
+        onConfirm={() => deleteConfirm && deleteMut.mutate(deleteConfirm.slug)}
+      />
     </div>
   );
 }

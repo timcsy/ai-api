@@ -56,8 +56,15 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <code className="text-sm bg-muted px-2 py-1 rounded">
-              {(member?.gateway_base_url ?? window.location.origin)}/v1
+              {window.location.origin}/v1
             </code>
+            {member?.gateway_base_url &&
+              !window.location.origin.startsWith(member.gateway_base_url) && (
+              <p className="text-xs text-muted-foreground mt-2">
+                如果你從其他主機呼叫，可改用 admin 設定的 base URL：
+                <code className="ml-1">{member.gateway_base_url}/v1</code>
+              </p>
+            )}
           </CardContent>
         </Card>
         <Alert className="mt-3">
