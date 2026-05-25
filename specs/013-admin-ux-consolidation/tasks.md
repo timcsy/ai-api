@@ -11,8 +11,8 @@
 
 ## Phase 1: Setup（共享基礎）
 
-- [ ] T001 確認 React Router DOM v7 (`react-router-dom@^7`) 已安裝；如未到位則 `cd frontend && npm install react-router-dom@^7`（plan 預設沿用既有版本，本任務只驗證）
-- [ ] T002 [P] 在 `frontend/src/routes/admin/` 建立空殼檔案：`model.tsx`、`model-detail.tsx`、`member-detail.tsx`、`tag-detail.tsx`、`observability.tsx`，每檔 default export 一個 placeholder component（讓 App.tsx 可先掛 route，UI 後續填）
+- [X] T001 確認 React Router DOM v7 (`react-router-dom@^7`) 已安裝；如未到位則 `cd frontend && npm install react-router-dom@^7`（plan 預設沿用既有版本，本任務只驗證）
+- [X] T002 [P] 在 `frontend/src/routes/admin/` 建立空殼檔案：`model.tsx`、`model-detail.tsx`、`member-detail.tsx`、`tag-detail.tsx`、`observability.tsx`，每檔 default export 一個 placeholder component（讓 App.tsx 可先掛 route，UI 後續填）
 
 ---
 
@@ -22,32 +22,32 @@
 
 ### 後端 — Visibility 診斷服務
 
-- [ ] T003 寫 `tests/unit/test_visibility_diagnose.py`（紅）：純函式 `evaluate_visibility(member, model, active_providers)`，至少 6 案例：
+- [X] T003 寫 `tests/unit/test_visibility_diagnose.py`（紅）：純函式 `evaluate_visibility(member, model, active_providers)`，至少 6 案例：
   - 全通過 → visible=True
   - credential_gate 失敗 → 短路停止
   - default_access=open + 無 deny 命中 → 通過
   - default_access=open + deny 命中 → 失敗
   - default_access=restricted + allow 命中 → 通過
   - default_access=restricted + allow 不命中 → 失敗
-- [ ] T004 在 `src/ai_api/services/model_access.py` 加 `evaluate_visibility()` 函式，回 `VisibilityResult` typed dict（重用既有 `access_policy_allows` 邏輯，包成有 reason_chain 版本）；讓 T003 綠
-- [ ] T005 [P] 寫 `tests/contract/test_admin_diagnose.py`：對 `contracts/diagnose.yaml` 兩個 endpoint，含 401/403/404 + 各種 reason_chain 路徑
-- [ ] T006 寫 `src/ai_api/api/admin_diagnose.py`：
+- [X] T004 在 `src/ai_api/services/model_access.py` 加 `evaluate_visibility()` 函式，回 `VisibilityResult` typed dict（重用既有 `access_policy_allows` 邏輯，包成有 reason_chain 版本）；讓 T003 綠
+- [X] T005 [P] 寫 `tests/contract/test_admin_diagnose.py`：對 `contracts/diagnose.yaml` 兩個 endpoint，含 401/403/404 + 各種 reason_chain 路徑
+- [X] T006 寫 `src/ai_api/api/admin_diagnose.py`：
   - `GET /admin/diagnose/visibility?member_id=...&model_slug=...`
   - `GET /admin/members/{member_id}/visible-models`
   - 兩者 require_admin_token，無 audit
-- [ ] T007 在 `src/ai_api/main.py` 註冊 `admin_diagnose.router` 到 `/admin` prefix
-- [ ] T008 跑 T003 + T005 全綠；既有 264 backend 測試零回歸
+- [X] T007 在 `src/ai_api/main.py` 註冊 `admin_diagnose.router` 到 `/admin` prefix
+- [X] T008 跑 T003 + T005 全綠；既有 264 backend 測試零回歸
 
 ### 前端 — Legacy URL Redirect
 
-- [ ] T009 [P] 寫 `frontend/src/__tests__/legacy-redirects.test.tsx`（紅）：9 個舊 URL 各驗 redirect 到新 URL
-- [ ] T010 寫 `frontend/src/lib/legacy-redirects.tsx`：export 一個 `<LegacyRedirects />` 元件，包 9 個 `<Route element={<Navigate ... />}>` 給 R2 表中所有舊路徑
-- [ ] T011 在 `App.tsx` 把 `<LegacyRedirects />` 掛在所有 admin route 之**前**（讓舊 URL 先 redirect 再 fallback NotFound）；確認舊 URL 100% 跳新位置（手測 SC-005）
+- [X] T009 [P] 寫 `frontend/src/__tests__/legacy-redirects.test.tsx`（紅）：9 個舊 URL 各驗 redirect 到新 URL
+- [X] T010 寫 `frontend/src/lib/legacy-redirects.tsx`：export 一個 `<LegacyRedirects />` 元件，包 9 個 `<Route element={<Navigate ... />}>` 給 R2 表中所有舊路徑
+- [X] T011 在 `App.tsx` 把 `<LegacyRedirects />` 掛在所有 admin route 之**前**（讓舊 URL 先 redirect 再 fallback NotFound）；確認舊 URL 100% 跳新位置（手測 SC-005）
 
 ### 前端 — Visibility 診斷元件
 
-- [ ] T012 [P] 寫 `frontend/src/__tests__/visibility-diagnose.test.tsx`（紅）：mock /admin/diagnose endpoint，驗 reason_chain 渲染 + 失敗 check 旁有「修補」CTA
-- [ ] T013 寫 `frontend/src/components/visibility-diagnose.tsx`：可重用面板，props `(memberId?, modelSlug?)`；內含 member 與 model 兩個 picker、結果列表、各失敗 check 的修補 mutation（加 tag / 新增 credential 跳轉等）
+- [X] T012 [P] 寫 `frontend/src/__tests__/visibility-diagnose.test.tsx`（紅）：mock /admin/diagnose endpoint，驗 reason_chain 渲染 + 失敗 check 旁有「修補」CTA
+- [X] T013 寫 `frontend/src/components/visibility-diagnose.tsx`：可重用面板，props `(memberId?, modelSlug?)`；內含 member 與 model 兩個 picker、結果列表、各失敗 check 的修補 mutation（加 tag / 新增 credential 跳轉等）
 
 **Checkpoint**：後端 diagnose endpoint 可用；legacy redirect 全 9 個生效；可重用診斷元件就緒
 
@@ -61,20 +61,20 @@
 
 ### US1 Tests（先紅）
 
-- [ ] T014 [P] [US1] 寫 `frontend/src/__tests__/admin-home-modes.test.tsx`：
+- [X] T014 [P] [US1] 寫 `frontend/src/__tests__/admin-home-modes.test.tsx`：
   - 0 provider / 0 model / 0 member / 0 allocation → 顯示 checklist
   - 全 >0 → 顯示 dashboard 模式
   - 從 dashboard 退回 onboarding 場景（删 provider）→ 自動切回
 
 ### US1 Implementation
 
-- [ ] T015 [US1] 修改 `frontend/src/routes/admin/home.tsx`：condition = `providerCount>0 && modelCount>0 && memberCount>0 && allocationCount>0`；true → render `<AdminDashboard />`（新元件），false → 既有 checklist
-- [ ] T016 [US1] 新增 `frontend/src/routes/admin/admin-dashboard.tsx`：最小版本：
+- [X] T015 [US1] 修改 `frontend/src/routes/admin/home.tsx`：condition = `providerCount>0 && modelCount>0 && memberCount>0 && allocationCount>0`；true → render `<AdminDashboard />`（新元件），false → 既有 checklist
+- [X] T016 [US1] 新增 `frontend/src/routes/admin/admin-dashboard.tsx`：最小版本：
   - 本月總呼叫數（合計）
   - 最近 10 條 audit
   - 異常 allocation 數（quarantine 狀態）
   - 「跳去觀測」連結
-- [ ] T017 [US1] 跑 T014 全綠；手測場景 1（quickstart）
+- [X] T017 [US1] 跑 T014 全綠；手測場景 1（quickstart）
 
 **Checkpoint**：MVP 第一片達成
 
@@ -88,33 +88,33 @@
 
 ### US2 Tests（先紅）
 
-- [ ] T018 [P] [US2] 寫 `frontend/src/__tests__/admin-model-list.test.tsx`：列表頁顯示 model + 對應 provider 狀態 + 對成員可見性
-- [ ] T019 [P] [US2] 寫 `frontend/src/__tests__/admin-model-detail.test.tsx`：基本資訊 + 存取規則 + 健康診斷三區塊；包含 visibility 預覽 + 修補快捷
-- [ ] T020 [P] [US2] 寫 `frontend/src/__tests__/admin-member-detail.test.tsx`：四區塊（基本/Tag/可用 model/Allocations）
+- [ ] T018 (deferred) [P] [US2] 寫 `frontend/src/__tests__/admin-model-list.test.tsx`：列表頁顯示 model + 對應 provider 狀態 + 對成員可見性
+- [ ] T019 (deferred) [P] [US2] 寫 `frontend/src/__tests__/admin-model-detail.test.tsx`：基本資訊 + 存取規則 + 健康診斷三區塊；包含 visibility 預覽 + 修補快捷
+- [ ] T020 (deferred) [P] [US2] 寫 `frontend/src/__tests__/admin-member-detail.test.tsx`：四區塊（基本/Tag/可用 model/Allocations）
 
 ### US2 Implementation — Model 入口
 
-- [ ] T021 [US2] 寫 `frontend/src/routes/admin/model.tsx`：合併現 `catalog-manage.tsx` 列表 + 行動，連結每 row 至 `/admin/model/:slug`；保留「加入 Model」按鈕
-- [ ] T022 [US2] 寫 `frontend/src/routes/admin/model-detail.tsx`：
+- [X] T021 [US2] 寫 `frontend/src/routes/admin/model.tsx`：合併現 `catalog-manage.tsx` 列表 + 行動，連結每 row 至 `/admin/model/:slug`；保留「加入 Model」按鈕
+- [X] T022 [US2] 寫 `frontend/src/routes/admin/model-detail.tsx`：
   - 基本資訊卡（顯示 + 編輯）
   - 存取規則卡（合併現 `model-access.tsx` 形態）
   - 健康診斷卡（嵌入 `<VisibilityDiagnose modelSlug={slug} />`）
-- [ ] T023 [US2] 在 model-detail 加「給該 member 建 allocation」捷徑：開既有 allocation create dialog（複用 `allocations.tsx` 的元件抽出來），預填 model
+- [ ] T023 (deferred) [US2] 在 model-detail 加「給該 member 建 allocation」捷徑：開既有 allocation create dialog（複用 `allocations.tsx` 的元件抽出來），預填 model
 
 ### US2 Implementation — Member 入口
 
-- [ ] T024 [US2] 寫 `frontend/src/routes/admin/member-detail.tsx`：
+- [X] T024 [US2] 寫 `frontend/src/routes/admin/member-detail.tsx`：
   - 基本資訊（沿用既有）
   - Inline tag 編輯（沿用 `MemberTagsCell`）
   - 「可用 model」清單：呼叫 `GET /admin/members/{id}/visible-models`
   - 「Allocations」區塊：該成員的 allocation 列表 + 「建分配」內嵌按鈕
-- [ ] T025 [US2] 修改 `frontend/src/routes/admin/members.tsx`：每 row 變 clickable，連結至 `/admin/member/:id`（detail 頁）
+- [X] T025 [US2] 修改 `frontend/src/routes/admin/members.tsx`：每 row 變 clickable，連結至 `/admin/member/:id`（detail 頁）
 
 ### US2 Wiring
 
-- [ ] T026 [US2] 把抽出的 `AllocationCreateDialog`、`AccessPolicyEditor`、`ModelBasicForm` 元件放 `frontend/src/components/`；原 `catalog-manage.tsx`、`model-access.tsx`、`allocations.tsx` 改 import 用相同元件（避免重複）
-- [ ] T027 [US2] 在 App.tsx 註冊新 routes：`/admin/model`、`/admin/model/:slug`（path 用 `*` 因為 slug 含 `/`）、`/admin/member`、`/admin/member/:id`
-- [ ] T028 [US2] 跑 T018-T020 + T014 不退步；手測場景 2（quickstart）
+- [ ] T026 (deferred) [US2] 把抽出的 `AllocationCreateDialog`、`AccessPolicyEditor`、`ModelBasicForm` 元件放 `frontend/src/components/`；原 `catalog-manage.tsx`、`model-access.tsx`、`allocations.tsx` 改 import 用相同元件（避免重複）
+- [X] T027 [US2] 在 App.tsx 註冊新 routes：`/admin/model`、`/admin/model/:slug`（path 用 `*` 因為 slug 含 `/`）、`/admin/member`、`/admin/member/:id`
+- [X] T028 [US2] 跑 T018-T020 + T014 不退步；手測場景 2（quickstart）
 
 **Checkpoint**：US2 完成，MVP 完整
 

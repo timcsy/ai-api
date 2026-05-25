@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -160,7 +161,11 @@ export function AdminMembersPage() {
           <TableBody>
             {query.data.map((m) => (
               <TableRow key={m.id}>
-                <TableCell className="font-medium">{m.email}</TableCell>
+                <TableCell className="font-medium">
+                  <Link to={`/admin/member/${m.id}`} className="text-primary hover:underline">
+                    {m.email}
+                  </Link>
+                </TableCell>
                 <TableCell>{m.provider}</TableCell>
                 <TableCell>
                   <Badge variant={m.status === "active" ? "default" : "secondary"}>{m.status}</Badge>

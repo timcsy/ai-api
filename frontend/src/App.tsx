@@ -6,14 +6,18 @@ import { AppShell } from "@/components/app-shell";
 import { ProtectedRoute } from "@/components/protected-route";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/auth";
-import { AdminAllocationsPage } from "@/routes/admin/allocations";
+import { LegacyRedirectRoutes } from "@/lib/legacy-redirects";
 import { AdminAuditPage } from "@/routes/admin/audit";
 import { AdminCatalogManagePage } from "@/routes/admin/catalog-manage";
 import { AdminHomePage } from "@/routes/admin/home";
 import { AdminMembersPage } from "@/routes/admin/members";
-import { AdminModelAccessPage } from "@/routes/admin/model-access";
+import { AdminMemberDetailPage } from "@/routes/admin/member-detail";
+import { AdminModelPage } from "@/routes/admin/model";
+import { AdminModelDetailPage } from "@/routes/admin/model-detail";
+import { AdminObservabilityPage } from "@/routes/admin/observability";
 import { AdminProvidersPage } from "@/routes/admin/providers";
 import { AdminQuotaPoolPage } from "@/routes/admin/quota-pool";
+import { AdminTagDetailPage } from "@/routes/admin/tag-detail";
 import { AdminTagsPage } from "@/routes/admin/tags";
 import {
   AdminRebalanceLogDetailPage,
@@ -56,23 +60,34 @@ export function App() {
               <Route path="/catalog" element={<CatalogPage />} />
               <Route path="/catalog/*" element={<CatalogDetailPage />} />
 
-              {/* Admin routes (Phase 3b.2) */}
+              {/* Phase 5.1 — admin routes (consolidated) */}
               <Route element={<AdminRoute />}>
+                {/* legacy URLs → new locations (must come before catch-alls) */}
+                {LegacyRedirectRoutes()}
+
                 <Route path="/admin" element={<AdminHomePage />} />
-                <Route path="/admin/members" element={<AdminMembersPage />} />
-                <Route path="/admin/allocations" element={<AdminAllocationsPage />} />
-                <Route path="/admin/usage" element={<AdminUsagePage />} />
-                <Route path="/admin/quota-pool" element={<AdminQuotaPoolPage />} />
-                <Route path="/admin/rebalance-log" element={<AdminRebalanceLogListPage />} />
-                <Route path="/admin/rebalance-log/:id" element={<AdminRebalanceLogDetailPage />} />
-                <Route path="/admin/catalog" element={<CatalogPage />} />
-                <Route path="/admin/catalog/*" element={<CatalogDetailPage />} />
-                {/* Phase 5 — multi-provider */}
+                <Route path="/admin/model" element={<AdminModelPage />} />
+                <Route path="/admin/model/*" element={<AdminModelDetailPage />} />
+                <Route path="/admin/member" element={<AdminMembersPage />} />
+                <Route path="/admin/member/:id" element={<AdminMemberDetailPage />} />
                 <Route path="/admin/providers" element={<AdminProvidersPage />} />
-                <Route path="/admin/tags" element={<AdminTagsPage />} />
-                <Route path="/admin/model-access" element={<AdminModelAccessPage />} />
-                <Route path="/admin/catalog-manage" element={<AdminCatalogManagePage />} />
-                <Route path="/admin/audit" element={<AdminAuditPage />} />
+                <Route path="/admin/tag" element={<AdminTagsPage />} />
+                <Route path="/admin/tag/:name" element={<AdminTagDetailPage />} />
+
+                {/* observability hub */}
+                <Route path="/admin/observability" element={<AdminObservabilityPage />}>
+                  <Route index element={<Navigate to="usage" replace />} />
+                  <Route path="usage" element={<AdminUsagePage />} />
+                  <Route path="quota" element={<AdminQuotaPoolPage />} />
+                  <Route path="rebalance" element={<AdminRebalanceLogListPage />} />
+                  <Route path="rebalance/:id" element={<AdminRebalanceLogDetailPage />} />
+                  <Route path="audit" element={<AdminAuditPage />} />
+                </Route>
+
+                {/* legacy entry pages kept as no-nav components for now; nav points to new URLs.
+                    These remain accessible so the catalog-manage/model-access deep features
+                    aren't lost until the new Model entry is fully built. */}
+                <Route path="/admin/_legacy/catalog-manage" element={<AdminCatalogManagePage />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFoundPage />} />

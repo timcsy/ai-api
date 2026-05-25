@@ -17,19 +17,14 @@ const subNavClass = ({ isActive }: { isActive: boolean }) =>
     isActive ? "text-foreground font-semibold" : "text-muted-foreground",
   );
 
+// Phase 5.1: consolidated 6 entries (was 11)
 const ADMIN_SUBNAV = [
   { to: "/admin", label: "首頁", end: true },
-  { to: "/admin/members", label: "成員" },
-  { to: "/admin/allocations", label: "分配" },
+  { to: "/admin/model", label: "Model" },
+  { to: "/admin/member", label: "成員" },
+  { to: "/admin/tag", label: "Tag" },
   { to: "/admin/providers", label: "Provider 憑證" },
-  { to: "/admin/tags", label: "Tag" },
-  { to: "/admin/model-access", label: "Model 存取" },
-  { to: "/admin/catalog-manage", label: "Catalog 管理" },
-  { to: "/admin/catalog", label: "目錄（檢視）" },
-  { to: "/admin/usage", label: "用量" },
-  { to: "/admin/quota-pool", label: "配額池" },
-  { to: "/admin/rebalance-log", label: "Rebalance 記錄" },
-  { to: "/admin/audit", label: "稽核紀錄" },
+  { to: "/admin/observability", label: "觀測" },
 ];
 
 export function AppShell() {
