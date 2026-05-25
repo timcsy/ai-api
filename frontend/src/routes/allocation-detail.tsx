@@ -1,12 +1,34 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import * as React from "react";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface Allocation {
   id: string;
@@ -35,6 +57,26 @@ interface CallsPage {
 
 export function AllocationDetailPage() {
   const { id = "" } = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [rotateConfirmOpen, setRotateConfirmOpen] = React.useState(false);
+  const [freshToken, setFreshToken] = React.useState<string | null>(null);
+
+  const rotateMut = useMutation({
+    mutationFn: () =>
+      api<{ token: string; token_prefix: string }>(
+        `/me/allocations/${id}/rotate-token`,
+        { method: "POST", headers: { "X-CSRF-Token": document.cookie.match(/aiapi_csrf=([^;]+)/)?.[1] ?? "" } },
+      ),
+    onSuccess: (data) => {
+      setFreshToken(data.token);
+      queryClient.invalidateQueries({ queryKey: ["me", "allocations"] });
+      toast({ title: "新 token 已產生", description: "舊 token 立即失效" });
+    },
+    onError: (err: ApiError) => {
+      toast({ title: "重新產生失敗", description: err.message, variant: "destructive" });
+    },
+  });
 
   const allocQuery = useQuery<Allocation | null, ApiError>({
     queryKey: ["me", "allocations"],
@@ -107,6 +149,87 @@ export function AllocationDetailPage() {
 
       <Card>
         <CardHeader>
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle className="text-lg">如何使用</CardTitle>
+              <CardDescription>API 端點 + 範例請求（含您的模型參數）</CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRotateConfirmOpen(true)}
+              disabled={rotateMut.isPending || alloc?.status !== "active"}
+            >
+              {rotateMut.isPending ? "產生中…" : "重新產生 token"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <div className="text-xs text-muted-foreground mb-1">API base</div>
+            <code className="text-sm bg-muted px-2 py-1 rounded">{window.location.origin}/v1</code>
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground mb-1">Token 前綴（系統不存完整 token）</div>
+            <code className="text-sm bg-muted px-2 py-1 rounded font-mono">
+              {alloc?.token_prefix}…
+            </code>
+          </div>
+          <Tabs defaultValue="curl">
+            <TabsList>
+              <TabsTrigger value="curl">curl</TabsTrigger>
+              <TabsTrigger value="python">Python</TabsTrigger>
+              <TabsTrigger value="javascript">JavaScript</TabsTrigger>
+            </TabsList>
+            <TabsContent value="curl">
+              <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">
+{`curl -X POST ${window.location.origin}/v1/chat/completions \\
+  -H "Authorization: Bearer $YOUR_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "${alloc?.resource_model ?? ""}",
+    "messages": [{"role": "user", "content": "你好"}]
+  }'`}
+              </pre>
+            </TabsContent>
+            <TabsContent value="python">
+              <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">
+{`from openai import OpenAI
+
+client = OpenAI(
+    base_url="${window.location.origin}/v1",
+    api_key="$YOUR_TOKEN",
+)
+resp = client.chat.completions.create(
+    model="${alloc?.resource_model ?? ""}",
+    messages=[{"role": "user", "content": "你好"}],
+)
+print(resp.choices[0].message.content)`}
+              </pre>
+            </TabsContent>
+            <TabsContent value="javascript">
+              <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">
+{`const res = await fetch("${window.location.origin}/v1/chat/completions", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer " + process.env.YOUR_TOKEN,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    model: "${alloc?.resource_model ?? ""}",
+    messages: [{ role: "user", content: "你好" }],
+  }),
+});
+const data = await res.json();
+console.log(data.choices[0].message.content);`}
+              </pre>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle className="text-lg">配額</CardTitle>
           <CardDescription>
             {quota === null
@@ -144,8 +267,8 @@ export function AllocationDetailPage() {
                 <span>時間</span>
                 <span>狀態</span>
                 <span>結果</span>
-                <span className="text-right">tokens</span>
-                <span className="text-right">request_id</span>
+                <span className="text-right">總 tokens</span>
+                <span className="text-right">請求 ID</span>
               </div>
               {items.map((c) => (
                 <div key={c.id} className="grid grid-cols-5 text-sm py-1 border-b border-border/30">
@@ -174,6 +297,54 @@ export function AllocationDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={rotateConfirmOpen} onOpenChange={setRotateConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>確認重新產生 token？</AlertDialogTitle>
+            <AlertDialogDescription>
+              產生新 token 後，舊 token <strong>立即失效</strong>。請確保已準備好更新所有使用此 token 的程式 / 腳本。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setRotateConfirmOpen(false);
+                rotateMut.mutate();
+              }}
+            >
+              確認重新產生
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={!!freshToken} onOpenChange={(open) => !open && setFreshToken(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>新 token — 此次顯示後無法再取得</DialogTitle>
+            <DialogDescription>
+              請立即複製並安全保存。關閉後系統僅保留雜湊。
+            </DialogDescription>
+          </DialogHeader>
+          <pre className="bg-muted p-3 rounded text-xs overflow-x-auto break-all">
+            {freshToken}
+          </pre>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                if (freshToken) await copyToClipboard(freshToken);
+                toast({ title: "已複製" });
+              }}
+            >
+              複製
+            </Button>
+            <Button onClick={() => setFreshToken(null)}>我已複製</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

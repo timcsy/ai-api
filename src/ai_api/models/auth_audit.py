@@ -38,6 +38,7 @@ class AuditEventType(enum.StrEnum):
     # Phase 3b.2
     member_promoted = "member_promoted"
     member_demoted = "member_demoted"
+    allocation_token_rotated = "allocation_token_rotated"
 
 
 class ActorType(enum.StrEnum):

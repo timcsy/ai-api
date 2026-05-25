@@ -99,6 +99,53 @@ async def list_my_allocation_calls(
     }
 
 
+@router.post(
+    "/me/allocations/{allocation_id}/rotate-token",
+    dependencies=[Depends(require_csrf)],
+)
+async def rotate_my_allocation_token(
+    allocation_id: str,
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Issue a new token for this member's own allocation. Old token immediately
+    invalid. Returns the new plaintext token ONCE — UI must store it client-side
+    if needed; we hash it in DB."""
+    from ai_api.auth import audit
+    from ai_api.models import ActorType, AuditEventType
+
+    service = AllocationService(db)
+    allocation = await service.get(allocation_id)
+    if allocation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "not_found", "message": "allocation not found"}},
+        )
+    if allocation.member_id != member.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"error": {"code": "forbidden", "message": "not your allocation"}},
+        )
+    try:
+        result = await service.rotate_token(allocation_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": {"code": "cannot_rotate", "message": str(exc)}},
+        ) from exc
+    assert result is not None
+    _, token = result
+    await audit.record(
+        db,
+        event_type=AuditEventType.allocation_token_rotated,
+        actor_type=ActorType.member,
+        actor_id=member.id,
+        target_type="allocation",
+        target_id=allocation_id,
+    )
+    return {"token": token.plaintext, "token_prefix": token.prefix}
+
+
 class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str

@@ -8,8 +8,16 @@
 
 ## 核心想法
 
-以 **LiteLLM** 為核心，建立組織內 AI API 的**單一分流入口**：
+自製 OpenAI 相容的組織內 AI API gateway，作為**單一分流入口**：
 
+- **多 provider**：Azure OpenAI、OpenAI cloud、Anthropic、Gemini 等
+  各家統一以 OpenAI 相容介面對成員開放；後續可加 self-hosted（Ollama / vLLM 等）
+- **Provider credential 由 admin 在 UI 管理**：API key 加密落 DB，不再
+  只靠 env / K8s Secret；可新增、rotate、停用、稽核
+- **動態 catalog 可見性**：成員只看得到 admin 已加 key 且授權給自己的 model
+  （兩道過濾：credential gate + access policy）
+- **存取規則以 Tag 為主**：admin 為 member 打 tag（組織 / 角色 / 試用群 ...），
+  每個 model 設定允許 / 禁止的 tag；改規則 = 改 tag，不必逐一指定
 - 開發者透過分配到的憑證直接呼叫 API
 - 不會寫程式的成員透過外部的「行政輔助服務」間接享受 AI——這些服務以
   管理員授予的高額度憑證呼叫本平台
@@ -21,21 +29,31 @@
 
 ## 現狀
 
-**2026-05-24：階段 3b.0 + 3b.1 + 3b.2~3b.6（合併）完成；只剩 3b.7 E2E。**
-後端 210 tests + 前端 50 tests 全綠；Member.is_admin 雙軌認證上線（c-β
-additive，274 既有測試零回歸）；2 個 image 經 Trivy + SBOM gate。
-詳細狀態見下方〈路線圖〉每個階段標記。
+**2026-05-24：階段 3b.0 + 3b.1 + 3b.2~3b.6（合併）+ 011 hotfix 完成；
+3b.7 E2E 與多 provider（階段 5）待開。**
+後端 213 tests + 前端 50 tests 全綠；Member.is_admin 雙軌認證上線
+（c-β additive，274 既有測試零回歸）；2 個 image 經 Trivy + SBOM gate；
+upstream 已從 litellm 改為官方 `openai` SDK（Azure mode）以縮減 CVE
+攻擊面，多 provider 在階段 5 重新評估接入方式。詳細狀態見下方〈路線圖〉
+每個階段標記。
 
 ## 架構
 
-- **底層**：LiteLLM（OSS）負責多供應商抽象、配額、速率限制、計費追蹤
+- **底層**：自製 FastAPI gateway；上游接入採 `litellm`（library only，
+  不啟用其 Proxy server form）作為多 provider 抽象層——library form 的
+  CVE 集中度遠低於 Proxy form，且涵蓋 100+ provider 不必逐家自寫 adapter
+- **Provider credential 儲存**：DB（Fernet 加密 at rest），加密金鑰由 K8s
+  Secret 提供；建立時一次性顯示明文（同 allocation token 模式），事後僅
+  顯示 fingerprint
+- **路由**：`model_catalog.provider` 指明每個 model 走哪家；呼叫時依 model
+  查 catalog → 取對應 `ProviderCredential` → 經 litellm 發送
 - **部署**：以 Kubernetes 為部署目標；資源以宣告式（Helm chart 或 Kustomize）
-  管理。本機開發走輕量路線（docker-compose 或直接執行 LiteLLM），不要求
-  本機跑 K8s。
-- **LiteLLM 自動更新**：LiteLLM 鏡像版本以自動化方式定期更新（例：Renovate
-  /Dependabot 監看 + GitOps 套用），確保安全性修補不滯後。更新流程必須有
-  「快速回滾」機制——任何一次更新若失敗或行為異常，可在分鐘內回到上一版。
-- **首選供應商**：Azure OpenAI（其他供應商日後再加）
+  管理。本機開發走輕量路線（直接執行 uvicorn + Vite），不要求本機跑 K8s。
+- **相依套件追蹤**：以 Renovate / Dependabot 自動監看 `litellm`、`openai`
+  等關鍵上游，安全性修補不滯後；任何更新若行為異常，可透過容器映像 tag
+  在分鐘內回滾。
+- **首批供應商**（階段 5）：Azure OpenAI / OpenAI cloud / Anthropic / Gemini；
+  後續 self-hosted（Ollama / vLLM 等）
 - **認證**：彈性身份驗證，預設提供 Google Workspace SSO（最低摩擦），
   同時支援：
   - 管理員手動加入 email（白名單）
@@ -59,13 +77,13 @@ additive，274 既有測試零回歸）；2 個 image 經 Trivy + SBOM gate。
 
 - [x] 完成（2026-05-21：本機 + k3s-tew 叢集全部 SC 達標）
 
-> **交付**：LiteLLM 跑起來、可代理 Azure OpenAI、可發行可撤回的憑證
+> **交付**：自製 gateway 跑起來、可代理 Azure OpenAI、可發行可撤回的憑證
 > **前置條件**：無
 
 **成功標準：**
-- [x] LiteLLM 本機可運作（docker-compose 或直接執行）
+- [x] 自製 FastAPI gateway 本機可運作（uvicorn）
 - [x] K8s 部署以宣告式定義（Helm/Kustomize）並可在開發叢集驗證
-- [x] LiteLLM 鏡像版本以自動化方式追蹤上游，且有回滾路徑
+- [x] 相依套件版本以自動化方式追蹤上游，且有回滾路徑
 - [x] Azure OpenAI 串接成功，可代理至少一個模型
 - [x] 可手動建立一筆「分配」並取得獨立憑證
 - [x] 該憑證的呼叫可追溯到分配 ID
@@ -96,7 +114,7 @@ additive，274 既有測試零回歸）；2 個 image 經 Trivy + SBOM gate。
 
 **成功標準（核心三件）：**
 - [x] **應用層 provider allowlist**：`Settings.allowed_providers`；未列出的
-      供應商即使 LiteLLM 能 route 也拒絕（FR-001~003 + 4 contract tests 通過）
+      供應商即使配置存在也拒絕（FR-001~003 + 4 contract tests 通過）
 - [x] **K8s NetworkPolicy（粗粒度）**：Helm template 已交付，deny-all egress
       + allow {DNS, Postgres podSelector, 443/TCP}，封 169.254.0.0/16
       （5 個 helm-template 結構測試通過；叢集生效需 CNI 支援）
@@ -229,5 +247,49 @@ additive，274 既有測試零回歸）；2 個 image 經 Trivy + SBOM gate。
 **明確排除（留 3b 或後階段）：**
 - ❌ UI / 視覺呈現（留 3b SPA）
 - ❌ 整合到「建立 allocation」流程作為 model picker（留 3b）
-- ❌ 從 Azure / LiteLLM 自動同步 model 清單（YAGNI）
+- ❌ 從 Azure 自動同步 model 清單（YAGNI）
 - ❌ 即時定價（cost_tier 而非絕對價；docs/model-catalog.md 記載未來整合 SOP）
+
+### 階段 5：多 Provider + Credential 管理 + Tag-based 存取規則 ⏳
+
+> **交付**：成員可使用多家 LLM 供應商（首批 4 家）；admin 在 UI 管理
+> provider API key 與成員存取規則；catalog 對成員的可見性 = credential
+> gate ∩ access policy。
+> **前置條件**：階段 4
+
+**核心原則：**
+- **Credential gate**：admin 沒加對應 provider 的 key → 該 provider 的
+  model 對所有成員隱藏
+- **Access policy**：通過 credential gate 後，再以 model 的 access policy
+  + member 的 tag 過濾誰看得到、用得到
+- **Tag 為主、規則為輔**：每個 model 設「允許 tag」「禁止 tag」；admin 為
+  member 打 tag 即可批次授權，不需逐人指定
+
+**成功標準（核心五件）：**
+- [ ] **多 provider 接入**：`upstream.py` 改回 `litellm`（library only），
+      首批支援 Azure OpenAI / OpenAI cloud / Anthropic / Gemini；catalog
+      載入對應 model；至少 1 個 model / provider 過 happy-path contract test
+- [ ] **ProviderCredential 實體**：admin CRUD endpoints + Fernet 加密欄位
+      + 建立時一次性顯示明文 + fingerprint + rotation + 停用 + 稽核事件
+      （`provider_credential_created/rotated/disabled`）
+- [ ] **加密金鑰**：`PROVIDER_KEY_ENC_KEY` 由 K8s Secret 提供；Helm template
+      標示 Secret 為必要、缺則 pod 拒啟動
+- [ ] **MemberTag 實體 + Model access policy**：`Member` ↔ `Tag` 多對多；
+      `ModelCatalog` 加 `default_access` (`open` / `restricted`) +
+      `allowed_tags` + `denied_tags`；catalog list / detail endpoint
+      套用過濾；proxy 呼叫時防禦性二次檢查
+- [ ] **Admin UI**：
+  - `/admin/providers`：list + 新增（一次性 banner 顯示明文）+ rotate + 停用
+  - `/admin/tags`：tag CRUD + bulk 批次貼標（select members → apply tag）
+  - `/admin/models/{slug}/access`：設定 default_access + allow / deny tags
+
+**成功標準（次要）：**
+- [ ] 既有 `AZURE_OPENAI_API_KEY` env 提供 migration script 灌入 DB 後可移除
+- [ ] Provider 加 `test-connection` endpoint（呼一次 `/models` 驗證）
+- [ ] 同 provider 多把 key 採 round-robin 或最少用量（首版 round-robin 即可）
+
+**明確排除（留更後）：**
+- ❌ Self-hosted provider（Ollama / vLLM）UI 與 health-check 流程
+- ❌ Rule matcher（複合條件式）— 首版只支援單 tag 集合的 AND / NOT
+- ❌ Provider failover（A 家掛了自動轉 B 家）— YAGNI 直到真的有需求
+- ❌ 按 provider 切配額池（沿用 3c 全域池）

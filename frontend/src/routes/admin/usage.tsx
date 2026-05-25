@@ -100,7 +100,7 @@ export function AdminUsagePage() {
   return (
     <div className="container mx-auto py-8 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Usage</h1>
+        <h1 className="text-3xl font-bold">用量統計</h1>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => void download("csv")}>
             下載 CSV
@@ -113,7 +113,7 @@ export function AdminUsagePage() {
 
       <div className="flex flex-wrap items-end gap-3 p-4 bg-card rounded-lg border">
         <div>
-          <Label htmlFor="from">From</Label>
+          <Label htmlFor="from">起始日期</Label>
           <Input
             id="from"
             type="date"
@@ -122,7 +122,7 @@ export function AdminUsagePage() {
           />
         </div>
         <div>
-          <Label htmlFor="to">To</Label>
+          <Label htmlFor="to">結束日期</Label>
           <Input
             id="to"
             type="date"
@@ -131,15 +131,15 @@ export function AdminUsagePage() {
           />
         </div>
         <div>
-          <Label htmlFor="group_by">Group by</Label>
+          <Label htmlFor="group_by">分組</Label>
           <Select value={groupBy} onValueChange={(v) => setParam("group_by", v)}>
             <SelectTrigger id="group_by" className="w-40">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="member">Member</SelectItem>
-              <SelectItem value="allocation">Allocation</SelectItem>
-              <SelectItem value="model">Model</SelectItem>
+              <SelectItem value="member">依成員</SelectItem>
+              <SelectItem value="allocation">依分配</SelectItem>
+              <SelectItem value="model">依模型</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -169,15 +169,15 @@ export function AdminUsagePage() {
           <TableHeader>
             <TableRow>
               <TableHead>
-                {groupBy === "member" && "Member"}
-                {groupBy === "allocation" && "Allocation"}
-                {groupBy === "model" && "Model"}
+                {groupBy === "member" && "成員"}
+                {groupBy === "allocation" && "分配"}
+                {groupBy === "model" && "模型"}
               </TableHead>
-              <TableHead className="text-right">Prompt tokens</TableHead>
-              <TableHead className="text-right">Completion tokens</TableHead>
-              <TableHead className="text-right">Total tokens</TableHead>
-              <TableHead className="text-right">Cost (USD)</TableHead>
-              <TableHead className="text-right">Calls</TableHead>
+              <TableHead className="text-right">輸入 tokens</TableHead>
+              <TableHead className="text-right">輸出 tokens</TableHead>
+              <TableHead className="text-right">總 tokens</TableHead>
+              <TableHead className="text-right">費用 (USD)</TableHead>
+              <TableHead className="text-right">呼叫次數</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

@@ -2,6 +2,23 @@
 
 ## 教訓
 
+### build vs adopt 評估要在 specify 之前做
+
+- **理論說**：vision 寫「以 LiteLLM 為核心」就代表會用 LiteLLM。
+- **實際發生**：Phase 1 一開始只用了 `litellm.acompletion()` 一個函式
+  （library mode），自製了 FastAPI gateway、認證、配額、UI、計費 — 直到
+  Phase 3b 收尾使用者才發現「我以為你在 LiteLLM 上加邏輯，沒想到是自幹
+  並行版」。多花了大量工，且揹了 LiteLLM 依賴卻沒享受其好處。
+- **解決方式**：在 spec / plan 階段就要明確分辨**LiteLLM 是「library」
+  還是「Proxy service」**——前者只是函式呼叫，後者才提供 UI / 認證 / 配額
+  / 計費。並要主動向 user 確認預設選擇，而不是隱性決定。Phase 011 起改用
+  官方 `openai` SDK（Azure mode）直連，drop `litellm` 套件。
+- **教訓**：vision 提到的工具，要先確認**它的形態**（lib vs service vs
+  framework）和**我們打算用哪個形態**；任何「build vs adopt」決策必須
+  在 specify 之前明確問 user，不要在 plan 階段才隱性決定。
+- **來源**：`src/ai_api/proxy/upstream.py`（從 `litellm.acompletion` 改
+  `AsyncAzureOpenAI`）；PR #11 之後（Phase 011 hotfix）
+
 ### 在 async SQLAlchemy 中禁止 lazy-load
 
 - **理論說**：SQLAlchemy 的關聯欄位 (`relationship`) 在用到時自動 lazy-load。

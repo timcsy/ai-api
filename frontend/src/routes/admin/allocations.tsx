@@ -108,7 +108,7 @@ export function AdminAllocationsPage() {
   return (
     <div className="container mx-auto py-8 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Allocations</h1>
+        <h1 className="text-3xl font-bold">分配管理</h1>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <Switch
@@ -118,7 +118,7 @@ export function AdminAllocationsPage() {
             />
             <Label htmlFor="service-only" className="text-sm">只看服務型</Label>
           </div>
-          <Button onClick={() => setCreateOpen(true)}>新建 Allocation</Button>
+          <Button onClick={() => setCreateOpen(true)}>新增分配</Button>
         </div>
       </div>
 
@@ -133,12 +133,12 @@ export function AdminAllocationsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Member</TableHead>
-              <TableHead>Model</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Quota</TableHead>
-              <TableHead>Flags</TableHead>
-              <TableHead>Token prefix</TableHead>
+              <TableHead>成員</TableHead>
+              <TableHead>模型</TableHead>
+              <TableHead>狀態</TableHead>
+              <TableHead>配額</TableHead>
+              <TableHead>標籤</TableHead>
+              <TableHead>Token 前綴</TableHead>
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -176,14 +176,14 @@ export function AdminAllocationsPage() {
                           patchMut.mutate({ id: a.id, body: { quota_tokens_per_month: value } });
                         }}
                       >
-                        調 quota
+                        調整配額
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() =>
                           patchMut.mutate({ id: a.id, body: { quota_locked: !a.quota_locked } })
                         }
                       >
-                        切 quota_locked
+                        切換鎖定配額
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() =>
@@ -193,7 +193,7 @@ export function AdminAllocationsPage() {
                           })
                         }
                       >
-                        切 is_service
+                        切換服務型
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive"
@@ -229,7 +229,7 @@ export function AdminAllocationsPage() {
       <Dialog open={!!tokenDialog} onOpenChange={(open) => !open && setTokenDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Allocation 已建立 — 此 token 只顯示一次</DialogTitle>
+            <DialogTitle>分配已建立 — 此 token 只顯示一次</DialogTitle>
             <DialogDescription>請立即複製並安全保存。關閉此 dialog 後無法再次取得。</DialogDescription>
           </DialogHeader>
           <pre className="bg-muted p-3 rounded text-xs overflow-x-auto break-all">
@@ -300,7 +300,7 @@ function CreateAllocationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>新建 Allocation</DialogTitle>
+          <DialogTitle>新增分配</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={onSubmit} className="space-y-4">
@@ -309,11 +309,11 @@ function CreateAllocationDialog({
               name="member_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Member</FormLabel>
+                  <FormLabel>成員</FormLabel>
                   <Select value={field.value ?? ""} onValueChange={field.onChange}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="選擇 member" />
+                        <SelectValue placeholder="選擇成員" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -333,7 +333,7 @@ function CreateAllocationDialog({
               name="resource_model"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Model</FormLabel>
+                  <FormLabel>模型</FormLabel>
                   <FormControl>
                     <Input {...field} />
                   </FormControl>
@@ -346,7 +346,7 @@ function CreateAllocationDialog({
               name="quota_tokens_per_month"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Quota tokens/month（可選）</FormLabel>
+                  <FormLabel>月度配額 tokens（可選；空白=無限額）</FormLabel>
                   <FormControl>
                     <Input
                       type="number"

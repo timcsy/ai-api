@@ -35,13 +35,22 @@ async def test_create_then_proxy_call_succeeds(
         "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
     }
 
-    # Patch litellm.acompletion (the lower-level lib) to verify the wrapper
-    # injects api_key + api_base from settings, not from the request.
-    async def fake(**kwargs):
-        fake.kwargs = kwargs  # type: ignore[attr-defined]
-        return stub
+    # Patch the AsyncAzureOpenAI client factory; the wrapper builds it from
+    # settings, so the mock confirms request never carries upstream credentials.
+    captured: dict[str, object] = {}
 
-    with patch("litellm.acompletion", side_effect=fake):
+    class FakeCompletions:
+        async def create(self, **kwargs):
+            captured.update(kwargs)
+            return stub
+
+    class FakeChat:
+        completions = FakeCompletions()
+
+    class FakeClient:
+        chat = FakeChat()
+
+    with patch("ai_api.proxy.upstream._client", return_value=FakeClient()):
         proxy_resp = await app_client.post(
             "/v1/chat/completions",
             headers={"Authorization": f"Bearer {alloc['token']}"},
@@ -53,7 +62,6 @@ async def test_create_then_proxy_call_succeeds(
     assert proxy_resp.status_code == 200
     assert proxy_resp.json()["choices"][0]["message"]["content"] == "pong"
 
-    # Verify wrapper injected internally-managed credentials.
-    assert fake.kwargs["api_key"]  # type: ignore[attr-defined]
-    assert fake.kwargs["api_base"]  # type: ignore[attr-defined]
-    assert fake.kwargs["model"] == "azure/gpt-4o-mini"  # type: ignore[attr-defined]
+    # azure/ prefix stripped to bare deployment name; credentials never came
+    # from the request payload.
+    assert captured["model"] == "gpt-4o-mini"
