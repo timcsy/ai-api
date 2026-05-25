@@ -39,7 +39,6 @@ Python 3.11+: Follow standard conventions
 ## Recent Changes
 - 012-multi-provider-access: Added Python 3.11+（後端不變）+ TypeScript strict / React 19 / Vite 6（前端不變） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2、`litellm`（library only，預計 `>=1.55,<2`）、`cryptography`（Fernet）、既有前端 stack（shadcn/ui + TanStack Query）
 - 010-admin-suite: Added 同 3b.1
-- 009-member-view: Added 同 3b.0（前端 TS 5.x / React 19 / Vite 6）+ Python 3.11+ 後端
 
 
 <!-- MANUAL ADDITIONS START -->

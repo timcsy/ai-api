@@ -1,0 +1,101 @@
+openapi: 3.0.3
+info:
+  title: Admin Diagnose Endpoints
+  version: 0.1.0
+  description: |
+    Phase 5.1 — admin diagnostic endpoints to back the "why can't X see Y"
+    UX. Pure read; no audit events written.
+servers:
+  - url: /admin
+security:
+  - sessionCookie: []
+  - adminToken: []
+paths:
+  /diagnose/visibility:
+    get:
+      summary: Evaluate whether a given member can see a given catalog model
+      description: |
+        Returns `{visible, reason_chain}`. The reason_chain is the ordered list
+        of checks that ran; the failing one tells admin what to fix. Pure
+        function evaluation — same logic as proxy and catalog filter share.
+      parameters:
+        - in: query
+          name: member_id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: model_slug
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VisibilityResult" }
+        "404":
+          description: Member or model not found
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+  /members/{member_id}/visible-models:
+    get:
+      summary: List all models in catalog visible to this specific member
+      description: |
+        Used by the Member detail page's "可用 model" section. Same filter
+        as /catalog/models but evaluated against THIS member's identity, not
+        the calling admin's.
+      parameters:
+        - in: path
+          name: member_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [slug, display_name, provider]
+                  properties:
+                    slug: { type: string }
+                    display_name: { type: string }
+                    provider: { type: string }
+        "404":
+          description: Member not found
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+components:
+  securitySchemes:
+    sessionCookie: { type: apiKey, in: cookie, name: session }
+    adminToken: { type: apiKey, in: header, name: X-Admin-Token }
+  schemas:
+    VisibilityCheck:
+      type: object
+      required: [check, "pass", detail]
+      properties:
+        check:
+          type: string
+          enum: [credential_gate, default_access, deny_tags, allow_tags]
+        "pass":
+          type: boolean
+        detail:
+          type: string
+    VisibilityResult:
+      type: object
+      required: [visible, reason_chain]
+      properties:
+        visible: { type: boolean }
+        reason_chain:
+          type: array
+          items: { $ref: "#/components/schemas/VisibilityCheck" }
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
