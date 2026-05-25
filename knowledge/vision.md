@@ -266,22 +266,26 @@
   member 打 tag 即可批次授權，不需逐人指定
 
 **成功標準（核心五件）：**
-- [x] **多 provider 接入**：`upstream.py` 改回 `litellm`（library only），
+- [x] **多 provider 接入**：`upstream.py` 用 `litellm`（library only），
       首批支援 Azure OpenAI / OpenAI cloud / Anthropic / Gemini；catalog
-      載入對應 model；至少 1 個 model / provider 過 happy-path contract test
+      載入對應 model。Azure + Anthropic 有整合測試（`test_us1_multiprovider`）；
+      OpenAI / Gemini 已配置 catalog YAML 並走 routing fixture，完整 4-provider
+      contract matrix 留 T014 deferred
 - [x] **ProviderCredential 實體**：admin CRUD endpoints + Fernet 加密欄位
       + 建立時一次性顯示明文 + fingerprint + rotation + 停用 + 稽核事件
       （`provider_credential_created/rotated/disabled`）
 - [x] **加密金鑰**：`PROVIDER_KEY_ENC_KEY` 由 K8s Secret 提供；Helm template
       標示 Secret 為必要、缺則 pod 拒啟動
-- [x] **MemberTag 實體 + Model access policy**：`Member` ↔ `Tag` 多對多；
+- [x] **MemberTag join table（無獨立 Tag entity）+ Model access policy**：
+      `MemberTag(member_id, tag, ...)` composite-PK 表，tag 名稱集合由
+      `SELECT DISTINCT` 推導（YAGNI，未來需要 metadata 再升 Tag entity）；
       `ModelCatalog` 加 `default_access` (`open` / `restricted`) +
       `allowed_tags` + `denied_tags`；catalog list / detail endpoint
       套用過濾；proxy 呼叫時防禦性二次檢查
 - [x] **Admin UI**：
   - `/admin/providers`：list + 新增（一次性 banner 顯示明文）+ rotate + 停用
   - `/admin/tags`：tag CRUD + bulk 批次貼標（select members → apply tag）
-  - `/admin/models/{slug}/access`：設定 default_access + allow / deny tags
+  - `/admin/model-access`：選 model → 設定 default_access + allow / deny tags（後端 endpoint：`PATCH /admin/catalog/models/{slug}/access`）
 
 **成功標準（次要）：**
 - [x] 既有 `AZURE_OPENAI_API_KEY` env 提供 migration script 灌入 DB 後可移除
