@@ -1,0 +1,203 @@
+openapi: 3.0.3
+info:
+  title: Admin Provider Credentials API
+  version: 0.1.0
+  description: |
+    Admin-only endpoints for managing provider API credentials.
+    Plaintext key is shown ONCE on create / rotate; never on list or get.
+servers:
+  - url: /admin
+security:
+  - sessionCookie: []
+  - adminToken: []
+paths:
+  /providers:
+    get:
+      summary: List provider credentials
+      parameters:
+        - in: query
+          name: provider
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, disabled] }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ProviderCredentialPublic" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      summary: Create provider credential
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProviderCredentialCreate" }
+      responses:
+        "201":
+          description: Created. Plaintext key shown ONCE in `api_key` field.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ProviderCredentialPublic"
+                  - type: object
+                    required: [api_key]
+                    properties:
+                      api_key:
+                        type: string
+                        description: Plaintext API key — shown ONCE; not retrievable afterwards.
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: Label already used for this provider
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorBody" }
+        "422":
+          description: Provider not in allowed_providers, or invalid payload
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorBody" }
+  /providers/{id}:
+    get:
+      summary: Get provider credential (no plaintext)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProviderCredentialPublic" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /providers/{id}/rotate:
+    post:
+      summary: Rotate API key for this credential
+      description: Old key invalidated immediately; new plaintext returned ONCE.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [api_key]
+              properties:
+                api_key:
+                  type: string
+                  minLength: 8
+      responses:
+        "200":
+          description: Rotated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ProviderCredentialPublic"
+                  - type: object
+                    required: [api_key]
+                    properties:
+                      api_key: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Cannot rotate (e.g., already disabled)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorBody" }
+  /providers/{id}/disable:
+    post:
+      summary: Disable provider credential
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Disabled
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProviderCredentialPublic" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Already disabled
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorBody" }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+    adminToken:
+      type: apiKey
+      in: header
+      name: X-Admin-Token
+  schemas:
+    ProviderCredentialPublic:
+      type: object
+      required: [id, provider, label, fingerprint, status, created_at, created_by]
+      properties:
+        id: { type: string }
+        provider: { type: string, enum: [azure_openai, openai, anthropic, gemini] }
+        label: { type: string }
+        fingerprint:
+          type: string
+          pattern: "^[0-9a-f]{16}$"
+          description: First 16 hex chars of SHA-256(plaintext)
+        base_url: { type: string, nullable: true }
+        extra_config:
+          type: object
+          additionalProperties: true
+          nullable: true
+        status: { type: string, enum: [active, disabled] }
+        last_used_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        created_by: { type: string }
+        disabled_at: { type: string, format: date-time, nullable: true }
+    ProviderCredentialCreate:
+      type: object
+      required: [provider, label, api_key]
+      properties:
+        provider: { type: string, enum: [azure_openai, openai, anthropic, gemini] }
+        label: { type: string, minLength: 1, maxLength: 64 }
+        api_key: { type: string, minLength: 8 }
+        base_url: { type: string, nullable: true }
+        extra_config:
+          type: object
+          additionalProperties: true
+          nullable: true
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+  responses:
+    Unauthorized:
+      description: Not authenticated
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+    Forbidden:
+      description: Not admin
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+    NotFound:
+      description: Credential not found
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
