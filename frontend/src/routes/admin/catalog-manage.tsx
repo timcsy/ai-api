@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -245,7 +246,11 @@ export function AdminCatalogManagePage() {
             const hidden = vis && vis.visible_member_count === 0;
             return (
             <TableRow key={m.slug}>
-              <TableCell className="font-mono text-xs">{m.slug}</TableCell>
+              <TableCell className="font-mono text-xs">
+                <Link to={`/admin/model/${m.slug}`} className="text-primary hover:underline">
+                  {m.slug}
+                </Link>
+              </TableCell>
               <TableCell>{m.display_name}</TableCell>
               <TableCell>{m.provider}</TableCell>
               <TableCell>

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
@@ -148,7 +149,9 @@ export function AdminTagsPage() {
           {tagsQuery.data?.map((t) => (
             <TableRow key={t.tag}>
               <TableCell>
-                <Badge variant="secondary">{t.tag}</Badge>
+                <Badge variant="secondary">
+                  <Link to={`/admin/tag/${t.tag}`} className="hover:underline">{t.tag}</Link>
+                </Badge>
               </TableCell>
               <TableCell>{t.member_count}</TableCell>
               <TableCell className="text-right">
