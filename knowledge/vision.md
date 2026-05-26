@@ -29,12 +29,12 @@
 
 ## 現狀
 
-**2026-05-25：階段 5（多 Provider + Credential 管理 + Tag-based 存取）完成。**
-後端 264 tests + 前端 56 tests 全綠；upstream 用 `litellm` library form 支援
-4 家 provider（Azure / OpenAI / Anthropic / Gemini）；admin UI 全套（providers
-/ tags / model-access / catalog-manage）已上線；ProviderCredential Fernet
-加密落 DB，K8s Secret 提供金鑰，pod 啟動時即驗證。3b.7 Playwright E2E 仍未開。
-詳細狀態見下方〈路線圖〉每個階段標記。
+**2026-05-26：階段 5.2（規則自動標籤）完成。**
+後端 311 tests + 前端 69 tests 全綠；upstream 用 `litellm` library form 支援
+4 家 provider（Azure / OpenAI / Anthropic / Gemini）；admin UI 經階段 5.1 從
+11 個入口整併為 6 個（journey-oriented）；階段 5.2 起新成員首次註冊可依 admin
+規則自動貼 tag。ProviderCredential Fernet 加密落 DB，K8s Secret 提供金鑰，pod
+啟動時即驗證。3b.7 Playwright E2E 仍未開。詳細狀態見下方〈路線圖〉每個階段標記。
 
 ## 架構
 
@@ -298,3 +298,48 @@
 - ❌ Rule matcher（複合條件式）— 首版只支援單 tag 集合的 AND / NOT
 - ❌ Provider failover（A 家掛了自動轉 B 家）— YAGNI 直到真的有需求
 - ❌ 按 provider 切配額池（沿用 3c 全域池）
+
+### 階段 5.1：管理員 UX 整併 ✅
+- [x] 完成（2026-05-25；PR #13）
+
+> **交付**：階段 5 把 admin 功能逐一加成 11 個入口後過於零散；本階段以
+> 「使用者旅程」重新收斂成 6 個入口，不加新功能。
+> **前置條件**：階段 5
+
+**成功標準：**
+- [x] sub-nav 由 11 條整併為 **6 條**（首頁 / Model / 成員 / Tag / Provider 憑證 / 觀測）
+- [x] 路由整併：`/admin/model`、`/admin/member`、`/admin/tag`、`/admin/observability`
+      （觀測為 usage / quota / rebalance / audit 的 nested hub）
+- [x] 舊深層連結以 React Router redirect 保留回溯相容（9 條 legacy → 新位置）
+- [x] 抽出可複用的 `VisibilityDiagnose` 面板（含修復 CTA），跨 model / member 詳情共用
+
+**明確排除（留後續 polish）：**
+- ❌ 新頁的 RTL 測試（T018-T020）、AllocationCreateDialog 元件抽出 — 非阻塞
+
+### 階段 5.2：規則自動標籤 ✅
+- [x] 完成（2026-05-26；後端 311 / 前端 69 全綠；PR #14）
+
+> **交付**：admin 定義有序規則，新成員**首次註冊**時 first-match-wins 自動貼 tag；
+> auto tag 與既有 tag 完全等價地進入 access policy，只多一個 `source=auto` 來源標記。
+> **前置條件**：階段 5（Tag-based 存取）
+
+**核心原則：**
+- **只在首次註冊跑**：規則評估是 cold path 單次，不在登入 hot path 重算
+- **first-match-wins**：由上而下評估，套用第一條命中的規則；`always` 作為 fallback
+
+**成功標準：**
+- [x] `TagRule` 實體（order / matcher_type / pattern / tag / enabled）+ admin CRUD
+      + 排序 + 「測試 email」dry-run（`/admin/tag-rules` 共 6 endpoints）
+- [x] 4 種 matcher：`email_localpart_regex`（學號）/ `email_suffix` / `email_domain`
+      / `always`（catch-all fallback）
+- [x] **regex 防 ReDoS**：自動 anchor `^(?:...)$` + local-part ≤64 截斷 + 巢狀量詞
+      / 複雜度檢查；**不引入 re2**（cold-path 單次評估，護欄足夠）
+- [x] 在 `_find_or_create_oidc_member`（OIDC 自助註冊）+ `MemberService.create`
+      （admin 建立）兩個點掛 hook；包 try/except，**永不讓註冊流程崩潰**
+- [x] `MemberTag` 加 `source`（manual / auto）+ `rule_id`；auto 貼 tag 寫稽核
+      `member_tag_added` details `source=auto, rule_id`
+- [x] 前端規則頁掛在 Tag 區（**不增加第 7 條 sub-nav**）；成員詳情頁 auto tag 加「自動」徽章
+
+**明確排除（留後續）：**
+- ❌ 多重 auto tag（首版 first-match 單一 tag）
+- ❌ 定期重算 / email 變更時重算（YAGNI；只首次註冊觸發）

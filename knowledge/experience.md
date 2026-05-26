@@ -2,6 +2,21 @@
 
 ## 教訓
 
+### UI 錯誤封包 shape 不一致會默默吃掉全 app 的錯誤訊息
+
+- **理論說**：前端 `api-client` 統一讀 `body.error.{code,message}` 就能顯示後端錯誤。
+- **實際發生**：Phase 5.2 在規則頁送惡意 regex，後端正確回 422 + 具體訊息
+  （`nested quantifier (ReDoS risk)`），但 UI 只跳「建立失敗」沒下文。追查發現
+  兩種錯誤封包並存：proxy 回 `{error:{...}}`，但 FastAPI `HTTPException(detail=...)`
+  包成 `{detail:{error:{...}}}`。api-client 只認前者，於是**所有走 HTTPException
+  的 admin 錯誤訊息**都被降級成空的 `statusText`——不只規則頁，是全 app 潛伏已久的 bug。
+- **解決方式**：api-client 改成 `body.error ?? body.detail?.error`，兩種 shape 都吃；
+  一行修復讓全 app 的 admin 錯誤訊息恢復可讀。
+- **教訓**：錯誤訊息的「封包形狀」要當成跨層契約。前後端若有兩種 error envelope，
+  client 必須都解析；否則使用者只看到無資訊的通用錯誤，且這種 bug 潛伏很久
+  （成功路徑不受影響，沒人發現）。新端點上線時順手驗一次「錯誤路徑」訊息真的有顯示。
+- **來源**：`frontend/src/lib/api-client.ts`；Phase 5.2 PR #14
+
 ### 對稱加密金鑰要在 pod 啟動時就驗證，別等 runtime
 
 - **理論說**：app 沒人呼叫加密路徑時，金鑰存不存在不影響運行；惰性檢查就好。
@@ -44,13 +59,16 @@
   並行版」。多花了大量工，且揹了 LiteLLM 依賴卻沒享受其好處。
 - **解決方式**：在 spec / plan 階段就要明確分辨**LiteLLM 是「library」
   還是「Proxy service」**——前者只是函式呼叫，後者才提供 UI / 認證 / 配額
-  / 計費。並要主動向 user 確認預設選擇，而不是隱性決定。Phase 011 起改用
-  官方 `openai` SDK（Azure mode）直連，drop `litellm` 套件。
+  / 計費。並要主動向 user 確認預設選擇，而不是隱性決定。Phase 011 先改用
+  官方 `openai` SDK（Azure mode）直連、drop `litellm`；**Phase 5 因要支援
+  多 provider（Azure / OpenAI / Anthropic / Gemini），又以 library form
+  重新採用 `litellm`**（只呼叫 `acompletion`，不啟用 Proxy server）。
 - **教訓**：vision 提到的工具，要先確認**它的形態**（lib vs service vs
   framework）和**我們打算用哪個形態**；任何「build vs adopt」決策必須
-  在 specify 之前明確問 user，不要在 plan 階段才隱性決定。
-- **來源**：`src/ai_api/proxy/upstream.py`（從 `litellm.acompletion` 改
-  `AsyncAzureOpenAI`）；PR #11 之後（Phase 011 hotfix）
+  在 specify 之前明確問 user，不要在 plan 階段才隱性決定。形態選對之後，
+  「採用」與「自製」可以並存、也能隨需求進退（litellm 一進一出再進就是例子）。
+- **來源**：`src/ai_api/proxy/upstream.py`（Phase 011 改 `AsyncAzureOpenAI`、
+  Phase 5 又回 `litellm.acompletion` 以支援多 provider）；PR #11 / #12
 
 ### 在 async SQLAlchemy 中禁止 lazy-load
 
