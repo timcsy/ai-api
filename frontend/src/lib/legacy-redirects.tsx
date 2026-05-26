@@ -13,7 +13,7 @@ const REDIRECTS: Array<{ from: string; to: string }> = [
   { from: "/admin/catalog-manage", to: "/admin/model" },
   { from: "/admin/model-access", to: "/admin/model" },
   { from: "/admin/catalog", to: "/admin/model" },
-  { from: "/admin/allocations", to: "/admin/member" },
+  { from: "/admin/allocations", to: "/admin/observability/allocations" },
   { from: "/admin/tags", to: "/admin/tag" },
   { from: "/admin/usage", to: "/admin/observability/usage" },
   { from: "/admin/quota-pool", to: "/admin/observability/quota" },

@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 
 const TABS = [
   { to: "usage", label: "用量" },
+  { to: "allocations", label: "分配" },
   { to: "quota", label: "配額池" },
   { to: "rebalance", label: "Rebalance 記錄" },
   { to: "audit", label: "稽核紀錄" },

@@ -1,9 +1,37 @@
+import * as React from "react";
 import { Link, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -12,8 +40,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useToast } from "@/components/ui/use-toast";
 import { VisibilityDiagnose } from "@/components/visibility-diagnose";
 import { ApiError, api } from "@/lib/api-client";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface AdminMember {
   id: string;
@@ -73,6 +103,22 @@ export function AdminMemberDetailPage() {
     queryFn: () => api<AdminAllocation[]>("/admin/allocations"),
   });
   const memberAllocs = (allocsQuery.data ?? []).filter((a) => a.member_id === memberId);
+
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [createOpen, setCreateOpen] = React.useState(false);
+  const [tokenDialog, setTokenDialog] = React.useState<string | null>(null);
+  const [revokeTarget, setRevokeTarget] = React.useState<AdminAllocation | null>(null);
+
+  const revokeMut = useMutation<void, ApiError, string>({
+    mutationFn: (allocId) => api(`/admin/allocations/${allocId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "allocations"] });
+      setRevokeTarget(null);
+      toast({ title: "已撤回" });
+    },
+    onError: (e) => toast({ title: "撤回失敗", description: e.message, variant: "destructive" }),
+  });
 
   if (membersQuery.isLoading) return <div className="container mx-auto py-8">載入中…</div>;
   if (!member) {
@@ -173,12 +219,21 @@ export function AdminMemberDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Allocations</CardTitle>
-          <CardDescription>該 member 的所有分配</CardDescription>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <CardTitle className="text-lg">分配（Allocations）</CardTitle>
+              <CardDescription>該成員的所有分配憑證；在此直接建立與撤回</CardDescription>
+            </div>
+            <Button size="sm" className="shrink-0" onClick={() => setCreateOpen(true)}>
+              新增分配
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {memberAllocs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">無 allocation</p>
+            <p className="text-sm text-muted-foreground">
+              此成員還沒有任何分配。按「新增分配」發一張綁定該成員的憑證。
+            </p>
           ) : (
             <Table>
               <TableHeader>
@@ -187,6 +242,7 @@ export function AdminMemberDetailPage() {
                   <TableHead>狀態</TableHead>
                   <TableHead>配額</TableHead>
                   <TableHead>Token</TableHead>
+                  <TableHead className="text-right">動作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -198,16 +254,182 @@ export function AdminMemberDetailPage() {
                     </TableCell>
                     <TableCell>{a.quota_tokens_per_month ?? "無限額"}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">{a.token_prefix}…</TableCell>
+                    <TableCell className="text-right">
+                      {a.status === "active" ? (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => setRevokeTarget(a)}
+                        >
+                          撤回
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">已撤回</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
-          <p className="text-xs text-muted-foreground mt-2">
-            建立 / 撤回等動作在「成員」列表（建分配 dialog）；後續可內嵌至此頁。
-          </p>
         </CardContent>
       </Card>
+
+      <CreateAllocationDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        memberId={memberId}
+        memberEmail={member.email}
+        onCreated={(token) => {
+          queryClient.invalidateQueries({ queryKey: ["admin", "allocations"] });
+          setTokenDialog(token);
+        }}
+      />
+
+      {/* one-time token reveal */}
+      <Dialog open={!!tokenDialog} onOpenChange={(open) => !open && setTokenDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>分配已建立 — 此 token 只顯示一次</DialogTitle>
+            <DialogDescription>請立即複製並安全保存。關閉後無法再次取得。</DialogDescription>
+          </DialogHeader>
+          <pre className="bg-muted p-3 rounded text-xs overflow-x-auto break-all">{tokenDialog}</pre>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                if (tokenDialog) await copyToClipboard(tokenDialog);
+                toast({ title: "已複製" });
+              }}
+            >
+              複製
+            </Button>
+            <Button onClick={() => setTokenDialog(null)}>我已複製</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* revoke confirm */}
+      <AlertDialog open={!!revokeTarget} onOpenChange={(open) => !open && setRevokeTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>撤回這筆分配？</AlertDialogTitle>
+            <AlertDialogDescription>
+              撤回後 token「{revokeTarget?.token_prefix}…」的後續呼叫會立即被拒絕，無法復原。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => revokeTarget && revokeMut.mutate(revokeTarget.id)}>
+              撤回
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+  );
+}
+
+function CreateAllocationDialog({
+  open,
+  onOpenChange,
+  memberId,
+  memberEmail,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  memberId: string;
+  memberEmail: string;
+  onCreated: (token: string) => void;
+}) {
+  const { toast } = useToast();
+  const [model, setModel] = React.useState("");
+  const [quota, setQuota] = React.useState("");
+  const [submitting, setSubmitting] = React.useState(false);
+
+  React.useEffect(() => {
+    if (open) {
+      setModel("");
+      setQuota("");
+    }
+  }, [open]);
+
+  const catalogQuery = useQuery<Array<{ slug: string; display_name: string }>, ApiError>({
+    queryKey: ["admin", "catalog-models-admin"],
+    queryFn: () =>
+      api<Array<{ slug: string; display_name: string }>>("/admin/catalog/models"),
+    enabled: open,
+  });
+
+  const submit = async () => {
+    setSubmitting(true);
+    try {
+      const created = await api<{ token: string }>("/admin/allocations", {
+        method: "POST",
+        body: JSON.stringify({
+          member_id: memberId,
+          resource_model: model,
+          quota_tokens_per_month: quota.trim() === "" ? undefined : Number(quota),
+        }),
+      });
+      onCreated(created.token);
+      onOpenChange(false);
+    } catch (err) {
+      toast({ title: "建立失敗", description: (err as ApiError).message, variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>新增分配</DialogTitle>
+          <DialogDescription>發一張綁定 {memberEmail} 的憑證。</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label>模型</Label>
+            <Select value={model || undefined} onValueChange={setModel}>
+              <SelectTrigger className="mt-1">
+                <SelectValue
+                  placeholder={
+                    catalogQuery.isLoading
+                      ? "載入 catalog…"
+                      : (catalogQuery.data?.length ?? 0) === 0
+                        ? "catalog 是空的；先到 Model → Catalog 管理加入"
+                        : "選擇 model"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {catalogQuery.data?.map((m) => (
+                  <SelectItem key={m.slug} value={m.slug}>
+                    {m.slug}
+                    <span className="text-muted-foreground ml-1">（{m.display_name}）</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="alloc-quota">月度配額 tokens（可選；空白＝無限額）</Label>
+            <Input
+              id="alloc-quota"
+              type="number"
+              className="mt-1"
+              value={quota}
+              onChange={(e) => setQuota(e.target.value)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
+          <Button disabled={!model || submitting} onClick={() => void submit()}>建立</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/auth";
 import { LegacyRedirectRoutes } from "@/lib/legacy-redirects";
+import { AdminAllocationsPage } from "@/routes/admin/allocations";
 import { AdminAuditPage } from "@/routes/admin/audit";
 import { AdminCatalogManagePage } from "@/routes/admin/catalog-manage";
 import { AdminHomePage } from "@/routes/admin/home";
@@ -80,6 +81,7 @@ export function App() {
                 <Route path="/admin/observability" element={<AdminObservabilityPage />}>
                   <Route index element={<Navigate to="usage" replace />} />
                   <Route path="usage" element={<AdminUsagePage />} />
+                  <Route path="allocations" element={<AdminAllocationsPage />} />
                   <Route path="quota" element={<AdminQuotaPoolPage />} />
                   <Route path="rebalance" element={<AdminRebalanceLogListPage />} />
                   <Route path="rebalance/:id" element={<AdminRebalanceLogDetailPage />} />
