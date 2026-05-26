@@ -1,0 +1,94 @@
+openapi: 3.0.3
+info:
+  title: Member Self-Service Allocation API
+  version: 0.1.0
+  description: |
+    Phase 6 — a member self-claims an allocation for a model the admin has
+    opened for self-service and the member is allowed by access policy.
+servers:
+  - url: /
+security:
+  - sessionCookie: []
+paths:
+  /me/allocations:
+    get:
+      summary: List my allocations (existing — unchanged shape, now includes origin)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MyAllocation" }
+    post:
+      summary: Self-claim an allocation for a self-service-enabled model
+      description: |
+        Requires CSRF. Eligibility = member active AND model.self_service_enabled
+        AND access-policy-visible AND no active self-service allocation for the
+        model AND not reclaim-locked.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model]
+              properties:
+                model: { type: string, description: "catalog slug, e.g. azure/gpt-5.4-mini" }
+      responses:
+        "201":
+          description: Claimed — token shown ONCE
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, allocation]
+                properties:
+                  token: { type: string, description: "one-time plaintext credential" }
+                  allocation: { $ref: "#/components/schemas/MyAllocation" }
+        "403":
+          description: |
+            - `model_forbidden`: access policy disallows this member
+            - `model_not_self_service`: model not opened for self-service
+            - `reclaim_locked`: revoked before; needs admin unlock
+            - `member_inactive`: member disabled
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+        "409":
+          description: "`already_claimed`: member already holds an active self-service allocation for this model"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { $ref: "#/components/schemas/ErrorEnvelope" }
+                  allocation: { $ref: "#/components/schemas/MyAllocation" }
+        "404":
+          description: model slug not in catalog
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+components:
+  securitySchemes:
+    sessionCookie: { type: apiKey, in: cookie, name: session }
+  schemas:
+    MyAllocation:
+      type: object
+      required: [id, resource_model, status, origin, quota_tokens_per_month, token_prefix, created_at]
+      properties:
+        id: { type: string }
+        resource_model: { type: string }
+        status: { type: string, enum: [active, revoked, quarantined] }
+        origin: { type: string, enum: [admin, self_service] }
+        quota_tokens_per_month: { type: integer, nullable: true }
+        token_prefix: { type: string }
+        created_at: { type: string, format: date-time }
+    ErrorEnvelope:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error: { $ref: "#/components/schemas/ErrorEnvelope" }
