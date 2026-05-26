@@ -9,7 +9,7 @@ import enum
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Enum, Index, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Enum, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai_api.db import Base
@@ -50,6 +50,10 @@ class ModelCatalog(Base):
     )
     allowed_tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     denied_tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+
+    # Phase 6: self-service allocation
+    self_service_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    self_service_default_quota: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
         Index("idx_model_catalog_status", "status"),

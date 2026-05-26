@@ -11,6 +11,7 @@ import {
   RadioGroup,
   RadioGroupItem,
 } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { VisibilityDiagnose } from "@/components/visibility-diagnose";
 import { ApiError, api } from "@/lib/api-client";
@@ -33,6 +34,8 @@ interface CatalogModel {
   default_access: "open" | "restricted";
   allowed_tags: string[];
   denied_tags: string[];
+  self_service_enabled: boolean;
+  self_service_default_quota: number | null;
   visibility?: Visibility;
 }
 
@@ -54,15 +57,35 @@ export function AdminModelDetailPage() {
   const [deniedTags, setDeniedTags] = React.useState<string[]>([]);
   const [allowInput, setAllowInput] = React.useState("");
   const [denyInput, setDenyInput] = React.useState("");
+  const [ssEnabled, setSsEnabled] = React.useState(false);
+  const [ssQuota, setSsQuota] = React.useState("");
   const seededRef = React.useRef(false);
   React.useEffect(() => {
     if (model && !seededRef.current) {
       setDefaultAccess(model.default_access);
       setAllowedTags([...model.allowed_tags]);
       setDeniedTags([...model.denied_tags]);
+      setSsEnabled(model.self_service_enabled);
+      setSsQuota(model.self_service_default_quota?.toString() ?? "");
       seededRef.current = true;
     }
   }, [model]);
+
+  const ssMut = useMutation<unknown, ApiError, void>({
+    mutationFn: () =>
+      api(`/admin/catalog/models/${slug}/self-service`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          enabled: ssEnabled,
+          default_quota: ssEnabled && ssQuota.trim() !== "" ? Number(ssQuota) : null,
+        }),
+      }),
+    onSuccess: () => {
+      toast({ title: "自助領取設定已更新" });
+      queryClient.invalidateQueries({ queryKey: ["admin", "catalog-models-admin"] });
+    },
+    onError: (e) => toast({ title: "更新失敗", description: e.message, variant: "destructive" }),
+  });
 
   const patchMut = useMutation<unknown, ApiError, void>({
     mutationFn: () =>
@@ -187,6 +210,47 @@ export function AdminModelDetailPage() {
           <div className="pt-2">
             <Button onClick={() => patchMut.mutate()} disabled={patchMut.isPending}>
               {patchMut.isPending ? "套用中…" : "套用"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 2.5 自助領取 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">自助領取</CardTitle>
+          <CardDescription>
+            開放後，被存取規則允許的成員可在自己的儀表板一鍵領取此 model 的憑證，不需 admin 逐筆建立。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Switch id="ss-enabled" checked={ssEnabled} onCheckedChange={setSsEnabled} />
+            <Label htmlFor="ss-enabled">允許自助領取</Label>
+          </div>
+          {ssEnabled && (
+            <div>
+              <Label htmlFor="ss-quota">自助領取預設月配額 tokens（必填）</Label>
+              <Input
+                id="ss-quota"
+                type="number"
+                className="mt-1"
+                placeholder="50000"
+                value={ssQuota}
+                onChange={(e) => setSsQuota(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                每張自助領取的憑證以此為初始月配額；之後比照一般分配進配額池調整。
+              </p>
+            </div>
+          )}
+          <div className="pt-1">
+            <Button
+              variant="outline"
+              onClick={() => ssMut.mutate()}
+              disabled={ssMut.isPending || (ssEnabled && ssQuota.trim() === "")}
+            >
+              {ssMut.isPending ? "套用中…" : "套用自助設定"}
             </Button>
           </div>
         </CardContent>

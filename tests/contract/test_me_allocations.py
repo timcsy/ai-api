@@ -1,0 +1,124 @@
+"""Phase 6 T013 / US2: POST /me/allocations self-service claim.
+
+Contract: specs/015-self-service-allocation/contracts/me-allocations.yaml
+"""
+from __future__ import annotations
+
+from datetime import UTC, datetime
+
+import pytest
+from httpx import AsyncClient
+
+from ai_api.api.deps import CSRF_HEADER
+from ai_api.db import get_sessionmaker
+from ai_api.models import ModelCatalog
+
+
+async def _seed_model(
+    slug: str,
+    *,
+    provider: str = "azure",
+    enabled: bool = True,
+    quota: int | None = 50000,
+    default_access: str = "open",
+    allowed: list[str] | None = None,
+) -> None:
+    sm = get_sessionmaker()
+    now = datetime.now(UTC)
+    async with sm() as s:
+        s.add(
+            ModelCatalog(
+                slug=slug, provider=provider, display_name="M", family="x",
+                description="", modality_input=["text"], modality_output=["text"],
+                capabilities=[], context_window=1024, cost_tier="low",
+                recommended_for=[], tags=[], example_request={}, official_doc_url=None,
+                status="active", deprecation_note=None, created_at=now, updated_at=now,
+                default_access=default_access, allowed_tags=allowed or [], denied_tags=[],
+                self_service_enabled=enabled, self_service_default_quota=quota,
+            )
+        )
+        await s.commit()
+
+
+async def _login(client: AsyncClient, admin_headers: dict[str, str], email: str = "claimer@x.com") -> dict:
+    await client.post(
+        "/admin/members",
+        headers=admin_headers,
+        json={"email": email, "provider": "local_password",
+              "initial_password": "VerySafePass123", "send_invitation": False},
+    )
+    await client.post("/auth/local/login", json={"email": email, "password": "VerySafePass123"})
+    return (await client.get("/me")).json()
+
+
+def _csrf(client: AsyncClient) -> dict[str, str]:
+    return {CSRF_HEADER: client.cookies.get("aiapi_csrf") or ""}
+
+
+@pytest.mark.asyncio
+async def test_claim_success(
+    app_client: AsyncClient, admin_headers: dict[str, str], make_provider_credential
+) -> None:
+    await make_provider_credential(provider="azure", api_key="sk-az-1")
+    await _seed_model("azure/open-ss")
+    await _login(app_client, admin_headers)
+    r = await app_client.post("/me/allocations", headers=_csrf(app_client), json={"model": "azure/open-ss"})
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["token"].startswith("aiapi_")
+    assert body["allocation"]["origin"] == "self_service"
+    assert body["allocation"]["quota_tokens_per_month"] == 50000
+    assert body["allocation"]["status"] == "active"
+
+
+@pytest.mark.asyncio
+async def test_claim_model_not_self_service(
+    app_client: AsyncClient, admin_headers: dict[str, str], make_provider_credential
+) -> None:
+    await make_provider_credential(provider="azure", api_key="sk-az-2")
+    await _seed_model("azure/closed", enabled=False, quota=None)
+    await _login(app_client, admin_headers)
+    r = await app_client.post("/me/allocations", headers=_csrf(app_client), json={"model": "azure/closed"})
+    assert r.status_code == 403
+    assert r.json()["detail"]["error"]["code"] == "model_not_self_service"
+
+
+@pytest.mark.asyncio
+async def test_claim_model_forbidden(
+    app_client: AsyncClient, admin_headers: dict[str, str], make_provider_credential
+) -> None:
+    await make_provider_credential(provider="azure", api_key="sk-az-3")
+    await _seed_model("azure/restricted", default_access="restricted", allowed=["eng"])
+    await _login(app_client, admin_headers)  # member has no 'eng' tag
+    r = await app_client.post("/me/allocations", headers=_csrf(app_client), json={"model": "azure/restricted"})
+    assert r.status_code == 403
+    assert r.json()["detail"]["error"]["code"] == "model_forbidden"
+
+
+@pytest.mark.asyncio
+async def test_claim_already_claimed(
+    app_client: AsyncClient, admin_headers: dict[str, str], make_provider_credential
+) -> None:
+    await make_provider_credential(provider="azure", api_key="sk-az-4")
+    await _seed_model("azure/dup")
+    await _login(app_client, admin_headers)
+    r1 = await app_client.post("/me/allocations", headers=_csrf(app_client), json={"model": "azure/dup"})
+    assert r1.status_code == 201
+    r2 = await app_client.post("/me/allocations", headers=_csrf(app_client), json={"model": "azure/dup"})
+    assert r2.status_code == 409
+    assert r2.json()["detail"]["error"]["code"] == "already_claimed"
+
+
+@pytest.mark.asyncio
+async def test_claim_unknown_model_404(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    await _login(app_client, admin_headers)
+    r = await app_client.post("/me/allocations", headers=_csrf(app_client), json={"model": "nope/x"})
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_claim_requires_session(app_client: AsyncClient) -> None:
+    r = await app_client.post("/me/allocations", json={"model": "azure/open-ss"})
+    assert r.status_code in (401, 403)

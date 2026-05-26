@@ -7,7 +7,7 @@ from ai_api.models.access_control import (
     RuleType,
     SourceRestriction,
 )
-from ai_api.models.allocation import Allocation, AllocationStatus
+from ai_api.models.allocation import Allocation, AllocationOrigin, AllocationStatus
 from ai_api.models.auth_audit import ActorType, AuditEventType, AuthAuditLog
 from ai_api.models.call_record import CallOutcome, CallRecord
 from ai_api.models.credential import Credential
@@ -20,12 +20,14 @@ from ai_api.models.password_attempt import AttemptOutcome, PasswordAttempt
 from ai_api.models.price_list import PriceList
 from ai_api.models.provider_credential import ProviderCredential, ProviderCredentialStatus
 from ai_api.models.rebalance_log import RebalanceLog
+from ai_api.models.self_service_lock import SelfServiceReclaimLock
 from ai_api.models.session import Session, SessionStatus
 from ai_api.models.tag_rule import MatcherType, TagRule
 
 __all__ = [
     "ActorType",
     "Allocation",
+    "AllocationOrigin",
     "AllocationStatus",
     "AttemptOutcome",
     "AuditEventType",
@@ -50,6 +52,7 @@ __all__ = [
     "ProviderCredentialStatus",
     "RebalanceLog",
     "RuleType",
+    "SelfServiceReclaimLock",
     "Session",
     "SessionStatus",
     "SourceRestriction",

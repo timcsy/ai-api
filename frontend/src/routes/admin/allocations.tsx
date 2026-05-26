@@ -57,6 +57,14 @@ interface AdminMember {
   email: string;
 }
 
+interface ReclaimLock {
+  member_id: string;
+  member_email: string | null;
+  model_slug: string;
+  locked_at: string;
+  locked_by: string;
+}
+
 const createSchema = z.object({
   member_id: z.string().min(1),
   resource_model: z.string().min(1),
@@ -106,8 +114,23 @@ export function AdminAllocationsPage() {
     mutationFn: (id: string) => api(`/admin/allocations/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "self-service-locks"] });
       toast({ title: "已撤回" });
     },
+  });
+
+  const locksQuery = useQuery<ReclaimLock[], ApiError>({
+    queryKey: ["admin", "self-service-locks"],
+    queryFn: () => api<ReclaimLock[]>("/admin/self-service-locks"),
+  });
+  const unlockMut = useMutation<void, ApiError, { member_id: string; model_slug: string }>({
+    mutationFn: (body) =>
+      api("/admin/self-service-locks/unlock", { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "self-service-locks"] });
+      toast({ title: "已解鎖，成員可重新自助領取" });
+    },
+    onError: (e) => toast({ title: "解鎖失敗", description: e.message, variant: "destructive" }),
   });
 
   const filtered = (allocsQuery.data ?? []).filter(
@@ -233,6 +256,48 @@ export function AdminAllocationsPage() {
             )}
           </TableBody>
         </Table>
+      )}
+
+      {(locksQuery.data?.length ?? 0) > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold">自助領取鎖定</h2>
+          <p className="text-sm text-muted-foreground">
+            這些（成員, model）的自助憑證被撤回後鎖定，解鎖後成員才能再次自助領取。
+          </p>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>成員</TableHead>
+                <TableHead>模型</TableHead>
+                <TableHead>鎖定時間</TableHead>
+                <TableHead className="text-right">動作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {locksQuery.data?.map((lk) => (
+                <TableRow key={`${lk.member_id}:${lk.model_slug}`}>
+                  <TableCell className="font-medium">{lk.member_email ?? lk.member_id}</TableCell>
+                  <TableCell className="font-mono text-xs">{lk.model_slug}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {new Date(lk.locked_at).toLocaleString("zh-TW")}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={unlockMut.isPending}
+                      onClick={() =>
+                        unlockMut.mutate({ member_id: lk.member_id, model_slug: lk.model_slug })
+                      }
+                    >
+                      解鎖
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
 
       <CreateAllocationDialog

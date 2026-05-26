@@ -10,9 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from ulid import ULID
 
+from ai_api.auth.audit import record as audit_record
 from ai_api.models import (
+    ActorType,
     Allocation,
+    AllocationOrigin,
     AllocationStatus,
+    AuditEventType,
     Credential,
     Member,
     MemberProvider,
@@ -40,6 +44,8 @@ class AllocationService:
         note: str | None = None,
         created_by: str | None = None,
         subject: str | None = None,
+        quota_tokens_per_month: int | None = None,
+        origin: AllocationOrigin = AllocationOrigin.admin,
     ) -> AllocationCreated:
         if not resource_model:
             raise ValueError("resource_model is required")
@@ -67,6 +73,8 @@ class AllocationService:
             revoked_at=None,
             created_by=created_by or self.BOOTSTRAP_ADMIN,
             note=note,
+            quota_tokens_per_month=quota_tokens_per_month,
+            origin=origin,
         )
         credential = Credential(
             allocation_id=allocation.id,
@@ -101,7 +109,7 @@ class AllocationService:
         await self._s.flush()
         return allocation, token
 
-    async def revoke(self, allocation_id: str) -> Allocation | None:
+    async def revoke(self, allocation_id: str, *, revoked_by: str | None = None) -> Allocation | None:
         stmt = (
             select(Allocation)
             .options(selectinload(Allocation.credential))
@@ -114,7 +122,37 @@ class AllocationService:
             allocation.status = AllocationStatus.revoked
             allocation.revoked_at = datetime.now(UTC)
             await self._s.flush()
+            # Phase 6: revoking a self-service allocation locks the member from
+            # re-claiming this model until an admin unlocks.
+            if allocation.origin == AllocationOrigin.self_service:
+                await self._lock_reclaim(allocation, revoked_by=revoked_by)
         return allocation
+
+    async def _lock_reclaim(self, allocation: Allocation, *, revoked_by: str | None) -> None:
+        from ai_api.models import SelfServiceReclaimLock
+
+        existing = await self._s.get(
+            SelfServiceReclaimLock, (allocation.member_id, allocation.resource_model)
+        )
+        if existing is None:
+            self._s.add(
+                SelfServiceReclaimLock(
+                    member_id=allocation.member_id,
+                    model_slug=allocation.resource_model,
+                    locked_at=datetime.now(UTC),
+                    locked_by=revoked_by or "admin",
+                )
+            )
+            await self._s.flush()
+        await audit_record(
+            self._s,
+            event_type=AuditEventType.self_service_reclaim_locked,
+            actor_type=ActorType.admin,
+            actor_id=revoked_by,
+            target_type="member",
+            target_id=allocation.member_id,
+            details={"model": allocation.resource_model, "allocation_id": allocation.id},
+        )
 
     async def get(self, allocation_id: str) -> Allocation | None:
         stmt = (
