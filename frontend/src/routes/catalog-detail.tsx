@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
+import { facetLabel } from "@/lib/catalog-labels";
 import { copyToClipboard } from "@/lib/clipboard";
 
 interface ModelDetail {
@@ -94,11 +95,11 @@ export function CatalogDetailPage() {
         <h1 className="text-3xl font-bold">{m.display_name}</h1>
         <p className="text-muted-foreground font-mono text-sm">{m.slug}</p>
         <div className="flex flex-wrap gap-2 mt-2">
-          <Badge>{m.cost_tier}</Badge>
+          <Badge>成本：{facetLabel(m.cost_tier)}</Badge>
           <Badge variant="secondary">{m.family}</Badge>
           <Badge variant="outline">{m.context_window.toLocaleString()} tokens</Badge>
           {m.capabilities.map((c) => (
-            <Badge key={c} variant="outline">{c}</Badge>
+            <Badge key={c} variant="outline">{facetLabel(c)}</Badge>
           ))}
         </div>
       </section>
