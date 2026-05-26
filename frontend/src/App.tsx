@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/auth";
 import { LegacyRedirectRoutes } from "@/lib/legacy-redirects";
+import { AdminAllocationsPage } from "@/routes/admin/allocations";
 import { AdminAuditPage } from "@/routes/admin/audit";
 import { AdminCatalogManagePage } from "@/routes/admin/catalog-manage";
 import { AdminHomePage } from "@/routes/admin/home";
@@ -18,6 +19,7 @@ import { AdminObservabilityPage } from "@/routes/admin/observability";
 import { AdminProvidersPage } from "@/routes/admin/providers";
 import { AdminQuotaPoolPage } from "@/routes/admin/quota-pool";
 import { AdminTagDetailPage } from "@/routes/admin/tag-detail";
+import { AdminTagRulesPage } from "@/routes/admin/tag-rules";
 import { AdminTagsPage } from "@/routes/admin/tags";
 import {
   AdminRebalanceLogDetailPage,
@@ -72,12 +74,14 @@ export function App() {
                 <Route path="/admin/member/:id" element={<AdminMemberDetailPage />} />
                 <Route path="/admin/providers" element={<AdminProvidersPage />} />
                 <Route path="/admin/tag" element={<AdminTagsPage />} />
+                <Route path="/admin/tag/rules" element={<AdminTagRulesPage />} />
                 <Route path="/admin/tag/:name" element={<AdminTagDetailPage />} />
 
                 {/* observability hub */}
                 <Route path="/admin/observability" element={<AdminObservabilityPage />}>
                   <Route index element={<Navigate to="usage" replace />} />
                   <Route path="usage" element={<AdminUsagePage />} />
+                  <Route path="allocations" element={<AdminAllocationsPage />} />
                   <Route path="quota" element={<AdminQuotaPoolPage />} />
                   <Route path="rebalance" element={<AdminRebalanceLogListPage />} />
                   <Route path="rebalance/:id" element={<AdminRebalanceLogDetailPage />} />

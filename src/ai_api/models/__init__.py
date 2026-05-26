@@ -13,7 +13,7 @@ from ai_api.models.call_record import CallOutcome, CallRecord
 from ai_api.models.credential import Credential
 from ai_api.models.invitation import InvitationToken
 from ai_api.models.member import Member, MemberProvider, MemberStatus
-from ai_api.models.member_tag import MemberTag
+from ai_api.models.member_tag import MemberTag, TagSource
 from ai_api.models.model_catalog import DefaultAccess, ModelCatalog
 from ai_api.models.oidc_state import OidcState
 from ai_api.models.password_attempt import AttemptOutcome, PasswordAttempt
@@ -21,6 +21,7 @@ from ai_api.models.price_list import PriceList
 from ai_api.models.provider_credential import ProviderCredential, ProviderCredentialStatus
 from ai_api.models.rebalance_log import RebalanceLog
 from ai_api.models.session import Session, SessionStatus
+from ai_api.models.tag_rule import MatcherType, TagRule
 
 __all__ = [
     "ActorType",
@@ -36,6 +37,7 @@ __all__ = [
     "DefaultAccess",
     "EmailWhitelist",
     "InvitationToken",
+    "MatcherType",
     "Member",
     "MemberProvider",
     "MemberStatus",
@@ -51,4 +53,6 @@ __all__ = [
     "Session",
     "SessionStatus",
     "SourceRestriction",
+    "TagRule",
+    "TagSource",
 ]

@@ -6,12 +6,18 @@ a pure schema extension.
 """
 from __future__ import annotations
 
+import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai_api.db import Base
+
+
+class TagSource(enum.StrEnum):
+    manual = "manual"
+    auto = "auto"
 
 
 class MemberTag(Base):
@@ -25,6 +31,12 @@ class MemberTag(Base):
     tag: Mapped[str] = mapped_column(String(64), primary_key=True)
     added_by: Mapped[str] = mapped_column(String(64), nullable=False)
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source: Mapped[TagSource] = mapped_column(
+        Enum(TagSource, native_enum=False, length=16),
+        nullable=False,
+        default=TagSource.manual,
+    )
+    rule_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     __table_args__ = (
         Index("idx_member_tags_tag", "tag"),

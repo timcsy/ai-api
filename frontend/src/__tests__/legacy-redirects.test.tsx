@@ -13,7 +13,7 @@ const cases: Array<[string, string]> = [
   ["/admin/catalog-manage", "/admin/model"],
   ["/admin/model-access", "/admin/model"],
   ["/admin/catalog", "/admin/model"],
-  ["/admin/allocations", "/admin/member"],
+  ["/admin/allocations", "/admin/observability/allocations"],
   ["/admin/tags", "/admin/tag"],
   ["/admin/usage", "/admin/observability/usage"],
   ["/admin/quota-pool", "/admin/observability/quota"],

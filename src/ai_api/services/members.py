@@ -89,6 +89,11 @@ class MemberService:
         except IntegrityError as exc:
             raise MemberAlreadyExists(email_n) from exc
 
+        # Phase 5.2: auto-tag the new member by admin-defined rules.
+        from ai_api.services.tag_rules import TagRuleService
+
+        await TagRuleService(self._db).apply_to_new_member(member.id, member.email)
+
         if (
             provider == MemberProvider.local_password
             and initial_password is None

@@ -9,7 +9,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.auth.audit import record as audit_record
-from ai_api.models import ActorType, AuditEventType, Member, MemberTag
+from ai_api.models import ActorType, AuditEventType, Member, MemberTag, TagSource
 
 _TAG_RE = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 
@@ -42,10 +42,29 @@ class MemberTagService:
         )
         return list((await self._s.execute(stmt)).scalars().all())
 
+    async def list_for_member_detail(self, member_id: str) -> list[MemberTag]:
+        """Like list_for_member but returns full rows (tag + source + rule_id)."""
+        stmt = (
+            select(MemberTag)
+            .where(MemberTag.member_id == member_id)
+            .order_by(MemberTag.tag)
+        )
+        return list((await self._s.execute(stmt)).scalars().all())
+
     async def add(
-        self, member_id: str, tags: list[str], *, added_by: str | None = None
+        self,
+        member_id: str,
+        tags: list[str],
+        *,
+        added_by: str | None = None,
+        source: TagSource = TagSource.manual,
+        rule_id: str | None = None,
     ) -> list[str]:
-        """Add tags to member; idempotent. Returns final tag list."""
+        """Add tags to member; idempotent. Returns final tag list.
+
+        ``source`` marks whether a tag was assigned manually or by an
+        auto-tag rule; ``rule_id`` records the matched rule when source=auto.
+        """
         member = await self._s.get(Member, member_id)
         if member is None:
             raise LookupError(f"member {member_id} not found")
@@ -57,19 +76,31 @@ class MemberTagService:
             validate_tag(tag)
             if tag in existing:
                 continue
-            self._s.add(MemberTag(member_id=member_id, tag=tag, added_by=by, added_at=now))
+            self._s.add(
+                MemberTag(
+                    member_id=member_id,
+                    tag=tag,
+                    added_by=by,
+                    added_at=now,
+                    source=source,
+                    rule_id=rule_id,
+                )
+            )
             existing.add(tag)
             added_any = True
         if added_any:
             await self._s.flush()
+            details: dict[str, object] = {"tags": sorted(set(tags)), "source": source.value}
+            if source is TagSource.auto and rule_id is not None:
+                details["rule_id"] = rule_id
             await audit_record(
                 self._s,
                 event_type=AuditEventType.member_tag_added,
-                actor_type=ActorType.admin,
+                actor_type=ActorType.admin if source is TagSource.manual else ActorType.system,
                 actor_id=added_by,
                 target_type="member",
                 target_id=member_id,
-                details={"tags": sorted(set(tags))},
+                details=details,
             )
         return sorted(existing)
 

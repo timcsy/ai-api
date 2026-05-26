@@ -16,6 +16,7 @@ import {
   type ListFilter,
 } from "@/hooks/use-catalog-filters";
 import { ApiError, api } from "@/lib/api-client";
+import { facetLabel } from "@/lib/catalog-labels";
 
 interface Model {
   slug: string;
@@ -70,8 +71,8 @@ function FacetSection({
               checked={selected.includes(value)}
               onCheckedChange={() => onToggle(filterKey, value)}
             />
-            <Label htmlFor={id} className="text-sm cursor-pointer flex-1 capitalize">
-              {value}
+            <Label htmlFor={id} className="text-sm cursor-pointer flex-1">
+              {facetLabel(value)}
             </Label>
             <span className="text-xs text-muted-foreground">({count})</span>
           </div>
@@ -162,8 +163,8 @@ export function CatalogPage() {
                                 checked={checked}
                                 onCheckedChange={() => setCostTier(checked ? null : tier)}
                               />
-                              <Label htmlFor={id} className="text-sm cursor-pointer flex-1 capitalize">
-                                {tier}
+                              <Label htmlFor={id} className="text-sm cursor-pointer flex-1">
+                                {facetLabel(tier)}
                               </Label>
                               <span className="text-xs text-muted-foreground">({count})</span>
                             </div>
@@ -207,13 +208,15 @@ export function CatalogPage() {
             <Link key={m.slug} to={`/catalog/${m.slug}`}>
               <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
                 <CardHeader>
-                  <div className="flex items-center justify-between mb-1">
-                    <CardTitle className="text-lg">{m.display_name}</CardTitle>
-                    <Badge variant="outline">{m.cost_tier}</Badge>
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <CardTitle className="text-lg leading-snug">{m.display_name}</CardTitle>
+                    <Badge variant="outline" className="shrink-0 whitespace-nowrap mt-0.5">
+                      成本：{facetLabel(m.cost_tier)}
+                    </Badge>
                   </div>
                   <CardDescription className="text-xs">
                     <Badge variant="secondary" className="mr-1">{m.family}</Badge>
-                    {m.modality_input.join(" / ")} → {m.modality_output.join(" / ")}
+                    {m.modality_input.map(facetLabel).join(" / ")} → {m.modality_output.map(facetLabel).join(" / ")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -224,7 +227,7 @@ export function CatalogPage() {
                     <div className="mt-3 flex flex-wrap gap-1">
                       {m.recommended_for.slice(0, 4).map((r) => (
                         <Badge key={r} variant="outline" className="text-[10px]">
-                          {r}
+                          {facetLabel(r)}
                         </Badge>
                       ))}
                     </div>

@@ -116,6 +116,9 @@ export function AdminTagsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Tag 管理</h1>
         <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/admin/tag/rules">自動標籤規則</Link>
+          </Button>
           <Button variant="outline" onClick={() => setCreateOpen(true)}>建立 Tag</Button>
           <Button onClick={() => setBulkOpen(true)}>批次貼標</Button>
         </div>

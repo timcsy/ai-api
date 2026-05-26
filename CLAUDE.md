@@ -1,6 +1,6 @@
 # ai-api Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-05-25
+Auto-generated from all feature plans. Last updated: 2026-05-26
 
 ## Active Technologies
 - Python 3.11+（同 Phase 1） (002-auth-membership)
