@@ -1,0 +1,185 @@
+openapi: 3.0.3
+info:
+  title: Admin Tag Rules API
+  version: 0.1.0
+  description: |
+    Phase 5.2 — admin-managed ordered rules that auto-assign tags at member
+    first registration. All admin-only.
+servers:
+  - url: /admin
+security:
+  - sessionCookie: []
+  - adminToken: []
+paths:
+  /tag-rules:
+    get:
+      summary: List tag rules in evaluation order
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TagRule" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      summary: Create a tag rule (appended last in order)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TagRuleCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TagRule" }
+        "422":
+          description: |
+            - `invalid_tag`: tag format wrong
+            - `unsafe_regex`: regex failed compile / complexity / length guard
+            - `invalid_matcher`: matcher_type unknown
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+  /tag-rules/{id}:
+    patch:
+      summary: Edit a rule (pattern / tag / matcher_type / enabled)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TagRuleUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TagRule" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: same validation errors as create
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+    delete:
+      summary: Delete a rule
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /tag-rules/reorder:
+    post:
+      summary: Set the full evaluation order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order]
+              properties:
+                order:
+                  type: array
+                  description: complete list of rule ids in desired order
+                  items: { type: string }
+      responses:
+        "200":
+          description: Reordered
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/TagRule" }
+        "422":
+          description: order list doesn't match existing rule id set
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+  /tag-rules/test:
+    post:
+      summary: Dry-run an email against the rules (no DB write, no member)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "200":
+          description: Evaluation result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RuleMatch" }
+components:
+  securitySchemes:
+    sessionCookie: { type: apiKey, in: cookie, name: session }
+    adminToken: { type: apiKey, in: header, name: X-Admin-Token }
+  schemas:
+    MatcherType:
+      type: string
+      enum: [email_localpart_regex, email_suffix, email_domain, always]
+    TagRule:
+      type: object
+      required: [id, order_index, matcher_type, pattern, tag, enabled, created_at, created_by]
+      properties:
+        id: { type: string }
+        order_index: { type: integer }
+        matcher_type: { $ref: "#/components/schemas/MatcherType" }
+        pattern: { type: string }
+        tag: { type: string }
+        enabled: { type: boolean }
+        created_at: { type: string, format: date-time }
+        created_by: { type: string }
+    TagRuleCreate:
+      type: object
+      required: [matcher_type, tag]
+      properties:
+        matcher_type: { $ref: "#/components/schemas/MatcherType" }
+        pattern: { type: string, default: "" }
+        tag: { type: string, pattern: "^[a-z][a-z0-9_-]{0,63}$" }
+        enabled: { type: boolean, default: true }
+    TagRuleUpdate:
+      type: object
+      properties:
+        matcher_type: { $ref: "#/components/schemas/MatcherType" }
+        pattern: { type: string }
+        tag: { type: string }
+        enabled: { type: boolean }
+    RuleMatch:
+      type: object
+      required: [matched]
+      properties:
+        matched: { type: boolean }
+        rule_id: { type: string, nullable: true }
+        tag: { type: string, nullable: true }
+        matcher_type: { $ref: "#/components/schemas/MatcherType", nullable: true }
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+  responses:
+    Unauthorized:
+      description: Not authenticated
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+    Forbidden:
+      description: Not admin
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+    NotFound:
+      description: Rule not found
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
