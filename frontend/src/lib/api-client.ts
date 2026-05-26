@@ -29,14 +29,18 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
 
   if (!res.ok) {
-    let body: { error?: { code?: string; message?: string } } = {};
+    type ErrEnvelope = { code?: string; message?: string };
+    let body: { error?: ErrEnvelope; detail?: { error?: ErrEnvelope } } = {};
     try {
       body = await res.json();
     } catch {
       // body may not be JSON (e.g. proxy 5xx)
     }
-    const code = body.error?.code ?? "unknown";
-    const message = body.error?.message ?? res.statusText;
+    // Two shapes in this app: proxy returns `{error}`, FastAPI HTTPException
+    // wraps it as `{detail: {error}}`. Accept either.
+    const err = body.error ?? body.detail?.error;
+    const code = err?.code ?? "unknown";
+    const message = err?.message ?? res.statusText;
 
     if (res.status === 401) {
       window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));

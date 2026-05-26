@@ -18,6 +18,7 @@ import { AdminObservabilityPage } from "@/routes/admin/observability";
 import { AdminProvidersPage } from "@/routes/admin/providers";
 import { AdminQuotaPoolPage } from "@/routes/admin/quota-pool";
 import { AdminTagDetailPage } from "@/routes/admin/tag-detail";
+import { AdminTagRulesPage } from "@/routes/admin/tag-rules";
 import { AdminTagsPage } from "@/routes/admin/tags";
 import {
   AdminRebalanceLogDetailPage,
@@ -72,6 +73,7 @@ export function App() {
                 <Route path="/admin/member/:id" element={<AdminMemberDetailPage />} />
                 <Route path="/admin/providers" element={<AdminProvidersPage />} />
                 <Route path="/admin/tag" element={<AdminTagsPage />} />
+                <Route path="/admin/tag/rules" element={<AdminTagRulesPage />} />
                 <Route path="/admin/tag/:name" element={<AdminTagDetailPage />} />
 
                 {/* observability hub */}

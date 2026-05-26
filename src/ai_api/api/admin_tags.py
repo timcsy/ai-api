@@ -80,6 +80,22 @@ async def list_member_tags(
     return await MemberTagService(session).list_for_member(member_id)
 
 
+@router.get("/members/{member_id}/tags/detail")
+async def list_member_tags_detail(
+    member_id: str, session: AsyncSession = Depends(get_db_session)
+) -> list[dict[str, Any]]:
+    """Tags with source metadata (manual/auto + rule_id). Separate from the plain
+    `/tags` endpoint so existing consumers keep their `list[str]` shape."""
+    from ai_api.models import Member
+    if (await session.get(Member, member_id)) is None:
+        raise HTTPException(status_code=404, detail=_err("not_found", "member not found"))
+    rows = await MemberTagService(session).list_for_member_detail(member_id)
+    return [
+        {"tag": r.tag, "source": r.source.value, "rule_id": r.rule_id}
+        for r in rows
+    ]
+
+
 @router.post("/members/{member_id}/tags")
 async def add_member_tags(
     member_id: str,

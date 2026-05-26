@@ -40,6 +40,12 @@ interface VisibleModel {
   provider: string;
 }
 
+interface MemberTagDetail {
+  tag: string;
+  source: "manual" | "auto";
+  rule_id: string | null;
+}
+
 export function AdminMemberDetailPage() {
   const { id } = useParams<{ id: string }>();
   const memberId = id ?? "";
@@ -50,9 +56,9 @@ export function AdminMemberDetailPage() {
   });
   const member = membersQuery.data?.find((m) => m.id === memberId);
 
-  const tagsQuery = useQuery<string[], ApiError>({
-    queryKey: ["admin", "members", memberId, "tags"],
-    queryFn: () => api<string[]>(`/admin/members/${memberId}/tags`),
+  const tagsQuery = useQuery<MemberTagDetail[], ApiError>({
+    queryKey: ["admin", "members", memberId, "tags", "detail"],
+    queryFn: () => api<MemberTagDetail[]>(`/admin/members/${memberId}/tags/detail`),
     enabled: !!memberId,
   });
 
@@ -120,8 +126,14 @@ export function AdminMemberDetailPage() {
           ) : (
             <div className="flex flex-wrap gap-1">
               {tagsQuery.data?.map((t) => (
-                <Badge key={t} variant="secondary" className="text-xs">
-                  <Link to={`/admin/tag/${t}`} className="hover:underline">{t}</Link>
+                <Badge key={t.tag} variant="secondary" className="text-xs">
+                  <Link to={`/admin/tag/${t.tag}`} className="hover:underline">{t.tag}</Link>
+                  {t.source === "auto" && (
+                    <span
+                      className="ml-1 rounded bg-primary/15 px-1 text-[10px] text-primary"
+                      title="由自動標籤規則貼上"
+                    >自動</span>
+                  )}
                 </Badge>
               ))}
             </div>

@@ -252,6 +252,10 @@ async def _find_or_create_oidc_member(
     )
     session.add(new)
     await session.flush()
+    # Phase 5.2: auto-tag new members by admin-defined rules (first registration only).
+    from ai_api.services.tag_rules import TagRuleService
+
+    await TagRuleService(session).apply_to_new_member(new.id, new.email)
     return new
 
 
