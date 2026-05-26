@@ -18,11 +18,22 @@ export class ApiError extends Error {
   }
 }
 
+function csrfToken(): string {
+  return document.cookie.match(/aiapi_csrf=([^;]+)/)?.[1] ?? "";
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const method = (init.method ?? "GET").toUpperCase();
+  // Auto-attach CSRF token for state-changing requests (the backend's
+  // require_csrf compares this header to the aiapi_csrf cookie). Admin
+  // endpoints authenticate via X-Admin-Token and simply ignore it.
+  const csrfHeaders: Record<string, string> =
+    method === "GET" ? {} : { "X-CSRF-Token": csrfToken() };
   const res = await fetch(path, {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...csrfHeaders,
       ...(init.headers ?? {}),
     },
     ...init,

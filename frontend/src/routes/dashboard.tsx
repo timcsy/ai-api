@@ -1,15 +1,25 @@
 import * as React from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/auth";
 import { ApiError, api } from "@/lib/api-client";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface Allocation {
   id: string;
@@ -22,13 +32,44 @@ interface Allocation {
   token_prefix: string;
 }
 
+interface ClaimableModel {
+  slug: string;
+  display_name: string;
+  provider: string;
+  default_quota: number | null;
+  state: "claimable" | "already_claimed" | "reclaim_locked";
+}
+
 export function DashboardPage() {
   const { member } = useAuth();
   const [includeRevoked, setIncludeRevoked] = React.useState(false);
 
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [tokenDialog, setTokenDialog] = React.useState<string | null>(null);
+
   const query = useQuery<Allocation[], ApiError>({
     queryKey: ["me", "allocations"],
     queryFn: () => api<Allocation[]>("/me/allocations"),
+  });
+
+  const claimableQuery = useQuery<ClaimableModel[], ApiError>({
+    queryKey: ["me", "claimable-models"],
+    queryFn: () => api<ClaimableModel[]>("/me/claimable-models"),
+  });
+
+  const claimMut = useMutation<{ token: string }, ApiError, string>({
+    mutationFn: (model) =>
+      api<{ token: string }>("/me/allocations", {
+        method: "POST",
+        body: JSON.stringify({ model }),
+      }),
+    onSuccess: (r) => {
+      setTokenDialog(r.token);
+      queryClient.invalidateQueries({ queryKey: ["me", "allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["me", "claimable-models"] });
+    },
+    onError: (e) => toast({ title: "領取失敗", description: e.message, variant: "destructive" }),
   });
 
   const filtered = React.useMemo(() => {
@@ -75,6 +116,47 @@ export function DashboardPage() {
         </Alert>
       </section>
 
+      {(claimableQuery.data?.length ?? 0) > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-xl font-semibold">可自助領取</h2>
+          <p className="text-sm text-muted-foreground">
+            以下 model 已開放自助領取且你被允許使用。按「領取憑證」即可取得一張可呼叫的 token。
+          </p>
+          <div className="grid gap-3 md:grid-cols-2">
+            {claimableQuery.data?.map((m) => (
+              <Card key={m.slug}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">{m.display_name}</CardTitle>
+                  <CardDescription className="font-mono text-xs">{m.slug}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    月配額 {m.default_quota?.toLocaleString() ?? "—"}
+                  </span>
+                  {m.state === "claimable" && (
+                    <Button
+                      size="sm"
+                      disabled={claimMut.isPending}
+                      onClick={() => claimMut.mutate(m.slug)}
+                    >
+                      領取憑證
+                    </Button>
+                  )}
+                  {m.state === "already_claimed" && (
+                    <Badge variant="secondary">已領取</Badge>
+                  )}
+                  {m.state === "reclaim_locked" && (
+                    <Badge variant="outline" className="text-amber-700 border-amber-500">
+                      需 admin 解鎖
+                    </Badge>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">我的分配</h2>
@@ -104,7 +186,7 @@ export function DashboardPage() {
         {query.data && filtered.length === 0 && (
           <Card>
             <CardContent className="py-10 text-center text-muted-foreground">
-              尚未獲得任何分配，請聯絡管理員。
+              尚未獲得任何分配。若上方有「可自助領取」的 model 可直接領取，否則請聯絡管理員。
             </CardContent>
           </Card>
         )}
@@ -132,6 +214,28 @@ export function DashboardPage() {
           ))}
         </div>
       </section>
+
+      <Dialog open={!!tokenDialog} onOpenChange={(open) => !open && setTokenDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>憑證已領取 — 此 token 只顯示一次</DialogTitle>
+            <DialogDescription>請立即複製並安全保存。關閉後無法再次取得。</DialogDescription>
+          </DialogHeader>
+          <pre className="bg-muted p-3 rounded text-xs overflow-x-auto break-all">{tokenDialog}</pre>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                if (tokenDialog) await copyToClipboard(tokenDialog);
+                toast({ title: "已複製" });
+              }}
+            >
+              複製
+            </Button>
+            <Button onClick={() => setTokenDialog(null)}>我已複製</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

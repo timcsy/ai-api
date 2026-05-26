@@ -37,25 +37,80 @@ async def get_me(member: Member = Depends(current_member)) -> dict[str, Any]:
     return _member_public(member)
 
 
+def _alloc_public(a: Any) -> dict[str, Any]:
+    return {
+        "id": a.id,
+        "member_id": a.member_id,
+        "subject_snapshot": a.subject_snapshot,
+        "resource_model": a.resource_model,
+        "status": a.status,
+        "origin": a.origin,
+        "quota_tokens_per_month": a.quota_tokens_per_month,
+        "created_at": a.created_at.isoformat(),
+        "revoked_at": a.revoked_at.isoformat() if a.revoked_at else None,
+        "token_prefix": a.credential.token_prefix,
+    }
+
+
 @router.get("/me/allocations")
 async def list_my_allocations(
     member: Member = Depends(current_member),
     db: AsyncSession = Depends(get_db_session),
 ) -> list[dict[str, Any]]:
     allocations = await AllocationService(db).list(member_id=member.id)
-    return [
-        {
-            "id": a.id,
-            "member_id": a.member_id,
-            "subject_snapshot": a.subject_snapshot,
-            "resource_model": a.resource_model,
-            "status": a.status,
-            "created_at": a.created_at.isoformat(),
-            "revoked_at": a.revoked_at.isoformat() if a.revoked_at else None,
-            "token_prefix": a.credential.token_prefix,
-        }
-        for a in allocations
-    ]
+    return [_alloc_public(a) for a in allocations]
+
+
+@router.get("/me/claimable-models")
+async def list_claimable_models(
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, Any]]:
+    """Self-service-opened models visible to this member, with claim state."""
+    from ai_api.services.self_service import SelfServiceService
+
+    return await SelfServiceService(db).list_claimable(member)
+
+
+class ClaimRequest(BaseModel):
+    model: str
+
+
+_CLAIM_STATUS = {
+    "not_found": status.HTTP_404_NOT_FOUND,
+    "model_forbidden": status.HTTP_403_FORBIDDEN,
+    "model_not_self_service": status.HTTP_403_FORBIDDEN,
+    "member_inactive": status.HTTP_403_FORBIDDEN,
+    "reclaim_locked": status.HTTP_403_FORBIDDEN,
+}
+
+
+@router.post("/me/allocations", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_csrf)])
+async def claim_allocation(
+    payload: ClaimRequest,
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    from ai_api.services.self_service import ClaimError, SelfServiceService
+
+    svc = SelfServiceService(db)
+    try:
+        created = await svc.claim(member, payload.model)
+    except ClaimError as exc:
+        if exc.reason == "already_claimed":
+            existing = await svc.existing_active(member.id, payload.model)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": {"code": "already_claimed", "message": "you already hold an active self-service allocation for this model"},
+                    "allocation": _alloc_public(existing) if existing else None,
+                },
+            ) from exc
+        raise HTTPException(
+            status_code=_CLAIM_STATUS.get(exc.reason, status.HTTP_403_FORBIDDEN),
+            detail={"error": {"code": exc.reason, "message": f"cannot claim: {exc.reason}"}},
+        ) from exc
+    return {"token": created.token.plaintext, "allocation": _alloc_public(created.allocation)}
 
 
 @router.get("/me/allocations/{allocation_id}/calls")

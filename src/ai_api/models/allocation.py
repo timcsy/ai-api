@@ -21,6 +21,11 @@ class AllocationStatus(enum.StrEnum):
     quarantined = "quarantined"
 
 
+class AllocationOrigin(enum.StrEnum):
+    admin = "admin"
+    self_service = "self_service"
+
+
 class Allocation(Base):
     __tablename__ = "allocations"
 
@@ -44,6 +49,12 @@ class Allocation(Base):
     is_service_allocation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Phase 3c
     quota_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Phase 6
+    origin: Mapped[AllocationOrigin] = mapped_column(
+        Enum(AllocationOrigin, native_enum=False, length=16),
+        nullable=False,
+        default=AllocationOrigin.admin,
+    )
 
     credential: Mapped[Credential] = relationship(
         back_populates="allocation", uselist=False, cascade="all, delete-orphan"

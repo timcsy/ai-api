@@ -1,0 +1,107 @@
+openapi: 3.0.3
+info:
+  title: Admin Self-Service Configuration API
+  version: 0.1.0
+  description: |
+    Phase 6 — admin opens/closes self-service per model (with a default quota),
+    lists reclaim locks, and unlocks a (member, model) pair. All admin-only.
+servers:
+  - url: /admin
+security:
+  - sessionCookie: []
+  - adminToken: []
+paths:
+  /catalog/models/{slug}/self-service:
+    patch:
+      summary: Open/close self-service for a model + set default quota
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+          description: catalog slug (may contain '/')
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+                default_quota:
+                  type: integer
+                  nullable: true
+                  description: required (non-null, > 0) when enabled=true
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SelfServiceConfig" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: "`quota_required`: enabled=true without a valid default_quota"
+          content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }
+  /self-service-locks:
+    get:
+      summary: List current reclaim locks
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ReclaimLock" }
+  /self-service-locks/unlock:
+    post:
+      summary: Unlock a (member, model) so the member can self-claim again
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [member_id, model_slug]
+              properties:
+                member_id: { type: string }
+                model_slug: { type: string }
+      responses:
+        "204": { description: Unlocked (lock removed; idempotent) }
+        "404": { $ref: "#/components/responses/NotFound" }
+components:
+  securitySchemes:
+    sessionCookie: { type: apiKey, in: cookie, name: session }
+    adminToken: { type: apiKey, in: header, name: X-Admin-Token }
+  schemas:
+    SelfServiceConfig:
+      type: object
+      required: [slug, self_service_enabled, self_service_default_quota]
+      properties:
+        slug: { type: string }
+        self_service_enabled: { type: boolean }
+        self_service_default_quota: { type: integer, nullable: true }
+    ReclaimLock:
+      type: object
+      required: [member_id, model_slug, locked_at, locked_by]
+      properties:
+        member_id: { type: string }
+        member_email: { type: string }
+        model_slug: { type: string }
+        locked_at: { type: string, format: date-time }
+        locked_by: { type: string }
+    ErrorBody:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+  responses:
+    NotFound:
+      description: Not found
+      content: { application/json: { schema: { $ref: "#/components/schemas/ErrorBody" } } }

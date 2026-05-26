@@ -49,6 +49,10 @@ class AuditEventType(enum.StrEnum):
     member_tag_removed = "member_tag_removed"
     member_tag_bulk_added = "member_tag_bulk_added"
     model_access_policy_updated = "model_access_policy_updated"
+    # Phase 6: self-service allocation
+    self_service_claimed = "self_service_claimed"
+    self_service_reclaim_locked = "self_service_reclaim_locked"
+    self_service_unlocked = "self_service_unlocked"
 
 
 class ActorType(enum.StrEnum):
