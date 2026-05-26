@@ -29,12 +29,14 @@
 
 ## 現狀
 
-**2026-05-26：階段 5.2（規則自動標籤）完成。**
-後端 311 tests + 前端 69 tests 全綠；upstream 用 `litellm` library form 支援
+**2026-05-26：階段 6（自助領取憑證）完成。**
+後端 335 tests + 前端 72 tests 全綠；upstream 用 `litellm` library form 支援
 4 家 provider（Azure / OpenAI / Anthropic / Gemini）；admin UI 經階段 5.1 從
 11 個入口整併為 6 個（journey-oriented）；階段 5.2 起新成員首次註冊可依 admin
-規則自動貼 tag。ProviderCredential Fernet 加密落 DB，K8s Secret 提供金鑰，pod
-啟動時即驗證。3b.7 Playwright E2E 仍未開。詳細狀態見下方〈路線圖〉每個階段標記。
+規則自動貼 tag；階段 6 起被允許的成員可對 admin 開放的 model 自助領取憑證。
+ProviderCredential Fernet 加密落 DB，K8s Secret 提供金鑰，pod 啟動時即驗證。
+3b.7 Playwright E2E 仍未開；**價目表仍只有後端（YAML+CLI），admin UI 待做（階段 7）**。
+詳細狀態見下方〈路線圖〉每個階段標記。
 
 ## 架構
 
@@ -343,3 +345,46 @@
 **明確排除（留後續）：**
 - ❌ 多重 auto tag（首版 first-match 單一 tag）
 - ❌ 定期重算 / email 變更時重算（YAGNI；只首次註冊觸發）
+
+### 階段 6：自助領取憑證 ✅
+- [x] 完成（2026-05-26；後端 335 / 前端 72 全綠；PR #15）
+
+> **交付**：把「取得可用憑證」從 admin 逐筆建立，變成成員自助。admin 逐 model
+> 開放（`self_service_enabled` + 預設配額），被 access policy 允許的成員在
+> 儀表板一鍵領取一張 allocation；領到的與 admin 手動建立完全等價。
+> **前置條件**：階段 5（access policy）
+
+**核心原則：**
+- **資格 = 既有可見性 ∩ 開放旗標**：複用 `evaluate_visibility`，不另立判定
+- **撤回保有止血意義**：撤回自助 allocation 後鎖定該（成員, model），admin 解鎖前不可重領
+
+**成功標準：**
+- [x] `ModelCatalog` +`self_service_enabled`/+`self_service_default_quota`；`Allocation` +`origin`
+- [x] `POST /me/allocations`（current_member + CSRF）資格五查（active / 開放 / 可見 / 未持有 / 未鎖定）
+- [x] 自助 allocation 與手動完全等價（呼叫 / 計量 / quota pool / 撤回）
+- [x] 撤回掛 `AllocationService.revoke`：`origin=self_service` 建 `self_service_reclaim_locks`；admin 解鎖端點
+- [x] 前端：儀表板「可自助領取」+ 領取 + token 一次性；admin model 開關+配額；觀測→分配 鎖定列表+解鎖
+- [x] `api-client` 非 GET 自動帶 CSRF（修好全 app /me mutation）
+
+**明確排除（留後續）：**
+- ❌ 自助調整自己配額 / 自助升級 model；審批流 / email 通知（YAGNI）
+
+### 階段 7：價目表管理 UI ⏳（規劃中）
+
+> **問題**：價目表（`price_list`，point-in-time 計費）目前**只有後端**——靠手寫
+> YAML + `python -m ai_api.cli.load_prices` 載入，admin 介面上看不到也改不了；
+> 且 YAML 只有舊的 Azure `gpt-4o` / `gpt-4o-mini`，階段 5 之後的多 provider 新
+> 模型（如 `azure/gpt-5.4-mini`、Anthropic / Gemini）**沒有價目**，成本可能算不出來。
+> **交付**：admin 在 UI 檢視 / 新增價目版本，沿用既有 point-in-time 機制（不改歷史帳）。
+> **前置條件**：階段 3a（pricing 後端）、階段 5（多 provider）
+
+**規劃成功標準（待 spec 細化）：**
+- [ ] admin 可在 UI 列出目前各 (provider, model) 的生效價目 + 歷史版本（依 `effective_from`）
+- [ ] admin 可新增一個價目版本（provider / model / input、output per 1k / effective_from / source_note），append-only 不覆寫歷史
+- [ ] 涵蓋現行多 provider 模型；缺價目的模型在 UI 明確標示「未定價」
+- [ ] 沿用 `lookup_price_for_call` point-in-time 計算，歷史用量帳不受新價目影響
+- [ ] 既有 YAML + CLI 載入路徑保留（批次匯入仍可用）
+
+**明確排除（候選）：**
+- ❌ 從供應商自動同步價目（YAGNI；先人工/CLI + UI）
+- ❌ 多幣別 / 匯率（沿用 USD per 1k tokens）
