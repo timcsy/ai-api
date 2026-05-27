@@ -159,6 +159,33 @@ async def list_catalog_prices(db: AsyncSession, now: datetime) -> list[dict[str,
     return rows
 
 
+async def current_price_map(
+    db: AsyncSession, now: datetime
+) -> dict[tuple[str, str], dict[str, str]]:
+    """(provider, model_key) → current {input_per_1k, output_per_1k} for catalog
+    display. model_key is the prefix-stripped billing key."""
+    all_prices = (await db.execute(select(PriceList))).scalars().all()
+    by_key: dict[tuple[str, str], list[PriceList]] = {}
+    for p in all_prices:
+        by_key.setdefault((p.provider, p.model), []).append(p)
+    out: dict[tuple[str, str], dict[str, str]] = {}
+    for key, versions in by_key.items():
+        cur = select_current_version(versions, now)
+        if cur is not None:
+            out[key] = {
+                "input_per_1k": _price_str(cur.input_per_1k_tokens_usd),
+                "output_per_1k": _price_str(cur.output_per_1k_tokens_usd),
+            }
+    return out
+
+
+def price_for_slug(
+    price_map: dict[tuple[str, str], dict[str, str]], provider: str, slug: str
+) -> dict[str, str] | None:
+    """Look up a catalog model's current price by (provider, prefix-stripped slug)."""
+    return price_map.get((provider, _model_key(slug)))
+
+
 async def list_history(db: AsyncSession, provider: str, model: str) -> list[dict[str, Any]]:
     """All versions for a (provider, model) key, newest first, with is_current."""
     stmt = (

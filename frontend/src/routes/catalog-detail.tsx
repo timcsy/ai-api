@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
 import { facetLabel } from "@/lib/catalog-labels";
+import { per1kToPer1m } from "@/lib/price-format";
 import { copyToClipboard } from "@/lib/clipboard";
 
 interface ModelDetail {
@@ -27,6 +28,7 @@ interface ModelDetail {
   status: string;
   deprecation_note: string | null;
   example_request: { curl?: string; body?: unknown; [k: string]: unknown };
+  price: { input_per_1k: string; output_per_1k: string } | null;
 }
 
 export function CatalogDetailPage() {
@@ -103,6 +105,29 @@ export function CatalogDetailPage() {
           ))}
         </div>
       </section>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">價格</CardTitle>
+          <CardDescription>USD / 1M tokens（計費以呼叫當時的價目計算）</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {m.price ? (
+            <div className="flex gap-8 text-sm">
+              <div>
+                <div className="text-xs text-muted-foreground">輸入</div>
+                <div className="font-mono text-lg tabular-nums">${per1kToPer1m(m.price.input_per_1k)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">輸出</div>
+                <div className="font-mono text-lg tabular-nums">${per1kToPer1m(m.price.output_per_1k)}</div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">未定價（此模型的用量成本目前會算成 0）</p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

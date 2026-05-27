@@ -206,7 +206,12 @@ export function AdminCatalogManagePage() {
     <div className="container mx-auto py-8 max-w-6xl space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Catalog 管理</h1>
-        <Button onClick={() => setCreateOpen(true)}>加入 Model</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/admin/model/prices">價目</Link>
+          </Button>
+          <Button onClick={() => setCreateOpen(true)}>加入 Model</Button>
+        </div>
       </div>
 
       <p className="text-sm text-muted-foreground">

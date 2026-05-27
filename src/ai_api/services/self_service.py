@@ -149,6 +149,18 @@ class SelfServiceService:
             return []
         tags = await self._member_tags(member.id)
         providers = await self._active_providers()
+        # Models the member can ALREADY use (any active allocation, admin or
+        # self-service) — don't offer to self-claim what they already hold.
+        held = set(
+            (
+                await self._s.execute(
+                    select(Allocation.resource_model).where(
+                        Allocation.member_id == member.id,
+                        Allocation.status == AllocationStatus.active,
+                    )
+                )
+            ).scalars().all()
+        )
         models = (
             await self._s.execute(
                 select(ModelCatalog).where(ModelCatalog.self_service_enabled.is_(True))
@@ -158,12 +170,9 @@ class SelfServiceService:
         for m in models:
             if not evaluate_visibility(m, tags, providers)["visible"]:
                 continue
-            if await self._has_active_self_alloc(member.id, m.slug):
-                state = "already_claimed"
-            elif await self._is_locked(member.id, m.slug):
-                state = "reclaim_locked"
-            else:
-                state = "claimable"
+            if m.slug in held:
+                continue  # already has a usable allocation for this model
+            state = "reclaim_locked" if await self._is_locked(member.id, m.slug) else "claimable"
             out.append({
                 "slug": m.slug,
                 "display_name": m.display_name,
