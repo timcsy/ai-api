@@ -29,14 +29,15 @@
 
 ## 現狀
 
-**2026-05-27：階段 7（價目表管理 UI）完成。**
-後端 349 tests + 前端 74 tests 全綠；upstream 用 `litellm` library form 支援
+**2026-05-27：階段 8（部署強化 / 首位管理員 bootstrap）完成。**
+後端 364 tests + 前端 74 tests 全綠；upstream 用 `litellm` library form 支援
 4 家 provider（Azure / OpenAI / Anthropic / Gemini）；admin UI 經階段 5.1 從
 11 個入口整併為 6 個（journey-oriented）；階段 5.2 起新成員首次註冊可依 admin
 規則自動貼 tag；階段 6 起被允許的成員可對 admin 開放的 model 自助領取憑證；
 階段 7 起 admin 在 Model 區管理價目（point-in-time），會員/管理員的模型目錄與
-分配詳情皆顯示現價。ProviderCredential Fernet 加密落 DB，K8s Secret 提供金鑰，
-pod 啟動時即驗證。3b.7 Playwright E2E 仍未開。
+分配詳情皆顯示現價；階段 8 起首位管理員可經 CLI / helm Job 自動佈建，bootstrap
+token 退為 break-glass，正式環境帶預設/空 token 即拒絕啟動。ProviderCredential
+Fernet 加密落 DB，K8s Secret 提供金鑰，pod 啟動時即驗證。3b.7 Playwright E2E 仍未開。
 詳細狀態見下方〈路線圖〉每個階段標記。
 
 ## 架構
@@ -394,3 +395,32 @@ pod 啟動時即驗證。3b.7 Playwright E2E 仍未開。
 **明確排除：**
 - ❌ 從供應商自動同步價目（YAGNI；人工/CLI + UI）
 - ❌ 多幣別 / 匯率（沿用 USD per 1K tokens）
+
+> **階段 7 後續 UX polish（#22–#25）**：admin 模型詳情「基本資訊」可編輯（#22）、
+> 目錄詳情上下文長度標籤正名（#23）、分配管理與成員詳情預設隱藏已撤回 +「含已撤回」
+> toggle（#24/#25）。
+
+### 階段 8：部署強化 / 首位管理員 bootstrap ✅
+- [x] 完成（2026-05-27；後端 364 / 前端 74 全綠；PR #26）
+
+> **問題**：全新部署的 DB 沒有任何 admin member，後台 UI 又只吃 session、從不送
+> bootstrap token → 部署完沒人進得了後台；且 `ADMIN_BOOTSTRAP_TOKEN` 預設值
+> `local-dev-admin-only` 是公開已知的萬能後門，未覆蓋即重大風險。
+> **交付**：首位 admin 自動佈建 + 不安全預設 token 啟動防呆 + 部署文件。
+> **前置條件**：階段 1（K8s 部署）、階段 5（ProviderCredential 啟動驗證模式）
+
+**成功標準：**
+- [x] `ai_api.cli.create_admin`：idempotent 佈建首位 admin（OIDC 預建首次登入綁定／
+      本地密碼邀請），複用 `MemberService.create` + `set_is_admin`；provider 衝突拒絕
+      覆寫；不洩漏 token
+- [x] 啟動防呆：`COOKIE_SECURE=true`（production 訊號）下 token 為空或預設值即拒絕
+      啟動（比照 Fernet key fail-fast）；dev 維持零設定
+- [x] Helm `bootstrap-admin-job.yaml`：pre-install/pre-upgrade hook（weight 1，排在
+      migrate 之後），僅在 `bootstrapAdmin.enabled` 且 email 非空時渲染
+- [x] `docs/deployment.md`（README 連結）：必填機密、首位 admin、防呆、全員失聯救援；
+      bootstrap token 定位為 break-glass
+- [x] 無 schema 變更；既有授權兩路徑與「不可降級最後一位 admin」保護不變
+
+**明確排除：**
+- ❌ 多個首位 admin / 批次 admin 佈建（YAGNI）
+- ❌ 新增 `APP_ENV` 環境變數（重用 `COOKIE_SECURE` 作 production 訊號）
