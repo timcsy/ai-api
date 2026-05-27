@@ -136,7 +136,7 @@ export function CatalogDetailPage() {
         <div className="flex flex-wrap gap-2 mt-2">
           <Badge>成本：{facetLabel(m.cost_tier)}</Badge>
           <Badge variant="secondary">{m.family}</Badge>
-          <Badge variant="outline">{m.context_window.toLocaleString()} tokens</Badge>
+          <Badge variant="outline">上下文 {m.context_window.toLocaleString()} tokens</Badge>
           {m.capabilities.map((c) => (
             <Badge key={c} variant="outline">{facetLabel(c)}</Badge>
           ))}
