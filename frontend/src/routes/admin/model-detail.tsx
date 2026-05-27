@@ -5,13 +5,29 @@ import { Link, useLocation } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   RadioGroup,
   RadioGroupItem,
 } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { VisibilityDiagnose } from "@/components/visibility-diagnose";
 import { per1kToPer1m } from "@/lib/price-format";
@@ -28,10 +44,16 @@ interface CatalogModel {
   slug: string;
   provider: string;
   display_name: string;
+  family: string;
   description: string;
   context_window: number;
   cost_tier: string;
   status: string;
+  modality_input: string[];
+  modality_output: string[];
+  capabilities: string[];
+  recommended_for: string[];
+  tags: string[];
   default_access: "open" | "restricted";
   allowed_tags: string[];
   denied_tags: string[];
@@ -106,6 +128,8 @@ export function AdminModelDetailPage() {
     onError: (e) => toast({ title: "更新失敗", description: e.message, variant: "destructive" }),
   });
 
+  const [editBasicsOpen, setEditBasicsOpen] = React.useState(false);
+
   const addTag = (
     list: string[],
     setList: (v: string[]) => void,
@@ -145,8 +169,15 @@ export function AdminModelDetailPage() {
       {/* 1. 基本資訊 */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">{model.display_name}</CardTitle>
-          <CardDescription className="font-mono text-xs">{model.slug}</CardDescription>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <CardTitle className="text-xl">{model.display_name}</CardTitle>
+              <CardDescription className="font-mono text-xs">{model.slug}</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" className="shrink-0" onClick={() => setEditBasicsOpen(true)}>
+              編輯
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-3 gap-3 text-sm">
@@ -302,7 +333,150 @@ export function AdminModelDetailPage() {
           <VisibilityDiagnose modelSlug={slug} compact />
         </CardContent>
       </Card>
+
+      <EditBasicsDialog
+        slug={slug}
+        model={editBasicsOpen ? model : null}
+        onOpenChange={(open) => setEditBasicsOpen(open)}
+        onSaved={() => {
+          toast({ title: "基本資訊已更新" });
+          queryClient.invalidateQueries({ queryKey: ["admin", "catalog-models-admin"] });
+          setEditBasicsOpen(false);
+        }}
+      />
     </div>
+  );
+}
+
+function EditBasicsDialog({
+  slug,
+  model,
+  onOpenChange,
+  onSaved,
+}: {
+  slug: string;
+  model: CatalogModel | null;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+}) {
+  const { toast } = useToast();
+  const [displayName, setDisplayName] = React.useState("");
+  const [family, setFamily] = React.useState("");
+  const [costTier, setCostTier] = React.useState("low");
+  const [contextWindow, setContextWindow] = React.useState("");
+  const [description, setDescription] = React.useState("");
+  const [modalityIn, setModalityIn] = React.useState("");
+  const [modalityOut, setModalityOut] = React.useState("");
+  const [capabilities, setCapabilities] = React.useState("");
+  const [recommendedFor, setRecommendedFor] = React.useState("");
+  const [tags, setTags] = React.useState("");
+
+  React.useEffect(() => {
+    if (model) {
+      setDisplayName(model.display_name);
+      setFamily(model.family);
+      setCostTier(model.cost_tier);
+      setContextWindow(String(model.context_window));
+      setDescription(model.description);
+      setModalityIn(model.modality_input.join(", "));
+      setModalityOut(model.modality_output.join(", "));
+      setCapabilities(model.capabilities.join(", "));
+      setRecommendedFor(model.recommended_for.join(", "));
+      setTags(model.tags.join(", "));
+    }
+  }, [model]);
+
+  const csv = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
+
+  const mut = useMutation<unknown, ApiError, void>({
+    mutationFn: () =>
+      api(`/admin/catalog/models/${slug}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          display_name: displayName.trim(),
+          family: family.trim(),
+          cost_tier: costTier,
+          context_window: Number(contextWindow),
+          description: description,
+          modality_input: csv(modalityIn),
+          modality_output: csv(modalityOut),
+          capabilities: csv(capabilities),
+          recommended_for: csv(recommendedFor),
+          tags: csv(tags),
+        }),
+      }),
+    onSuccess: () => onSaved(),
+    onError: (e) => toast({ title: "更新失敗", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open={model !== null} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>編輯基本資訊</DialogTitle>
+          <DialogDescription>
+            <span className="font-mono text-xs">{slug}</span>；provider 與 slug 不可改（改 slug 等於換模型）。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="b-name">顯示名稱</Label>
+              <Input id="b-name" className="mt-1" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="b-family">Family</Label>
+              <Input id="b-family" className="mt-1" value={family} onChange={(e) => setFamily(e.target.value)} />
+            </div>
+            <div>
+              <Label>成本等級</Label>
+              <Select value={costTier} onValueChange={setCostTier}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">low</SelectItem>
+                  <SelectItem value="medium">medium</SelectItem>
+                  <SelectItem value="high">high</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="b-ctx">Context window</Label>
+              <Input id="b-ctx" type="number" className="mt-1" value={contextWindow} onChange={(e) => setContextWindow(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="b-desc">說明</Label>
+            <Textarea id="b-desc" className="mt-1" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="b-mi">輸入模態（逗號分隔）</Label>
+              <Input id="b-mi" className="mt-1" placeholder="text, image" value={modalityIn} onChange={(e) => setModalityIn(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="b-mo">輸出模態（逗號分隔）</Label>
+              <Input id="b-mo" className="mt-1" placeholder="text" value={modalityOut} onChange={(e) => setModalityOut(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="b-cap">能力（逗號分隔）</Label>
+            <Input id="b-cap" className="mt-1" placeholder="chat, vision, function-calling" value={capabilities} onChange={(e) => setCapabilities(e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="b-rec">適用情境（逗號分隔）</Label>
+            <Input id="b-rec" className="mt-1" placeholder="chat, summarization" value={recommendedFor} onChange={(e) => setRecommendedFor(e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="b-tags">標籤（逗號分隔）</Label>
+            <Input id="b-tags" className="mt-1" value={tags} onChange={(e) => setTags(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
+          <Button disabled={!displayName.trim() || mut.isPending} onClick={() => mut.mutate()}>儲存</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
