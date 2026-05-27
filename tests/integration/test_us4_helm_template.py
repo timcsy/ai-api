@@ -43,6 +43,64 @@ def _render() -> list[dict]:
     return docs
 
 
+_BASE_SETS = [
+    "adminBootstrapToken=tok",
+    "azureOpenAI.apiBase=https://example.openai.azure.com",
+    "azureOpenAI.apiKey=test-key-DO-NOT-LEAK",
+    "database.url=postgresql+asyncpg://u:p@h:5432/db",
+    "providerKeyEncKey=wG4iqV3qxGqQfp_8ARDqVU93G8YzxBOFnHTL98_3l9I=",
+]
+
+
+def _render_with(extra_sets: list[str]) -> list[dict]:
+    args = ["helm", "template", "test", str(CHART_DIR)]
+    for s in [*_BASE_SETS, *extra_sets]:
+        args += ["--set", s]
+    result = subprocess.run(args, capture_output=True, text=True, check=True)
+    return [d for d in yaml.safe_load_all(result.stdout) if d]
+
+
+def _jobs_by_label(docs: list[dict], value: str) -> list[dict]:
+    out = []
+    for d in docs:
+        if d.get("kind") != "Job":
+            continue
+        labels = d["spec"]["template"]["metadata"].get("labels", {})
+        if labels.get("job") == value:
+            out.append(d)
+    return out
+
+
+# Phase 017 US3 — first-admin bootstrap Job
+def test_bootstrap_admin_job_absent_by_default() -> None:
+    docs = _render()  # default values: bootstrapAdmin not enabled
+    assert _jobs_by_label(docs, "bootstrap-admin") == []
+
+
+def test_bootstrap_admin_job_rendered_when_enabled() -> None:
+    docs = _render_with(
+        ["bootstrapAdmin.enabled=true", "bootstrapAdmin.email=admin@org.edu"]
+    )
+    jobs = _jobs_by_label(docs, "bootstrap-admin")
+    assert len(jobs) == 1
+    job = jobs[0]
+    ann = job["metadata"]["annotations"]
+    assert "pre-install" in ann["helm.sh/hook"]
+    assert "pre-upgrade" in ann["helm.sh/hook"]
+    # must run AFTER the migrate job (weight 0)
+    assert int(ann["helm.sh/hook-weight"]) > 0
+    container = job["spec"]["template"]["spec"]["containers"][0]
+    assert any("secretRef" in e for e in container.get("envFrom", []))
+    cmd = " ".join(container["command"] + container.get("args", []))
+    assert "create_admin" in cmd
+    assert "admin@org.edu" in cmd
+
+
+def test_bootstrap_admin_job_absent_when_email_empty() -> None:
+    docs = _render_with(["bootstrapAdmin.enabled=true"])  # email left empty
+    assert _jobs_by_label(docs, "bootstrap-admin") == []
+
+
 def test_renders_required_resources() -> None:
     docs = _render()
     kinds = {d["kind"] for d in docs}

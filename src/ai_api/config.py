@@ -6,6 +6,11 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Well-known dev default for ADMIN_BOOTSTRAP_TOKEN. Shared with the startup
+# guard (main.create_app) and its tests so the "is this still the insecure
+# default?" check has a single source of truth.
+DEFAULT_ADMIN_BOOTSTRAP_TOKEN = "local-dev-admin-only"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -19,7 +24,7 @@ class Settings(BaseSettings):
         alias="DATABASE_URL",
     )
     admin_bootstrap_token: str = Field(
-        default="local-dev-admin-only",
+        default=DEFAULT_ADMIN_BOOTSTRAP_TOKEN,
         alias="ADMIN_BOOTSTRAP_TOKEN",
     )
 

@@ -85,8 +85,21 @@ def create_app() -> FastAPI:
     app.include_router(catalog.router, prefix="/catalog", tags=["catalog"])
     app.include_router(proxy_router, prefix="/v1", tags=["proxy"])
 
-    # touch settings to fail-fast on misconfiguration
-    _ = settings.admin_bootstrap_token
+    # Phase 017 FR-006: refuse to start in production (COOKIE_SECURE=true) when
+    # ADMIN_BOOTSTRAP_TOKEN is empty or still the well-known dev default — that
+    # token is a publicly-known admin skeleton key. Dev (COOKIE_SECURE=false)
+    # keeps the zero-config default usable. Never echo the token value.
+    from ai_api.config import DEFAULT_ADMIN_BOOTSTRAP_TOKEN
+
+    if settings.cookie_secure and settings.admin_bootstrap_token in (
+        "",
+        DEFAULT_ADMIN_BOOTSTRAP_TOKEN,
+    ):
+        raise RuntimeError(
+            "ADMIN_BOOTSTRAP_TOKEN is empty or still the dev default — refusing "
+            "to start in production (COOKIE_SECURE=true). Set a strong random "
+            "value via the deployment secret."
+        )
     # Phase 5 FR-011 / SC-006: validate Fernet key at app construction so a
     # missing/malformed PROVIDER_KEY_ENC_KEY causes pod to refuse to start
     # (CrashLoopBackOff) rather than failing at first credential operation.

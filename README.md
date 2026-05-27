@@ -10,7 +10,12 @@
 - 願景：[`knowledge/vision.md`](./knowledge/vision.md)
 - 階段 1 規格：[`specs/001-gateway-core/`](./specs/001-gateway-core/)
 - 快速開始：[`specs/001-gateway-core/quickstart.md`](./specs/001-gateway-core/quickstart.md)
+- 部署指南（K8s / Helm、首位管理員）：[`docs/deployment.md`](./docs/deployment.md)
 
 ## 本機開發
 
 詳見 quickstart.md。
+
+## 部署
+
+Kubernetes / Helm 部署與首位管理員設定，詳見 [`docs/deployment.md`](./docs/deployment.md)。
