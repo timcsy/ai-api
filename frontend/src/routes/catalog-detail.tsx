@@ -1,14 +1,35 @@
-import { useQuery } from "@tanstack/react-query";
+import * as React from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/use-toast";
 import { ApiUsageExample } from "@/components/api-usage-example";
 import { ApiError, api } from "@/lib/api-client";
 import { facetLabel } from "@/lib/catalog-labels";
 import { per1kToPer1m } from "@/lib/price-format";
+import { copyToClipboard } from "@/lib/clipboard";
+
+interface MyAllocation {
+  id: string;
+  resource_model: string;
+  status: string;
+}
+interface ClaimableModel {
+  slug: string;
+  state: "claimable" | "already_claimed" | "reclaim_locked";
+}
 
 interface ModelDetail {
   slug: string;
@@ -34,10 +55,45 @@ export function CatalogDetailPage() {
   const location = useLocation();
   const slug = location.pathname.replace(/^\/catalog\//, "");
 
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [tokenDialog, setTokenDialog] = React.useState<string | null>(null);
+
   const query = useQuery<ModelDetail, ApiError>({
     queryKey: ["catalog", "model", slug],
     queryFn: () => api<ModelDetail>(`/catalog/models/${slug}`),
     enabled: !!slug,
+  });
+
+  // A+C: surface the member's relationship to this model (held → link to the
+  // allocation; claimable → claim here; otherwise just catalog info).
+  const myAllocsQuery = useQuery<MyAllocation[], ApiError>({
+    queryKey: ["me", "allocations"],
+    queryFn: () => api<MyAllocation[]>("/me/allocations"),
+    enabled: !!slug,
+  });
+  const claimableQuery = useQuery<ClaimableModel[], ApiError>({
+    queryKey: ["me", "claimable-models"],
+    queryFn: () => api<ClaimableModel[]>("/me/claimable-models"),
+    enabled: !!slug,
+  });
+  const heldAlloc = (myAllocsQuery.data ?? []).find(
+    (a) => a.resource_model === slug && a.status === "active",
+  );
+  const claimable = (claimableQuery.data ?? []).find((c) => c.slug === slug);
+
+  const claimMut = useMutation<{ token: string }, ApiError, void>({
+    mutationFn: () =>
+      api<{ token: string }>("/me/allocations", {
+        method: "POST",
+        body: JSON.stringify({ model: slug }),
+      }),
+    onSuccess: (r) => {
+      setTokenDialog(r.token);
+      queryClient.invalidateQueries({ queryKey: ["me", "allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["me", "claimable-models"] });
+    },
+    onError: (e) => toast({ title: "領取失敗", description: e.message, variant: "destructive" }),
   });
 
   if (query.error?.status === 404) {
@@ -87,6 +143,41 @@ export function CatalogDetailPage() {
         </div>
       </section>
 
+      {/* A+C: your relationship to this model */}
+      {heldAlloc ? (
+        <Card className="border-primary/40">
+          <CardContent className="flex items-center justify-between gap-3 py-4">
+            <div className="text-sm">
+              <span className="font-medium">你已領取此模型</span>
+              <Badge variant="default" className="ml-2">{heldAlloc.status}</Badge>
+              <p className="text-xs text-muted-foreground mt-1">用 token 呼叫即可；憑證與用量在儀表板管理。</p>
+            </div>
+            <Button asChild variant="outline" size="sm" className="shrink-0">
+              <Link to={`/dashboard/allocations/${heldAlloc.id}`}>查看憑證與用量 →</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : claimable?.state === "claimable" ? (
+        <Card className="border-primary/40">
+          <CardContent className="flex items-center justify-between gap-3 py-4">
+            <div className="text-sm">
+              <span className="font-medium">此模型開放自助領取</span>
+              <p className="text-xs text-muted-foreground mt-1">一鍵領取一張可呼叫的憑證（token 只顯示一次）。</p>
+            </div>
+            <Button size="sm" className="shrink-0" disabled={claimMut.isPending} onClick={() => claimMut.mutate()}>
+              領取憑證
+            </Button>
+          </CardContent>
+        </Card>
+      ) : claimable?.state === "reclaim_locked" ? (
+        <Card>
+          <CardContent className="py-4 text-sm">
+            <span className="font-medium">自助領取已鎖定</span>
+            <p className="text-xs text-muted-foreground mt-1">先前的憑證被撤回，需管理員解鎖後才能再次領取。</p>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">價格</CardTitle>
@@ -133,6 +224,28 @@ export function CatalogDetailPage() {
           </a>
         </p>
       )}
+
+      <Dialog open={!!tokenDialog} onOpenChange={(open) => !open && setTokenDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>憑證已領取 — 此 token 只顯示一次</DialogTitle>
+            <DialogDescription>請立即複製並安全保存。關閉後無法再次取得。</DialogDescription>
+          </DialogHeader>
+          <pre className="bg-muted p-3 rounded text-xs overflow-x-auto break-all">{tokenDialog}</pre>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                if (tokenDialog) await copyToClipboard(tokenDialog);
+                toast({ title: "已複製" });
+              }}
+            >
+              複製
+            </Button>
+            <Button onClick={() => setTokenDialog(null)}>我已複製</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
