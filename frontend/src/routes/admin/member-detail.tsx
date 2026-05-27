@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -102,7 +103,10 @@ export function AdminMemberDetailPage() {
     queryKey: ["admin", "allocations"],
     queryFn: () => api<AdminAllocation[]>("/admin/allocations"),
   });
-  const memberAllocs = (allocsQuery.data ?? []).filter((a) => a.member_id === memberId);
+  const [showRevoked, setShowRevoked] = React.useState(false);
+  const allMemberAllocs = (allocsQuery.data ?? []).filter((a) => a.member_id === memberId);
+  const memberAllocs = allMemberAllocs.filter((a) => showRevoked || a.status !== "revoked");
+  const revokedCount = allMemberAllocs.filter((a) => a.status === "revoked").length;
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -224,15 +228,27 @@ export function AdminMemberDetailPage() {
               <CardTitle className="text-lg">分配（Allocations）</CardTitle>
               <CardDescription>該成員的所有分配憑證；在此直接建立與撤回</CardDescription>
             </div>
-            <Button size="sm" className="shrink-0" onClick={() => setCreateOpen(true)}>
-              新增分配
-            </Button>
+            <div className="flex items-center gap-3 shrink-0">
+              {revokedCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <Switch id="member-show-revoked" checked={showRevoked} onCheckedChange={setShowRevoked} />
+                  <Label htmlFor="member-show-revoked" className="text-sm">
+                    含已撤回（{revokedCount}）
+                  </Label>
+                </div>
+              )}
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                新增分配
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
           {memberAllocs.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              此成員還沒有任何分配。按「新增分配」發一張綁定該成員的憑證。
+              {!showRevoked && revokedCount > 0
+                ? `無進行中的分配（另有 ${revokedCount} 筆已撤回，開啟「含已撤回」可查看）。`
+                : "此成員還沒有任何分配。按「新增分配」發一張綁定該成員的憑證。"}
             </p>
           ) : (
             <Table>
