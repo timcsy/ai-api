@@ -14,6 +14,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { VisibilityDiagnose } from "@/components/visibility-diagnose";
+import { per1kToPer1m } from "@/lib/price-format";
 import { ApiError, api } from "@/lib/api-client";
 
 interface Visibility {
@@ -36,6 +37,7 @@ interface CatalogModel {
   denied_tags: string[];
   self_service_enabled: boolean;
   self_service_default_quota: number | null;
+  price: { input_per_1k: string; output_per_1k: string } | null;
   visibility?: Visibility;
 }
 
@@ -151,6 +153,13 @@ export function AdminModelDetailPage() {
             <div><span className="text-muted-foreground">Provider：</span>{model.provider}</div>
             <div><span className="text-muted-foreground">Cost tier：</span>{model.cost_tier}</div>
             <div><span className="text-muted-foreground">Context window：</span>{model.context_window.toLocaleString()}</div>
+            <div className="col-span-3">
+              <span className="text-muted-foreground">價格（每 1M）：</span>
+              {model.price
+                ? <span className="font-mono">輸入 ${per1kToPer1m(model.price.input_per_1k)} / 輸出 ${per1kToPer1m(model.price.output_per_1k)}</span>
+                : <span className="text-amber-700">未定價</span>}
+              <Link to="/admin/model/prices" className="ml-2 text-xs text-primary hover:underline">管理價目 →</Link>
+            </div>
             <div className="col-span-3"><span className="text-muted-foreground">說明：</span>{model.description || "—"}</div>
           </div>
         </CardContent>

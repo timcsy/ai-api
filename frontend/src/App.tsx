@@ -70,6 +70,7 @@ export function App() {
 
                 <Route path="/admin" element={<AdminHomePage />} />
                 <Route path="/admin/model" element={<AdminModelPage />} />
+                <Route path="/admin/model/prices" element={<AdminPricesPage />} />
                 <Route path="/admin/model/*" element={<AdminModelDetailPage />} />
                 <Route path="/admin/member" element={<AdminMembersPage />} />
                 <Route path="/admin/member/:id" element={<AdminMemberDetailPage />} />
@@ -83,7 +84,6 @@ export function App() {
                   <Route index element={<Navigate to="usage" replace />} />
                   <Route path="usage" element={<AdminUsagePage />} />
                   <Route path="allocations" element={<AdminAllocationsPage />} />
-                  <Route path="prices" element={<AdminPricesPage />} />
                   <Route path="quota" element={<AdminQuotaPoolPage />} />
                   <Route path="rebalance" element={<AdminRebalanceLogListPage />} />
                   <Route path="rebalance/:id" element={<AdminRebalanceLogDetailPage />} />

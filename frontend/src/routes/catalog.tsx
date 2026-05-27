@@ -17,6 +17,7 @@ import {
 } from "@/hooks/use-catalog-filters";
 import { ApiError, api } from "@/lib/api-client";
 import { facetLabel } from "@/lib/catalog-labels";
+import { per1kToPer1m } from "@/lib/price-format";
 
 interface Model {
   slug: string;
@@ -30,6 +31,7 @@ interface Model {
   recommended_for: string[];
   tags: string[];
   status: string;
+  price: { input_per_1k: string; output_per_1k: string } | null;
 }
 
 interface Facets {
@@ -232,6 +234,11 @@ export function CatalogPage() {
                       ))}
                     </div>
                   )}
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    {m.price
+                      ? `💲 輸入 $${per1kToPer1m(m.price.input_per_1k)} / 輸出 $${per1kToPer1m(m.price.output_per_1k)}（每 1M tokens）`
+                      : "💲 未定價"}
+                  </p>
                 </CardContent>
               </Card>
             </Link>

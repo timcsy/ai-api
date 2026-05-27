@@ -4,6 +4,7 @@ All endpoints require an active member.
 """
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import get_db_session, require_active_member
 from ai_api.models import Member, ModelCatalog
+from ai_api.services import pricing
 from ai_api.services.model_access import ModelAccessService
 from ai_api.services.model_catalog import compute_facets, filter_models
 
@@ -22,7 +24,7 @@ def _err(code: str, message: str) -> dict[str, Any]:
     return {"error": {"code": code, "message": message}}
 
 
-def _to_summary(m: ModelCatalog) -> dict[str, Any]:
+def _to_summary(m: ModelCatalog, price: dict[str, str] | None = None) -> dict[str, Any]:
     return {
         "slug": m.slug,
         "provider": m.provider,
@@ -38,11 +40,12 @@ def _to_summary(m: ModelCatalog) -> dict[str, Any]:
         "tags": list(m.tags),
         "official_doc_url": m.official_doc_url,
         "status": m.status,
+        "price": price,  # current per-1K {input_per_1k, output_per_1k} or null
     }
 
 
-def _to_detail(m: ModelCatalog) -> dict[str, Any]:
-    out = _to_summary(m)
+def _to_detail(m: ModelCatalog, price: dict[str, str] | None = None) -> dict[str, Any]:
+    out = _to_summary(m, price)
     out["example_request"] = m.example_request
     out["deprecation_note"] = m.deprecation_note
     out["created_at"] = m.created_at.isoformat()
@@ -83,7 +86,11 @@ async def list_models(
         family=family,
         min_context_window=min_context_window,
     )
-    return [_to_summary(m) for m in filtered]
+    price_map = await pricing.current_price_map(session, datetime.now(UTC))
+    return [
+        _to_summary(m, pricing.price_for_slug(price_map, m.provider, m.slug))
+        for m in filtered
+    ]
 
 
 @router.get("/models/{slug:path}")
@@ -108,7 +115,8 @@ async def get_model(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=_err("not_found", f"model {slug} not found"),
         )
-    return _to_detail(model)
+    price_map = await pricing.current_price_map(session, datetime.now(UTC))
+    return _to_detail(model, pricing.price_for_slug(price_map, model.provider, model.slug))
 
 
 @router.get("/filters")

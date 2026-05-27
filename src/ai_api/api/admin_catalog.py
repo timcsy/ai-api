@@ -17,6 +17,7 @@ from ai_api.api.deps import get_db_session, require_admin_token
 from ai_api.auth.audit import record as audit_record
 from ai_api.config import get_settings
 from ai_api.models import ActorType, AuditEventType, DefaultAccess, ModelCatalog
+from ai_api.services import pricing
 
 router = APIRouter(dependencies=[Depends(require_admin_token)])
 
@@ -62,7 +63,7 @@ def _err(code: str, message: str) -> dict[str, Any]:
     return {"error": {"code": code, "message": message}}
 
 
-def _to_dict(m: ModelCatalog) -> dict[str, Any]:
+def _to_dict(m: ModelCatalog, price: dict[str, str] | None = None) -> dict[str, Any]:
     return {
         "slug": m.slug,
         "provider": m.provider,
@@ -82,6 +83,9 @@ def _to_dict(m: ModelCatalog) -> dict[str, Any]:
         "default_access": m.default_access.value,
         "allowed_tags": list(m.allowed_tags or []),
         "denied_tags": list(m.denied_tags or []),
+        "self_service_enabled": m.self_service_enabled,
+        "self_service_default_quota": m.self_service_default_quota,
+        "price": price,  # current per-1K {input_per_1k, output_per_1k} or null
         "created_at": m.created_at.isoformat(),
         "updated_at": m.updated_at.isoformat(),
     }
@@ -139,6 +143,7 @@ async def admin_list_models(
     for (rm,) in alloc_q.all():
         alloc_counts[rm] = alloc_counts.get(rm, 0) + 1
 
+    price_map = await pricing.current_price_map(session, datetime.now(UTC))
     out: list[dict[str, Any]] = []
     for m in rows:
         provider_has_cred = m.provider in active_providers
@@ -150,7 +155,7 @@ async def admin_list_models(
                 for member in members
                 if access_policy_allows(m, tags_by_member.get(member.id, set()))
             )
-        body = _to_dict(m)
+        body = _to_dict(m, pricing.price_for_slug(price_map, m.provider, m.slug))
         body["visibility"] = {
             "provider_has_credential": provider_has_cred,
             "visible_member_count": visible,

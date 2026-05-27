@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,13 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
+import {
+  PriceUnit,
+  UNIT_LABEL,
+  displayPrice,
+  per1kToPer1m,
+  per1mToPer1k,
+} from "@/lib/price-format";
 
 interface CurrentPrice {
   input_per_1k: string;
@@ -57,7 +65,7 @@ interface PriceVersion {
   is_current: boolean;
 }
 
-type Unit = "per_1k" | "per_1m";
+type Unit = PriceUnit;
 
 // 常見供應商價格範本（USD / 1M tokens，**僅為預設，請核對供應商最新公告**）
 const TEMPLATES: { label: string; provider: string; model: string; in1m: string; out1m: string }[] = [
@@ -70,44 +78,6 @@ const TEMPLATES: { label: string; provider: string; model: string; in1m: string;
 ];
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("zh-TW");
-
-// Shift a decimal string 3 places left (÷1000) exactly, avoiding float artifacts.
-// "0.15" → "0.00015", "2.5" → "0.0025", "10" → "0.01".
-function per1mToPer1k(value: string): string {
-  const v = value.trim();
-  if (!/^\d*\.?\d+$/.test(v)) return value; // let backend validate non-numeric
-  const neg = v.startsWith("-");
-  const [intPart, fracPart = ""] = v.replace("-", "").split(".");
-  const digits = intPart + fracPart;
-  const pointFromRight = fracPart.length + 3; // move 3 more left
-  const padded = digits.padStart(pointFromRight + 1, "0");
-  const cut = padded.length - pointFromRight;
-  const out = `${padded.slice(0, cut)}.${padded.slice(cut)}`
-    .replace(/^0+(?=\d)/, "")        // strip leading zeros in int part
-    .replace(/(\.\d*?)0+$/, "$1")    // strip trailing zeros in frac
-    .replace(/\.$/, "");             // drop bare trailing point
-  return (neg ? "-" : "") + out;
-}
-
-// Shift a decimal string 3 places right (×1000) exactly, for per-1K → per-1M
-// display. "0.0003" → "0.3", "0.00120000" → "1.2".
-function per1kToPer1m(value: string): string {
-  const v = value.trim();
-  if (!/^-?\d*\.?\d+$/.test(v)) return value;
-  const neg = v.startsWith("-");
-  const [intPart, fracRaw = ""] = v.replace("-", "").split(".");
-  const frac = fracRaw.padEnd(3, "0");
-  const moved = (intPart + frac.slice(0, 3)).replace(/^0+(?=\d)/, "");
-  const rest = frac.slice(3).replace(/0+$/, "");
-  const out = rest ? `${moved}.${rest}` : moved;
-  return (neg ? "-" : "") + (out || "0");
-}
-
-const UNIT_LABEL: Record<Unit, string> = { per_1k: "1K", per_1m: "1M" };
-
-function displayPrice(per1k: string, unit: Unit): string {
-  return unit === "per_1m" ? per1kToPer1m(per1k) : per1k;
-}
 
 interface DialogState {
   provider: string;
@@ -132,6 +102,9 @@ export function AdminPricesPage() {
 
   return (
     <div className="container mx-auto py-8 max-w-4xl space-y-4">
+      <div className="text-sm">
+        <Link to="/admin/model" className="text-muted-foreground hover:underline">← 回 Model</Link>
+      </div>
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">價目表</h1>
         <Button className="shrink-0" onClick={() => setDialog({ provider: "", model: "", lockKey: false })}>
