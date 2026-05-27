@@ -267,3 +267,21 @@
   alpine-based image 一律加 apk upgrade 是建議做法；distroless 或 wolfi 才
   能避開這層責任。
 - **來源**：`deploy/docker/Dockerfile.frontend`，PR #8 Trivy scan
+
+### 部署完成 ≠ 跑得起來：可登入的首位管理員是部署的一部分
+
+- **理論說**：image 部署上去、migration 跑完、pod healthy，部署就完成了。
+- **實際發生**：使用者問「部署上去後管理員會是誰？」一查才發現：全新 DB 沒有任何
+  admin member，後台 UI 又只吃 session、從不送 bootstrap token（前端刻意如此），
+  OIDC 自助註冊的新成員一律非 admin → **部署完成卻沒有任何人進得了後台**。唯一能
+  動的是預設值為公開已知 `local-dev-admin-only` 的 bootstrap token，沒覆蓋還是後門。
+- **解決方式**：補 `create_admin` CLI（idempotent）以 helm pre-upgrade hook Job 在
+  migrate 之後佈建首位 admin（OIDC 預建，首次登入比對綁定）；把「正式環境帶預設/空
+  token」做成啟動防呆，複用「對稱加密金鑰要在 pod 啟動時就驗證」那條的 fail-fast
+  模式，並重用既有 `COOKIE_SECURE` 當 production 訊號（不新增 `APP_ENV`）。
+- **教訓**：「部署成功」的驗收條件要包含「指定的人真的能登入並操作」，不只是 pod
+  healthy。凡是「session-only 後台 + 不自動 seed 管理員」的系統，首位 admin 的佈建
+  必須是部署流程的一等公民；安全相關預設值（金鑰、後門 token）一律啟動時 fail-fast，
+  誤觸範圍才是 0。沿用既有環境訊號比新增旗標更省心（YAGNI）。
+- **來源**：`src/ai_api/cli/create_admin.py` + `main.py` 啟動防呆 +
+  `deploy/helm/ai-api/templates/bootstrap-admin-job.yaml` + `docs/deployment.md`，PR #26
