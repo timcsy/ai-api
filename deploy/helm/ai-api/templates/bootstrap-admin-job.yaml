@@ -1,0 +1,45 @@
+{{- if and .Values.bootstrapAdmin.enabled .Values.bootstrapAdmin.email -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ai-api.fullname" . }}-bootstrap-admin-{{ .Release.Revision }}
+  labels:
+    {{- include "ai-api.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    # weight 1 → runs AFTER the migration job (weight 0), so the schema exists.
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.bootstrapAdmin.backoffLimit }}
+  template:
+    metadata:
+      labels:
+        {{- include "ai-api.selectorLabels" . | nindent 8 }}
+        job: bootstrap-admin
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      restartPolicy: Never
+      containers:
+        - name: bootstrap-admin
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - secretRef:
+                name: {{ include "ai-api.fullname" . }}-secrets
+          command:
+            - python
+            - -m
+            - ai_api.cli.create_admin
+            - --email
+            - {{ .Values.bootstrapAdmin.email | quote }}
+            - --provider
+            - {{ .Values.bootstrapAdmin.provider | quote }}
+            {{- with .Values.bootstrapAdmin.displayName }}
+            - --name
+            - {{ . | quote }}
+            {{- end }}
+{{- end }}

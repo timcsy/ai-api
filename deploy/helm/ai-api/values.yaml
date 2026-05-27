@@ -91,6 +91,18 @@ migrationJob:
   enabled: true
   backoffLimit: 3
 
+# Phase 017: first-admin provisioning. Runs as a pre-install/pre-upgrade hook
+# Job AFTER the migration job and BEFORE the app rolls out (idempotent — safe to
+# re-run every upgrade). The named member becomes admin; for google_oidc they
+# bind on first Google login, for local_password an invitation is printed to the
+# Job logs. Job is only rendered when enabled AND email is non-empty.
+bootstrapAdmin:
+  enabled: false
+  email: ""
+  provider: "google_oidc"   # google_oidc | local_password
+  displayName: ""
+  backoffLimit: 3
+
 # Phase 2.5 hardening
 networkPolicy:
   enabled: true

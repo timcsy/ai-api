@@ -18,14 +18,14 @@ def _model(*, enabled=True, default=DefaultAccess.open, allowed=None, denied=Non
 
 
 def _eval(**kw):
-    base = dict(
-        member_active=True,
-        model=_model(),
-        member_tags=set(),
-        active_providers={"azure"},
-        has_active_self_alloc=False,
-        reclaim_locked=False,
-    )
+    base = {
+        "member_active": True,
+        "model": _model(),
+        "member_tags": set(),
+        "active_providers": {"azure"},
+        "has_active_self_alloc": False,
+        "reclaim_locked": False,
+    }
     base.update(kw)
     return evaluate_claim_eligibility(**base)
 
