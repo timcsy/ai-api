@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { ApiUsageExample } from "@/components/api-usage-example";
+import { per1kToPer1m } from "@/lib/price-format";
 import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -36,6 +37,7 @@ interface Allocation {
   status: string;
   token_prefix: string;
   quota_tokens_per_month?: number | null;
+  price?: { input_per_1k: string; output_per_1k: string } | null;
 }
 
 interface CallItem {
@@ -71,6 +73,7 @@ export function AllocationDetailPage() {
     onSuccess: (data) => {
       setFreshToken(data.token);
       queryClient.invalidateQueries({ queryKey: ["me", "allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["me", "allocation-detail", id] });
       toast({ title: "新 token 已產生", description: "舊 token 立即失效" });
     },
     onError: (err: ApiError) => {
@@ -79,7 +82,9 @@ export function AllocationDetailPage() {
   });
 
   const allocQuery = useQuery<Allocation | null, ApiError>({
-    queryKey: ["me", "allocations"],
+    // distinct key from the dashboard list ("me","allocations") — sharing it
+    // made this read the cached array instead of a single allocation.
+    queryKey: ["me", "allocation-detail", id],
     queryFn: async () => {
       const list = await api<Allocation[]>("/me/allocations");
       return list.find((a) => a.id === id) ?? null;
@@ -175,21 +180,32 @@ export function AllocationDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">配額</CardTitle>
+          <CardTitle className="text-lg">配額與價格</CardTitle>
           <CardDescription>
             {quota === null
-              ? "無限額"
-              : `已用 ${usedThisPage.toLocaleString()} / ${quota.toLocaleString()}`}
+              ? "配額：無限額"
+              : `配額：已用 ${usedThisPage.toLocaleString()} / ${quota.toLocaleString()}`}
           </CardDescription>
         </CardHeader>
-        {quota !== null && (
-          <CardContent>
-            <Progress value={usagePct} className={isOver ? "[&>div]:bg-destructive" : ""} />
-            {isOver && (
-              <p className="text-destructive text-sm mt-2">⚠ 超出本月配額</p>
+        <CardContent className="space-y-3">
+          {quota !== null && (
+            <>
+              <Progress value={usagePct} className={isOver ? "[&>div]:bg-destructive" : ""} />
+              {isOver && <p className="text-destructive text-sm">⚠ 超出本月配額</p>}
+            </>
+          )}
+          <div className="text-sm">
+            <span className="text-muted-foreground">價格（每 1M tokens）：</span>
+            {alloc?.price
+              ? <span className="font-mono">輸入 ${per1kToPer1m(alloc.price.input_per_1k)} / 輸出 ${per1kToPer1m(alloc.price.output_per_1k)}</span>
+              : <span className="text-muted-foreground">未定價</span>}
+            {alloc && (
+              <Link to={`/catalog/${alloc.resource_model}`} className="ml-2 text-xs text-primary hover:underline">
+                看模型詳情 →
+              </Link>
             )}
-          </CardContent>
-        )}
+          </div>
+        </CardContent>
       </Card>
 
       <Card>

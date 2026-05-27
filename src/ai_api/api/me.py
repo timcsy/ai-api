@@ -37,7 +37,7 @@ async def get_me(member: Member = Depends(current_member)) -> dict[str, Any]:
     return _member_public(member)
 
 
-def _alloc_public(a: Any) -> dict[str, Any]:
+def _alloc_public(a: Any, price: dict[str, str] | None = None) -> dict[str, Any]:
     return {
         "id": a.id,
         "member_id": a.member_id,
@@ -49,7 +49,12 @@ def _alloc_public(a: Any) -> dict[str, Any]:
         "created_at": a.created_at.isoformat(),
         "revoked_at": a.revoked_at.isoformat() if a.revoked_at else None,
         "token_prefix": a.credential.token_prefix,
+        "price": price,  # current per-1K price of the resource_model, or null
     }
+
+
+def _provider_of(slug: str) -> str:
+    return slug.split("/", 1)[0] if "/" in slug else ""
 
 
 @router.get("/me/allocations")
@@ -57,8 +62,16 @@ async def list_my_allocations(
     member: Member = Depends(current_member),
     db: AsyncSession = Depends(get_db_session),
 ) -> list[dict[str, Any]]:
+    from datetime import UTC, datetime
+
+    from ai_api.services import pricing
+
     allocations = await AllocationService(db).list(member_id=member.id)
-    return [_alloc_public(a) for a in allocations]
+    price_map = await pricing.current_price_map(db, datetime.now(UTC))
+    return [
+        _alloc_public(a, pricing.price_for_slug(price_map, _provider_of(a.resource_model), a.resource_model))
+        for a in allocations
+    ]
 
 
 @router.get("/me/claimable-models")
