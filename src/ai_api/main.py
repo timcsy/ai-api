@@ -14,6 +14,7 @@ from ai_api.api import (
     admin_diagnose,
     admin_members,
     admin_model_access,
+    admin_prices,
     admin_providers,
     admin_self_service,
     admin_tag_rules,
@@ -71,6 +72,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_tags.router, prefix="/admin", tags=["admin-tags"])
     app.include_router(admin_tag_rules.router, prefix="/admin", tags=["admin-tag-rules"])
     app.include_router(admin_self_service.router, prefix="/admin", tags=["admin-self-service"])
+    app.include_router(admin_prices.router, prefix="/admin", tags=["admin-prices"])
     # model_access (PATCH .../access) MUST register BEFORE admin_catalog (PATCH
     # .../{slug}) so the more-specific /access route wins via order.
     app.include_router(admin_model_access.router, prefix="/admin", tags=["admin-model-access"])

@@ -53,6 +53,8 @@ class AuditEventType(enum.StrEnum):
     self_service_claimed = "self_service_claimed"
     self_service_reclaim_locked = "self_service_reclaim_locked"
     self_service_unlocked = "self_service_unlocked"
+    # Phase 7: price list admin
+    price_version_added = "price_version_added"
 
 
 class ActorType(enum.StrEnum):

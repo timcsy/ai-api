@@ -16,6 +16,7 @@ import { AdminMemberDetailPage } from "@/routes/admin/member-detail";
 import { AdminModelPage } from "@/routes/admin/model";
 import { AdminModelDetailPage } from "@/routes/admin/model-detail";
 import { AdminObservabilityPage } from "@/routes/admin/observability";
+import { AdminPricesPage } from "@/routes/admin/prices";
 import { AdminProvidersPage } from "@/routes/admin/providers";
 import { AdminQuotaPoolPage } from "@/routes/admin/quota-pool";
 import { AdminTagDetailPage } from "@/routes/admin/tag-detail";
@@ -82,6 +83,7 @@ export function App() {
                   <Route index element={<Navigate to="usage" replace />} />
                   <Route path="usage" element={<AdminUsagePage />} />
                   <Route path="allocations" element={<AdminAllocationsPage />} />
+                  <Route path="prices" element={<AdminPricesPage />} />
                   <Route path="quota" element={<AdminQuotaPoolPage />} />
                   <Route path="rebalance" element={<AdminRebalanceLogListPage />} />
                   <Route path="rebalance/:id" element={<AdminRebalanceLogDetailPage />} />
