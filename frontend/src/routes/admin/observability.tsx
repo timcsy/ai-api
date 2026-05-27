@@ -6,6 +6,7 @@ const TABS = [
   { to: "usage", label: "用量" },
   { to: "allocations", label: "分配" },
   { to: "quota", label: "配額池" },
+  { to: "prices", label: "價目" },
   { to: "rebalance", label: "Rebalance 記錄" },
   { to: "audit", label: "稽核紀錄" },
 ];
