@@ -29,13 +29,14 @@
 
 ## 現狀
 
-**2026-05-26：階段 6（自助領取憑證）完成。**
-後端 335 tests + 前端 72 tests 全綠；upstream 用 `litellm` library form 支援
+**2026-05-27：階段 7（價目表管理 UI）完成。**
+後端 349 tests + 前端 74 tests 全綠；upstream 用 `litellm` library form 支援
 4 家 provider（Azure / OpenAI / Anthropic / Gemini）；admin UI 經階段 5.1 從
 11 個入口整併為 6 個（journey-oriented）；階段 5.2 起新成員首次註冊可依 admin
-規則自動貼 tag；階段 6 起被允許的成員可對 admin 開放的 model 自助領取憑證。
-ProviderCredential Fernet 加密落 DB，K8s Secret 提供金鑰，pod 啟動時即驗證。
-3b.7 Playwright E2E 仍未開；**價目表仍只有後端（YAML+CLI），admin UI 待做（階段 7）**。
+規則自動貼 tag；階段 6 起被允許的成員可對 admin 開放的 model 自助領取憑證；
+階段 7 起 admin 在 Model 區管理價目（point-in-time），會員/管理員的模型目錄與
+分配詳情皆顯示現價。ProviderCredential Fernet 加密落 DB，K8s Secret 提供金鑰，
+pod 啟動時即驗證。3b.7 Playwright E2E 仍未開。
 詳細狀態見下方〈路線圖〉每個階段標記。
 
 ## 架構
@@ -369,22 +370,27 @@ ProviderCredential Fernet 加密落 DB，K8s Secret 提供金鑰，pod 啟動時
 **明確排除（留後續）：**
 - ❌ 自助調整自己配額 / 自助升級 model；審批流 / email 通知（YAGNI）
 
-### 階段 7：價目表管理 UI ⏳（規劃中）
+### 階段 7：價目表管理 UI ✅
+- [x] 完成（2026-05-27；PR #16 / #17 / #20）
 
-> **問題**：價目表（`price_list`，point-in-time 計費）目前**只有後端**——靠手寫
+> **問題**：價目表（`price_list`，point-in-time 計費）原本**只有後端**——靠手寫
 > YAML + `python -m ai_api.cli.load_prices` 載入，admin 介面上看不到也改不了；
-> 且 YAML 只有舊的 Azure `gpt-4o` / `gpt-4o-mini`，階段 5 之後的多 provider 新
-> 模型（如 `azure/gpt-5.4-mini`、Anthropic / Gemini）**沒有價目**，成本可能算不出來。
-> **交付**：admin 在 UI 檢視 / 新增價目版本，沿用既有 point-in-time 機制（不改歷史帳）。
+> 且階段 5 之後的多 provider 新模型沒價目 → 成本算成 0。
+> **交付**：admin 在 UI 檢視 / 新增價目版本，沿用既有 point-in-time（不改歷史帳）。
 > **前置條件**：階段 3a（pricing 後端）、階段 5（多 provider）
 
-**規劃成功標準（待 spec 細化）：**
-- [ ] admin 可在 UI 列出目前各 (provider, model) 的生效價目 + 歷史版本（依 `effective_from`）
-- [ ] admin 可新增一個價目版本（provider / model / input、output per 1k / effective_from / source_note），append-only 不覆寫歷史
-- [ ] 涵蓋現行多 provider 模型；缺價目的模型在 UI 明確標示「未定價」
-- [ ] 沿用 `lookup_price_for_call` point-in-time 計算，歷史用量帳不受新價目影響
-- [ ] 既有 YAML + CLI 載入路徑保留（批次匯入仍可用）
+**成功標準：**
+- [x] admin 可在 UI 列出各 (provider, model) 生效價目 + 歷史版本（依 `effective_from`，標「目前生效 / 排程生效」）
+- [x] admin 可新增價目版本，append-only 不覆寫歷史；單位可切每 1M / 每 1K + 常見供應商範本 + 自由指定 model
+- [x] 涵蓋現行多 provider 模型；缺價目的模型 UI 標「未定價」
+- [x] 沿用 `lookup_price_for_call` point-in-time，歷史用量帳不受新價目影響（整合測試驗證）
+- [x] 既有 YAML + CLI 載入路徑保留（與 UI 寫同一張表，無 schema 變更）
 
-**明確排除（候選）：**
-- ❌ 從供應商自動同步價目（YAGNI；先人工/CLI + UI）
-- ❌ 多幣別 / 匯率（沿用 USD per 1k tokens）
+**實作超出原規劃（#17 / #20）：**
+- [x] 價目頁放 **Model 區**（`/admin/model/prices`），不增頂層 nav（守 5.1）；觀測不放價目
+- [x] 會員與管理員的**模型目錄（列表卡片 + 詳情）** 顯示現價（每 1M）；分配詳情也顯示
+- [x] 模型詳情顯示會員與該 model 的關係：已領取→連結憑證、開放自助→領取鈕、鎖定→提示
+
+**明確排除：**
+- ❌ 從供應商自動同步價目（YAGNI；人工/CLI + UI）
+- ❌ 多幣別 / 匯率（沿用 USD per 1K tokens）

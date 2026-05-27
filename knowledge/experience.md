@@ -2,6 +2,31 @@
 
 ## 教訓
 
+### React Query：兩個 query 共用 key 但回傳形狀不同 → 讀到別人的快取
+
+- **理論說**：用資源名當 queryKey（如 `["me","allocations"]`）很直覺，反正都在打同一個端點。
+- **實際發生**：dashboard 列表用 `useQuery(["me","allocations"])` 回**陣列**；分配詳情頁也用
+  `["me","allocations"]` 但 queryFn 回**單筆**（`list.find(...)`）。從 dashboard 點進詳情時，
+  React Query 認為 key 已有新鮮資料 → 詳情頁直接讀到快取的**陣列**，沒跑自己的 find。
+  `alloc.resource_model` 變 undefined → 標題退回 ULID、curl 顯示 `<model-slug>` 佔位。
+- **解決方式**：給語意/形狀不同的 query **不同的 key**——詳情頁改 `["me","allocation-detail", id]`，
+  並在會變動它的 mutation（rotate）一併 invalidate。
+- **教訓**：queryKey 是「快取身分證」，不是「端點名」。**回傳形狀不同 → key 必須不同**；
+  同一端點的 list 與 detail 衍生視圖要各自獨立 key，否則會互相污染且難以察覺。
+- **來源**：`frontend/src/routes/allocation-detail.tsx`，修正於 PR #19
+
+### 同一概念的 UI 做兩份一定會 drift → 抽共用元件
+
+- **理論說**：兩頁都要「怎麼呼叫 API」的範例，各自寫一份比較快。
+- **實際發生**：分配詳情與型錄詳情各做一套——標題（如何使用 vs 使用範例）、分頁數（3 vs 4）、
+  有無複製鈕、佔位符（`$YOUR_TOKEN` vs `$TOKEN`）全都不一樣，型錄那份還用了去前綴的 model
+  （proxy 其實吃完整 slug）→ 範例跑不動。使用者一眼就覺得「兩邊很割裂」。
+- **解決方式**：抽 `<ApiUsageExample model={slug}/>` 共用元件，兩頁都用；統一文案/分頁/佔位符，
+  model 一律用完整 slug。各頁只保留真正該不同的部分。
+- **教訓**：同一個概念在兩處呈現，第一次就抽共用元件——複製出來的兩份**必然**隨時間 drift，
+  且會累積成「割裂感」與隱性 bug（如錯誤的 model 範例）。
+- **來源**：`frontend/src/components/api-usage-example.tsx`，PR #18
+
 ### UI 錯誤封包 shape 不一致會默默吃掉全 app 的錯誤訊息
 
 - **理論說**：前端 `api-client` 統一讀 `body.error.{code,message}` 就能顯示後端錯誤。
