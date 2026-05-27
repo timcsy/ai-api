@@ -80,6 +80,7 @@ export function AdminAllocationsPage() {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [tokenDialog, setTokenDialog] = React.useState<string | null>(null);
   const [serviceOnly, setServiceOnly] = React.useState(false);
+  const [showRevoked, setShowRevoked] = React.useState(false);
 
   const allocsQuery = useQuery<AdminAllocation[], ApiError>({
     queryKey: ["admin", "allocations"],
@@ -134,14 +135,27 @@ export function AdminAllocationsPage() {
   });
 
   const filtered = (allocsQuery.data ?? []).filter(
-    (a) => !serviceOnly || a.is_service_allocation,
+    (a) =>
+      (!serviceOnly || a.is_service_allocation) &&
+      (showRevoked || a.status !== "revoked"),
   );
+  const revokedCount = (allocsQuery.data ?? []).filter((a) => a.status === "revoked").length;
 
   return (
     <div className="container mx-auto py-8 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">分配管理</h1>
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="show-revoked"
+              checked={showRevoked}
+              onCheckedChange={setShowRevoked}
+            />
+            <Label htmlFor="show-revoked" className="text-sm">
+              含已撤回{revokedCount > 0 && `（${revokedCount}）`}
+            </Label>
+          </div>
           <div className="flex items-center gap-2">
             <Switch
               id="service-only"
@@ -250,7 +264,9 @@ export function AdminAllocationsPage() {
             {filtered.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                  尚無 allocation
+                  {!showRevoked && revokedCount > 0
+                    ? `無進行中的分配（另有 ${revokedCount} 筆已撤回，開啟上方「含已撤回」可查看）`
+                    : "尚無 allocation"}
                 </TableCell>
               </TableRow>
             )}
