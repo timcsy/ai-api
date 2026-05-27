@@ -25,7 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ApiUsageExample } from "@/components/api-usage-example";
 import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -149,14 +149,15 @@ export function AllocationDetailPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-2">
             <div>
-              <CardTitle className="text-lg">如何使用</CardTitle>
-              <CardDescription>API 端點 + 範例請求（含您的模型參數）</CardDescription>
+              <CardTitle className="text-lg">你的憑證</CardTitle>
+              <CardDescription>token 僅在建立時顯示一次；系統只存雜湊</CardDescription>
             </div>
             <Button
               variant="outline"
               size="sm"
+              className="shrink-0"
               onClick={() => setRotateConfirmOpen(true)}
               disabled={rotateMut.isPending || alloc?.status !== "active"}
             >
@@ -164,69 +165,13 @@ export function AllocationDetailPage() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <div className="text-xs text-muted-foreground mb-1">API base</div>
-            <code className="text-sm bg-muted px-2 py-1 rounded">{window.location.origin}/v1</code>
-          </div>
-          <div>
-            <div className="text-xs text-muted-foreground mb-1">Token 前綴（系統不存完整 token）</div>
-            <code className="text-sm bg-muted px-2 py-1 rounded font-mono">
-              {alloc?.token_prefix}…
-            </code>
-          </div>
-          <Tabs defaultValue="curl">
-            <TabsList>
-              <TabsTrigger value="curl">curl</TabsTrigger>
-              <TabsTrigger value="python">Python</TabsTrigger>
-              <TabsTrigger value="javascript">JavaScript</TabsTrigger>
-            </TabsList>
-            <TabsContent value="curl">
-              <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">
-{`curl -X POST ${window.location.origin}/v1/chat/completions \\
-  -H "Authorization: Bearer $YOUR_TOKEN" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "model": "${alloc?.resource_model ?? ""}",
-    "messages": [{"role": "user", "content": "你好"}]
-  }'`}
-              </pre>
-            </TabsContent>
-            <TabsContent value="python">
-              <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">
-{`from openai import OpenAI
-
-client = OpenAI(
-    base_url="${window.location.origin}/v1",
-    api_key="$YOUR_TOKEN",
-)
-resp = client.chat.completions.create(
-    model="${alloc?.resource_model ?? ""}",
-    messages=[{"role": "user", "content": "你好"}],
-)
-print(resp.choices[0].message.content)`}
-              </pre>
-            </TabsContent>
-            <TabsContent value="javascript">
-              <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">
-{`const res = await fetch("${window.location.origin}/v1/chat/completions", {
-  method: "POST",
-  headers: {
-    "Authorization": "Bearer " + process.env.YOUR_TOKEN,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    model: "${alloc?.resource_model ?? ""}",
-    messages: [{ role: "user", content: "你好" }],
-  }),
-});
-const data = await res.json();
-console.log(data.choices[0].message.content);`}
-              </pre>
-            </TabsContent>
-          </Tabs>
+        <CardContent>
+          <div className="text-xs text-muted-foreground mb-1">Token 前綴</div>
+          <code className="text-sm bg-muted px-2 py-1 rounded font-mono">{alloc?.token_prefix}…</code>
         </CardContent>
       </Card>
+
+      <ApiUsageExample model={alloc?.resource_model ?? ""} />
 
       <Card>
         <CardHeader>

@@ -75,7 +75,7 @@ describe("<CatalogDetailPage />", () => {
     expect(screen.getByRole("tab", { name: "JSON body" })).toBeInTheDocument();
   });
 
-  it("clicking 複製 curl writes to clipboard and shows success toast", async () => {
+  it("clicking 複製 writes the generated snippet to clipboard and shows success toast", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -85,9 +85,10 @@ describe("<CatalogDetailPage />", () => {
     renderDetail("azure/dall-e-3", DALLE_DETAIL);
     await waitFor(() => expect(screen.getByText("DALL·E 3")).toBeInTheDocument());
 
-    await userEvent.click(screen.getByRole("button", { name: "複製 curl" }));
-    expect(writeText).toHaveBeenCalledWith(DALLE_DETAIL.example_request.curl);
-    await waitFor(() => expect(screen.getByText("已複製到剪貼簿")).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "複製" }));
+    // shared ApiUsageExample copies the active tab (curl) — generated with the full slug
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("azure/dall-e-3"));
+    await waitFor(() => expect(screen.getByText("已複製")).toBeInTheDocument());
   });
 
   it("shows fallback toast when clipboard API unavailable", async () => {
@@ -96,7 +97,7 @@ describe("<CatalogDetailPage />", () => {
     renderDetail("azure/dall-e-3", DALLE_DETAIL);
     await waitFor(() => expect(screen.getByText("DALL·E 3")).toBeInTheDocument());
 
-    await userEvent.click(screen.getByRole("button", { name: "複製 curl" }));
+    await userEvent.click(screen.getByRole("button", { name: "複製" }));
     await waitFor(() => expect(screen.getByText("複製失敗")).toBeInTheDocument());
   });
 
