@@ -304,3 +304,22 @@
 **明確排除：**
 - ❌ 排程自動暫停 / 恢復（首版手動）
 - ❌ 成員自助暫停自己的憑證（首版只 admin）
+
+## 階段 10：使用體驗打磨（成員端為主）
+
+完成（2026-05-28；後端 385 / 前端 96 全綠；PR #30/#34/#37/#38）。前置：階段 6（自助領取）、階段 7（價目顯示）。
+源於 2026-05-27 真實使用者實測盤點出的摩擦：資訊要逐張點開、技術 slug 不好讀、新手無引導、端點顯示、admin 原生彈窗、token 文案；另含一個能力缺口（憑證暫停/恢復，獨立為階段 019）。
+
+**成功標準：**
+- [x] 「我的分配」卡片顯示 display_name（slug 為輔）+ 現價（每 1M，未定價標示）+ 本月已用/配額進度條（配額部分 PR #30）
+- [x] `/me/allocations` additive 加 `display_name`（orphan→null）
+- [x] 可自助領取卡片可點進 `/catalog/{slug}`；領取鈕 stopPropagation 不誤觸導頁
+- [x] 無分配成員見三步上手引導（① 領取 ② 複製 ③ 貼進 Authorization）
+- [x] 呼叫端點單一來源 `lib/api-base.ts` 的 `apiBaseUrl()`，dashboard 與 ApiUsageExample 共用；dev `BASE_URL` :8000 → :47822 修正
+- [x] admin 調整配額改 shadcn Dialog（預填、驗證、空白=無限額）取代原生 `prompt()`
+- [x] token 提示文案涵蓋自助領取（`<strong>` 強調，非 markdown）
+- [x] 憑證暫停/恢復（見階段 019）
+
+**明確排除：**
+- ❌ 全面視覺改版 / 換 design system
+- ❌ 3b.7 Playwright E2E（獨立 test-infra，暫緩）
