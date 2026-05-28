@@ -6,7 +6,7 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 確認測試基線：`uv run pytest -q` 全綠、`cd frontend && npx tsc --noEmit && npm test -- --run` 全綠、`uv run ruff check .` 無錯（退化比對基準，SC-006）。
+- [X] T001 確認測試基線：`uv run pytest -q` 全綠、`cd frontend && npx tsc --noEmit && npm test -- --run` 全綠、`uv run ruff check .` 無錯（退化比對基準，SC-006）。
 
 ## Phase 2: Foundational（阻擋 US1）
 
@@ -14,13 +14,13 @@
 
 ### Tests（先寫，須 Red）
 
-- [ ] T002 [P] 於 `tests/contract/test_me_allocations.py` 加測：成員有一張對應目錄 model 的分配 → `/me/allocations` 該筆含 `display_name` = 目錄顯示名稱；既有 `price`/欄位不變（FR-001）。
-- [ ] T003 [P] 同檔加測：分配的 model 不在目錄（orphan）→ `display_name` 為 `null`、不報錯（Edge）。
+- [X] T002 [P] 於 `tests/contract/test_me_allocations.py` 加測：成員有一張對應目錄 model 的分配 → `/me/allocations` 該筆含 `display_name` = 目錄顯示名稱；既有 `price`/欄位不變（FR-001）。
+- [X] T003 [P] 同檔加測：分配的 model 不在目錄（orphan）→ `display_name` 為 `null`、不報錯（Edge）。
 
 ### Implementation
 
-- [ ] T004 在 `src/ai_api/api/me.py`：`_alloc_public` 加 `display_name` 參數並輸出；`list_my_allocations` 建 slug→display_name map（查 `model_catalog`，比照既有 `price_map`），傳入。orphan→None。
-- [ ] T005 跑 T002–T003 轉綠；確認既有 `/me/allocations` 測試零退化。
+- [X] T004 在 `src/ai_api/api/me.py`：`_alloc_public` 加 `display_name` 參數並輸出；`list_my_allocations` 建 slug→display_name map（查 `model_catalog`，比照既有 `price_map`），傳入。orphan→None。
+- [X] T005 跑 T002–T003 轉綠；確認既有 `/me/allocations` 測試零退化。
 
 ## Phase 3: User Story 1 — 分配卡片名稱 + 現價 (P1) 🎯 MVP
 
@@ -29,12 +29,12 @@
 
 ### Tests（先寫，須 Red）
 
-- [ ] T006 [P] [US1] 於 `frontend/src/__tests__/dashboard.test.tsx`（或新檔 `dashboard-cards.test.tsx`）加測：mock `/me/allocations` 回 `display_name` + `price` → 卡片顯示 display_name（slug 為輔）與現價（每 1M）；`price=null` → 「未定價」；`display_name=null` → 退回 slug。
+- [X] T006 [P] [US1] 於 `frontend/src/__tests__/dashboard.test.tsx`（或新檔 `dashboard-cards.test.tsx`）加測：mock `/me/allocations` 回 `display_name` + `price` → 卡片顯示 display_name（slug 為輔）與現價（每 1M）；`price=null` → 「未定價」；`display_name=null` → 退回 slug。
 
 ### Implementation
 
-- [ ] T007 [US1] 在 `frontend/src/routes/dashboard.tsx`：Allocation 介面加 `display_name?: string | null`、`price?: {...} | null`；卡片標題以 display_name 為主（fallback `resource_model`）、slug 小字為輔；現價以 `lib/price-format` 的 `per1kToPer1m` 顯示每 1M（null→「未定價」）。
-- [ ] T008 [US1] 跑 T006 轉綠；`tsc --noEmit` 乾淨。
+- [X] T007 [US1] 在 `frontend/src/routes/dashboard.tsx`：Allocation 介面加 `display_name?: string | null`、`price?: {...} | null`；卡片標題以 display_name 為主（fallback `resource_model`）、slug 小字為輔；現價以 `lib/price-format` 的 `per1kToPer1m` 顯示每 1M（null→「未定價」）。
+- [X] T008 [US1] 跑 T006 轉綠；`tsc --noEmit` 乾淨。
 
 ## Phase 4: User Story 4 — 呼叫端點單一可信來源 (P1)
 
@@ -43,12 +43,12 @@
 
 ### Tests（先寫，須 Red）
 
-- [ ] T009 [P] [US4] 建 `frontend/src/__tests__/api-base.test.ts`：`apiBaseUrl()` 回 `${window.location.origin}/v1`（mock location）。
+- [X] T009 [P] [US4] 建 `frontend/src/__tests__/api-base.test.ts`：`apiBaseUrl()` 回 `${window.location.origin}/v1`（mock location）。
 
 ### Implementation
 
-- [ ] T010 [US4] 新增 `frontend/src/lib/api-base.ts` 匯出 `apiBaseUrl()`；`dashboard.tsx`「API 端點」與 `components/api-usage-example.tsx` 皆改引用它（取代各自硬寫的 `window.location.origin`）。保留 dashboard 跨主機提示（`member.gateway_base_url`）。
-- [ ] T011 [US4] 跑 T009 + 既有 dashboard/catalog-detail 測試轉綠（確認 ApiUsageExample 仍正常）。
+- [X] T010 [US4] 新增 `frontend/src/lib/api-base.ts` 匯出 `apiBaseUrl()`；`dashboard.tsx`「API 端點」與 `components/api-usage-example.tsx` 皆改引用它（取代各自硬寫的 `window.location.origin`）。保留 dashboard 跨主機提示（`member.gateway_base_url`）。
+- [X] T011 [US4] 跑 T009 + 既有 dashboard/catalog-detail 測試轉綠（確認 ApiUsageExample 仍正常）。
 
 ## Phase 5: User Story 2 — 可自助領取卡片可點進詳情 (P2)
 
@@ -56,12 +56,12 @@
 
 ### Tests（先寫，須 Red）
 
-- [ ] T012 [P] [US2] 於 `frontend/src/__tests__/dashboard-claim.test.tsx`（或既有）加測：點 claimable 卡片 → 導向 `/catalog/{slug}`；點「領取」鈕 → 觸發領取、不導頁。
+- [X] T012 [P] [US2] 於 `frontend/src/__tests__/dashboard-claim.test.tsx`（或既有）加測：點 claimable 卡片 → 導向 `/catalog/{slug}`；點「領取」鈕 → 觸發領取、不導頁。
 
 ### Implementation
 
-- [ ] T013 [US2] 在 `dashboard.tsx`：claimable 卡片外層包 Link 至 `/catalog/{slug}`；「領取」鈕 `onClick` 加 `e.stopPropagation()`（或置於 Link 外），避免誤觸導頁。
-- [ ] T014 [US2] 跑 T012 轉綠。
+- [X] T013 [US2] 在 `dashboard.tsx`：claimable 卡片外層包 Link 至 `/catalog/{slug}`；「領取」鈕 `onClick` 加 `e.stopPropagation()`（或置於 Link 外），避免誤觸導頁。
+- [X] T014 [US2] 跑 T012 轉綠。
 
 ## Phase 6: User Story 3 — 新成員上手引導 (P2)
 
@@ -69,12 +69,12 @@
 
 ### Tests（先寫，須 Red）
 
-- [ ] T015 [P] [US3] 於 `dashboard.test.tsx` 加測：無分配（`/me/allocations` 回 []）→ 顯示三步引導文字；有分配 → 不顯示。
+- [X] T015 [P] [US3] 於 `dashboard.test.tsx` 加測：無分配（`/me/allocations` 回 []）→ 顯示三步引導文字；有分配 → 不顯示。
 
 ### Implementation
 
-- [ ] T016 [US3] 在 `dashboard.tsx` 空狀態加「① 領取憑證 ② 複製 ③ 貼進 Authorization」三步引導（既有空狀態文案旁或取代）。
-- [ ] T017 [US3] 跑 T015 轉綠。
+- [X] T016 [US3] 在 `dashboard.tsx` 空狀態加「① 領取憑證 ② 複製 ③ 貼進 Authorization」三步引導（既有空狀態文案旁或取代）。
+- [X] T017 [US3] 跑 T015 轉綠。
 
 ## Phase 7: User Story 5 — admin 配額 Dialog (P3)
 
@@ -82,23 +82,23 @@
 
 ### Tests（先寫，須 Red）
 
-- [ ] T018 [P] [US5] 建 `frontend/src/__tests__/admin-allocations-quota.test.tsx`：開「調整配額」→ 站內 Dialog 預填目前值；輸入非數字/負數被擋；有效值送出呼叫 `PATCH /admin/allocations/{id}`；空白＝無限額（送 null）。
+- [X] T018 [P] [US5] 建 `frontend/src/__tests__/admin-allocations-quota.test.tsx`：開「調整配額」→ 站內 Dialog 預填目前值；輸入非數字/負數被擋；有效值送出呼叫 `PATCH /admin/allocations/{id}`；空白＝無限額（送 null）。
 
 ### Implementation
 
-- [ ] T019 [US5] 在 `frontend/src/routes/admin/allocations.tsx`：把「調整配額」`prompt()` 改為 shadcn `Dialog` + 數字輸入（預填、驗證、空白=無限額），送出走既有 `patchMut`。
-- [ ] T020 [US5] 跑 T018 轉綠。
+- [X] T019 [US5] 在 `frontend/src/routes/admin/allocations.tsx`：把「調整配額」`prompt()` 改為 shadcn `Dialog` + 數字輸入（預填、驗證、空白=無限額），送出走既有 `patchMut`。
+- [X] T020 [US5] 跑 T018 轉綠。
 
 ## Phase 8: User Story 6 — token 文案 (P3)
 
-- [ ] T021 [P] [US6] 於 `dashboard.test.tsx` 加測：token 提示文案含自助領取情境關鍵字。
-- [ ] T022 [US6] 在 `dashboard.tsx` 改 token 提示文案，涵蓋「自助領取」與「管理員分配」兩種來源；跑 T021 轉綠。
+- [X] T021 [P] [US6] 於 `dashboard.test.tsx` 加測：token 提示文案含自助領取情境關鍵字。
+- [X] T022 [US6] 在 `dashboard.tsx` 改 token 提示文案，涵蓋「自助領取」與「管理員分配」兩種來源；跑 T021 轉綠。
 
 ## Phase 9: Polish & Cross-cutting
 
-- [ ] T023 全套：`uv run pytest -q` 綠、`cd frontend && npx tsc --noEmit && npm test -- --run` 綠、`uv run ruff check .` 無錯；確認既有成員/管理員行為零退化（FR-008, SC-006）。
-- [ ] T024 確認無新 migration：`DATABASE_URL="sqlite+aiosqlite:////tmp/p020.db" uv run alembic upgrade head` 仍止於 0012。
-- [ ] T025 依 `quickstart.md` 手動走一遍：卡片名稱/現價、可自助領取導頁、三步引導、端點一致、admin 配額 Dialog、token 文案。
+- [X] T023 全套：`uv run pytest -q` 綠、`cd frontend && npx tsc --noEmit && npm test -- --run` 綠、`uv run ruff check .` 無錯；確認既有成員/管理員行為零退化（FR-008, SC-006）。
+- [X] T024 確認無新 migration：`DATABASE_URL="sqlite+aiosqlite:////tmp/p020.db" uv run alembic upgrade head` 仍止於 0012。
+- [X] T025 依 `quickstart.md` 手動走一遍：卡片名稱/現價、可自助領取導頁、三步引導、端點一致、admin 配額 Dialog、token 文案。
 
 ## Dependencies
 

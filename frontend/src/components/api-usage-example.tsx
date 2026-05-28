@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
+import { apiBaseUrl } from "@/lib/api-base";
 import { copyToClipboard } from "@/lib/clipboard";
 
 /**
@@ -17,7 +18,7 @@ import { copyToClipboard } from "@/lib/clipboard";
 export function ApiUsageExample({ model }: { model: string }) {
   const { toast } = useToast();
   const [tab, setTab] = React.useState("curl");
-  const base = `${window.location.origin}/v1`;
+  const base = apiBaseUrl();
   const m = model || "<model-slug>";
 
   const snippets: Record<string, string> = {

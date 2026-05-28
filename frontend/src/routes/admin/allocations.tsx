@@ -81,6 +81,8 @@ export function AdminAllocationsPage() {
   const [tokenDialog, setTokenDialog] = React.useState<string | null>(null);
   const [serviceOnly, setServiceOnly] = React.useState(false);
   const [showRevoked, setShowRevoked] = React.useState(false);
+  const [quotaTarget, setQuotaTarget] = React.useState<AdminAllocation | null>(null);
+  const [quotaValue, setQuotaValue] = React.useState("");
 
   const allocsQuery = useQuery<AdminAllocation[], ApiError>({
     queryKey: ["admin", "allocations"],
@@ -231,10 +233,8 @@ export function AdminAllocationsPage() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
                         onClick={() => {
-                          const next = prompt("新 quota (空白=無限額)", String(a.quota_tokens_per_month ?? ""));
-                          if (next === null) return;
-                          const value = next.trim() === "" ? null : Number(next);
-                          patchMut.mutate({ id: a.id, body: { quota_tokens_per_month: value } });
+                          setQuotaTarget(a);
+                          setQuotaValue(a.quota_tokens_per_month != null ? String(a.quota_tokens_per_month) : "");
                         }}
                       >
                         調整配額
@@ -365,6 +365,44 @@ export function AdminAllocationsPage() {
               複製
             </Button>
             <Button onClick={() => setTokenDialog(null)}>我已複製</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!quotaTarget} onOpenChange={(open) => !open && setQuotaTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>調整月度配額</DialogTitle>
+            <DialogDescription>留空＝無限額；否則填非負整數 tokens。</DialogDescription>
+          </DialogHeader>
+          <Input
+            type="number"
+            min={0}
+            value={quotaValue}
+            placeholder="無限額"
+            aria-label="月度配額"
+            onChange={(e) => setQuotaValue(e.target.value)}
+          />
+          {quotaValue.trim() !== "" && !/^\d+$/.test(quotaValue.trim()) && (
+            <p className="text-xs text-destructive">請填非負整數，或留空表示無限額。</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuotaTarget(null)}>取消</Button>
+            <Button
+              disabled={quotaValue.trim() !== "" && !/^\d+$/.test(quotaValue.trim())}
+              onClick={() => {
+                if (!quotaTarget) return;
+                const v = quotaValue.trim();
+                if (v !== "" && !/^\d+$/.test(v)) return;
+                patchMut.mutate({
+                  id: quotaTarget.id,
+                  body: { quota_tokens_per_month: v === "" ? null : Number(v) },
+                });
+                setQuotaTarget(null);
+              }}
+            >
+              套用
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

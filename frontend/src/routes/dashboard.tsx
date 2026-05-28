@@ -20,19 +20,23 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { UsageSummary } from "@/components/usage-summary";
 import { useAuth } from "@/contexts/auth";
+import { apiBaseUrl } from "@/lib/api-base";
 import { ApiError, api } from "@/lib/api-client";
 import { copyToClipboard } from "@/lib/clipboard";
+import { per1kToPer1m } from "@/lib/price-format";
 
 interface Allocation {
   id: string;
   member_id: string;
   subject_snapshot: string;
   resource_model: string;
+  display_name?: string | null;
   status: string;
   created_at: string;
   revoked_at: string | null;
   token_prefix: string;
   quota_tokens_per_month?: number | null;
+  price?: { input_per_1k: string; output_per_1k: string } | null;
 }
 
 interface UsageByAlloc {
@@ -116,7 +120,7 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <code className="text-sm bg-muted px-2 py-1 rounded">
-              {window.location.origin}/v1
+              {apiBaseUrl()}
             </code>
             {member?.gateway_base_url &&
               !window.location.origin.startsWith(member.gateway_base_url) && (
@@ -129,8 +133,8 @@ export function DashboardPage() {
         </Card>
         <Alert className="mt-3">
           <AlertDescription>
-            您的 API token 在管理員建立分配時一次性顯示；系統僅保存雜湊。如需取得新 token，
-            請進入單筆分配後點「重新產生 token」（舊 token 立即失效）。
+            API token 在你**自助領取**或管理員建立分配時一次性顯示；系統僅保存雜湊。
+            如需取得新 token，請進入單筆分配後點「重新產生 token」（舊 token 立即失效）。
           </AlertDescription>
         </Alert>
       </section>
@@ -147,7 +151,8 @@ export function DashboardPage() {
           </p>
           <div className="grid gap-3 md:grid-cols-2">
             {claimableQuery.data?.map((m) => (
-              <Card key={m.slug}>
+              <Link key={m.slug} to={`/catalog/${m.slug}`} className="block">
+                <Card className="hover:bg-accent transition-colors cursor-pointer">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">{m.display_name}</CardTitle>
                   <CardDescription className="font-mono text-xs">{m.slug}</CardDescription>
@@ -160,7 +165,11 @@ export function DashboardPage() {
                     <Button
                       size="sm"
                       disabled={claimMut.isPending}
-                      onClick={() => claimMut.mutate(m.slug)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        claimMut.mutate(m.slug);
+                      }}
                     >
                       領取憑證
                     </Button>
@@ -174,7 +183,8 @@ export function DashboardPage() {
                     </Badge>
                   )}
                 </CardContent>
-              </Card>
+                </Card>
+              </Link>
             ))}
           </div>
         </section>
@@ -208,8 +218,13 @@ export function DashboardPage() {
 
         {query.data && filtered.length === 0 && (
           <Card>
-            <CardContent className="py-10 text-center text-muted-foreground">
-              尚未獲得任何分配。若上方有「可自助領取」的 model 可直接領取，否則請聯絡管理員。
+            <CardContent className="py-8 space-y-4 text-sm text-muted-foreground">
+              <p className="text-center">尚未獲得任何分配。三步開始使用：</p>
+              <ol className="mx-auto max-w-md space-y-2">
+                <li><span className="font-semibold text-foreground">① 領取憑證</span>——上方「可自助領取」按「領取憑證」，或請管理員分配。</li>
+                <li><span className="font-semibold text-foreground">② 複製 token</span>——領取/建立時一次性顯示，立即複製保存。</li>
+                <li><span className="font-semibold text-foreground">③ 貼進 Authorization</span>——呼叫 API 時放於 <code className="text-xs">Authorization: Bearer &lt;token&gt;</code>，端點見上方「API 端點」。</li>
+              </ol>
             </CardContent>
           </Card>
         )}
@@ -220,13 +235,13 @@ export function DashboardPage() {
               <Card className="hover:bg-accent transition-colors cursor-pointer">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{a.resource_model}</CardTitle>
+                    <CardTitle className="text-lg">{a.display_name ?? a.resource_model}</CardTitle>
                     <Badge variant={a.status === "active" ? "default" : "secondary"}>
                       {a.status}
                     </Badge>
                   </div>
                   <CardDescription className="font-mono text-xs">
-                    {a.token_prefix}…
+                    {a.resource_model} · {a.token_prefix}…
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2 text-xs text-muted-foreground">
@@ -244,6 +259,12 @@ export function DashboardPage() {
                       <div>配額：無上限</div>
                     )
                   )}
+                  <div>
+                    現價（每 1M）：
+                    {a.price
+                      ? <span className="font-mono">輸入 ${per1kToPer1m(a.price.input_per_1k)} / 輸出 ${per1kToPer1m(a.price.output_per_1k)}</span>
+                      : <span>未定價</span>}
+                  </div>
                   <div>建立於 {new Date(a.created_at).toLocaleString("zh-TW")}</div>
                 </CardContent>
               </Card>
