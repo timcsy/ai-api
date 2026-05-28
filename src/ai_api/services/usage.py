@@ -30,6 +30,9 @@ class UsageItem:
     total_cost_usd: Decimal
     call_count: int
     is_service_allocation: bool | None = None
+    # Phase 11: Responses API token breakdown (subsets of prompt/completion).
+    reasoning_tokens: int = 0
+    cached_tokens: int = 0
 
 
 @dataclass(frozen=True)
@@ -53,6 +56,8 @@ async def aggregate_usage(
     sum_prompt = func.coalesce(func.sum(CallRecord.prompt_tokens), 0).label("prompt")
     sum_completion = func.coalesce(func.sum(CallRecord.completion_tokens), 0).label("completion")
     sum_cost = func.coalesce(func.sum(CallRecord.cost_usd), 0).label("cost")
+    sum_reasoning = func.coalesce(func.sum(CallRecord.reasoning_tokens), 0).label("reasoning")
+    sum_cached = func.coalesce(func.sum(CallRecord.cached_tokens), 0).label("cached")
     cnt = func.count().label("cnt")
 
     base_filters = [
@@ -77,6 +82,8 @@ async def aggregate_usage(
                 sum_completion,
                 sum_cost,
                 cnt,
+                sum_reasoning,
+                sum_cached,
             )
             .join(Allocation, Allocation.id == CallRecord.allocation_id)
             .join(Member, Member.id == Allocation.member_id)
@@ -96,6 +103,8 @@ async def aggregate_usage(
                 completion_tokens=int(r[5] or 0),
                 total_cost_usd=Decimal(r[6] or 0),
                 call_count=int(r[7]),
+                reasoning_tokens=int(r[8] or 0),
+                cached_tokens=int(r[9] or 0),
             )
             for r in rows
         ]
@@ -111,6 +120,8 @@ async def aggregate_usage(
                 sum_completion,
                 sum_cost,
                 cnt,
+                sum_reasoning,
+                sum_cached,
             )
             .join(CallRecord, CallRecord.allocation_id == Allocation.id)
             .where(*base_filters)
@@ -130,6 +141,8 @@ async def aggregate_usage(
                 total_cost_usd=Decimal(r[6] or 0),
                 call_count=int(r[7]),
                 is_service_allocation=bool(r[2]),
+                reasoning_tokens=int(r[8] or 0),
+                cached_tokens=int(r[9] or 0),
             )
             for r in alloc_rows
         ]
@@ -143,6 +156,8 @@ async def aggregate_usage(
             sum_completion,
             sum_cost,
             cnt,
+            sum_reasoning,
+            sum_cached,
         )
         .join(Allocation, Allocation.id == CallRecord.allocation_id)
         .where(*base_filters)
@@ -161,6 +176,8 @@ async def aggregate_usage(
             completion_tokens=int(r[3] or 0),
             total_cost_usd=Decimal(r[4] or 0),
             call_count=int(r[5]),
+            reasoning_tokens=int(r[6] or 0),
+            cached_tokens=int(r[7] or 0),
         )
         for r in model_rows
     ]

@@ -23,6 +23,7 @@ class Price:
     provider: str
     model: str
     effective_from: datetime
+    cached_input_per_1k: Decimal | None = None
 
 
 async def lookup_price_for_call(
@@ -48,6 +49,7 @@ async def lookup_price_for_call(
         provider=row.provider,
         model=row.model,
         effective_from=row.effective_from,
+        cached_input_per_1k=row.cached_input_per_1k_tokens_usd,
     )
 
 
@@ -56,14 +58,28 @@ def calculate_cost(
     price: Price | None,
     prompt_tokens: int | None,
     completion_tokens: int | None,
+    cached_tokens: int | None = None,
 ) -> Decimal | None:
-    """Compute USD cost. Returns None when no price is available."""
+    """Compute USD cost. Returns None when no price is available.
+
+    `prompt_tokens` includes `cached_tokens`; cached input is billed at the
+    discounted `cached_input_per_1k` when defined, else at the full input price.
+    `completion_tokens` already includes any reasoning tokens (not added again).
+    """
     if price is None:
         return None
+    cached = Decimal(cached_tokens or 0)
     pt = Decimal(prompt_tokens or 0)
+    full_input = pt - cached
+    if full_input < 0:  # defensive: cached can't exceed prompt
+        full_input = Decimal(0)
+        cached = pt
     ct = Decimal(completion_tokens or 0)
-    return ((pt / Decimal(1000)) * price.input_per_1k) + (
-        (ct / Decimal(1000)) * price.output_per_1k
+    cached_rate = price.cached_input_per_1k if price.cached_input_per_1k is not None else price.input_per_1k
+    return (
+        (full_input / Decimal(1000)) * price.input_per_1k
+        + (cached / Decimal(1000)) * cached_rate
+        + (ct / Decimal(1000)) * price.output_per_1k
     )
 
 

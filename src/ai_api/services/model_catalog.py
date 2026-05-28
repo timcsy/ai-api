@@ -27,6 +27,7 @@ CAPABILITY_VALUES = (
     "reasoning",
     "embedding",
     "fine-tuning",
+    "responses",
 )
 COST_TIER_VALUES = ("low", "medium", "high")
 STATUS_VALUES = ("active", "preview", "deprecated")
@@ -47,6 +48,7 @@ Capability = Literal[
     "reasoning",
     "embedding",
     "fine-tuning",
+    "responses",
 ]
 CostTier = Literal["low", "medium", "high"]
 Status = Literal["active", "preview", "deprecated"]

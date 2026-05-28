@@ -32,6 +32,7 @@ from ai_api.config import get_settings
 from ai_api.db import dispose_engine
 from ai_api.observability.logging import setup_logging
 from ai_api.observability.request_id import RequestIdMiddleware
+from ai_api.proxy.responses import router as responses_router
 from ai_api.proxy.router import router as proxy_router
 
 
@@ -84,6 +85,7 @@ def create_app() -> FastAPI:
     app.include_router(quota_pool.router, prefix="/admin", tags=["admin-quota-pool"])
     app.include_router(catalog.router, prefix="/catalog", tags=["catalog"])
     app.include_router(proxy_router, prefix="/v1", tags=["proxy"])
+    app.include_router(responses_router, prefix="/v1", tags=["proxy"])
 
     # Phase 017 FR-006: refuse to start in production (COOKIE_SECURE=true) when
     # ADMIN_BOOTSTRAP_TOKEN is empty or still the well-known dev default — that

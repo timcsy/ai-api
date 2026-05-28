@@ -104,3 +104,67 @@ helm template test deploy/helm/ai-api \
 ```
 
 確認渲染出 migration Job 與 bootstrap-admin Job，且後者的 hook-weight 大於前者。
+
+---
+
+## 7. Responses API（`/v1/responses`）與 Codex
+
+平台提供 OpenAI Responses API 相容端點 `POST /v1/responses`，讓 OpenAI Codex 等
+agent CLI 直接以平台分配的憑證使用——用量與成本照常歸戶到該分配。
+
+### 7.1 模型啟用
+
+只有在模型目錄 `capabilities` 含 `responses` 的模型才開放此端點。`deploy/catalog/*.yaml`
+已對支援的模型（如 `azure/gpt-4o`）標記；新增時補上 `responses` 並重新載入：
+
+```bash
+python -m ai_api.cli.load_models deploy/catalog/azure-2026-05.yaml
+```
+
+未標記的模型呼叫 `/v1/responses` 會回 `400 model_not_responses_capable`。
+
+### 7.2 路由與計費
+
+- **統一經 litellm `aresponses`**：OpenAI/Azure 原生高保真，其他 provider 自動橋接（含
+  streaming）。OpenAI 專屬語意（加密 reasoning 跨輪 replay）在非 OpenAI provider 等效降級。
+- **計費**：`input_tokens→prompt`、`output_tokens→completion`（已含 reasoning，不重複計），
+  另分項記錄 `reasoning_tokens`、`cached_tokens`；快取輸入若價目表設有
+  `cached_input_per_1k_tokens_usd` 則套折扣價。
+
+### 7.3 SSE 不緩衝（重要）
+
+Codex 全程依賴 SSE streaming。frontend nginx 已對 `/v1/responses` 設 `proxy_buffering off`
+（見 `deploy/nginx/default.conf.template`）。若前面另有反向代理 / ingress，務必確認**不緩衝
+SSE**，否則會出現 502 / timeout。部署後以 `curl -N` 驗證串流逐步抵達：
+
+```bash
+curl -N https://<平台>/v1/responses \
+  -H "Authorization: Bearer <allocation-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"azure/gpt-4o","input":"count to 5","stream":true}'
+```
+
+### 7.4 Codex 設定（`~/.codex/config.toml`）
+
+```toml
+model = "azure/gpt-4o"
+model_provider = "ccsh"
+
+[model_providers.ccsh]
+name = "CCSH AI Gateway"
+base_url = "https://<平台>/v1"
+wire_api = "responses"
+env_key = "CCSH_AI_TOKEN"
+```
+
+```bash
+export CCSH_AI_TOKEN="<allocation-token>"
+codex "在這個 repo 新增一個 hello world 並跑起來"
+```
+
+### 7.5 對話狀態與清理
+
+支援 `store=true` 與 `previous_response_id`——平台記錄 response 歸屬，僅允許**同一分配**
+接續（跨分配回 `403 response_forbidden`，不存在/逾期回 `404 response_not_found`）。逾期
+記錄由 `storedResponseCleanup` CronJob 每日清理（`values.yaml` 預設 03:00 UTC，可關閉）。
+Codex 預設 `store=false`、自帶 context，不經此路徑。

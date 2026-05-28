@@ -18,6 +18,11 @@ class PriceList(Base):
     model: Mapped[str] = mapped_column(String(128), nullable=False)
     input_per_1k_tokens_usd: Mapped[Decimal] = mapped_column(Numeric(12, 8), nullable=False)
     output_per_1k_tokens_usd: Mapped[Decimal] = mapped_column(Numeric(12, 8), nullable=False)
+    # Phase 11: discounted price for cached input tokens (Responses API prompt
+    # caching). NULL → cached input is billed at the full input price.
+    cached_input_per_1k_tokens_usd: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 8), nullable=True
+    )
     effective_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_by: Mapped[str] = mapped_column(String(128), nullable=False)

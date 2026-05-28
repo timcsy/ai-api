@@ -27,6 +27,16 @@ server {
     location /healthz     { proxy_pass http://${BACKEND_UPSTREAM}; }
     location /auth        { proxy_pass http://${BACKEND_UPSTREAM}; }
     location /me          { proxy_pass http://${BACKEND_UPSTREAM}; }
+    # Responses API streams Server-Sent Events (Codex). Disable proxy buffering
+    # and caching so SSE chunks reach the client immediately (no 502/timeout).
+    location /v1/responses {
+        proxy_pass http://${BACKEND_UPSTREAM};
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 3600s;
+        proxy_set_header Connection "";
+        proxy_http_version 1.1;
+    }
     location /v1          { proxy_pass http://${BACKEND_UPSTREAM}; }
     location /docs        { proxy_pass http://${BACKEND_UPSTREAM}; }
     location /openapi.json { proxy_pass http://${BACKEND_UPSTREAM}; }

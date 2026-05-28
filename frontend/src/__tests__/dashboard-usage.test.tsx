@@ -61,6 +61,24 @@ describe("<UsageSummary />", () => {
     expect(screen.queryByText(/未定價/)).not.toBeInTheDocument();
   });
 
+  it("shows reasoning/cached breakdown when present", async () => {
+    renderUsage({
+      ...SUMMARY,
+      summary: { ...SUMMARY.summary, reasoning_tokens: 300, cached_tokens: 120 },
+    });
+    await waitFor(() => expect(screen.getByText(/推理 300 tokens/)).toBeInTheDocument());
+    expect(screen.getByText(/快取輸入 120 tokens/)).toBeInTheDocument();
+  });
+
+  it("hides reasoning/cached line when both zero", async () => {
+    renderUsage({
+      ...SUMMARY,
+      summary: { ...SUMMARY.summary, reasoning_tokens: 0, cached_tokens: 0 },
+    });
+    await waitFor(() => expect(screen.getByText("1,500")).toBeInTheDocument());
+    expect(screen.queryByText(/推理/)).not.toBeInTheDocument();
+  });
+
   it("degrades quietly on error (renders nothing, no throw)", async () => {
     const { container } = renderUsage({ error: {} }, 500);
     await waitFor(() => expect(screen.queryByText(/載入/)).not.toBeInTheDocument());

@@ -22,6 +22,7 @@ from ai_api.models.provider_credential import ProviderCredential, ProviderCreden
 from ai_api.models.rebalance_log import RebalanceLog
 from ai_api.models.self_service_lock import SelfServiceReclaimLock
 from ai_api.models.session import Session, SessionStatus
+from ai_api.models.stored_response import StoredResponse
 from ai_api.models.tag_rule import MatcherType, TagRule
 
 __all__ = [
@@ -56,6 +57,7 @@ __all__ = [
     "Session",
     "SessionStatus",
     "SourceRestriction",
+    "StoredResponse",
     "TagRule",
     "TagSource",
 ]

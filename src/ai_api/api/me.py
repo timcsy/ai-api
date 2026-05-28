@@ -77,7 +77,7 @@ async def list_my_allocations(
     price_map = await pricing.current_price_map(db, datetime.now(UTC))
     # slug → display_name from the catalog (orphan slugs absent → None)
     name_rows = await db.execute(select(ModelCatalog.slug, ModelCatalog.display_name))
-    name_map = dict(name_rows.all())
+    name_map: dict[str, str] = {row[0]: row[1] for row in name_rows.all()}
     return [
         _alloc_public(
             a,
@@ -92,12 +92,15 @@ def _summary_dict(row: Any, has_unpriced: bool) -> dict[str, Any]:
     if row is None:
         return {
             "total_tokens": 0, "prompt_tokens": 0, "completion_tokens": 0,
+            "reasoning_tokens": 0, "cached_tokens": 0,
             "total_cost_usd": 0.0, "call_count": 0, "has_unpriced": False,
         }
     return {
         "total_tokens": row.total_tokens,
         "prompt_tokens": row.prompt_tokens,
         "completion_tokens": row.completion_tokens,
+        "reasoning_tokens": row.reasoning_tokens,
+        "cached_tokens": row.cached_tokens,
         "total_cost_usd": float(row.total_cost_usd),
         "call_count": row.call_count,
         "has_unpriced": has_unpriced,
@@ -146,6 +149,8 @@ async def get_my_usage(
                 "total_tokens": it.total_tokens,
                 "prompt_tokens": it.prompt_tokens,
                 "completion_tokens": it.completion_tokens,
+                "reasoning_tokens": it.reasoning_tokens,
+                "cached_tokens": it.cached_tokens,
                 "total_cost_usd": float(it.total_cost_usd),
                 "call_count": it.call_count,
             }

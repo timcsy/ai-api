@@ -12,7 +12,7 @@ models:
       支援 function-calling、tool-use、JSON mode。適合複雜對話、agent、視覺理解。
     modality_input: [text, image]
     modality_output: [text]
-    capabilities: [chat, vision, function-calling, json-mode, tool-use, streaming]
+    capabilities: [chat, vision, function-calling, json-mode, tool-use, streaming, responses]
     context_window: 128000
     cost_tier: high
     recommended_for: [chat, agent, code, summarization, translation]

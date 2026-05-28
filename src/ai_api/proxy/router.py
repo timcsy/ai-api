@@ -7,7 +7,6 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import get_db_session
@@ -16,41 +15,13 @@ from ai_api.models import Allocation, CallOutcome
 from ai_api.observability.logging import redact_string
 from ai_api.observability.request_id import current_request_id
 from ai_api.proxy import upstream
-from ai_api.proxy.allowlist import check_allowed, parse_provider
 from ai_api.proxy.auth import parse_bearer_token
-from ai_api.proxy.guard import enforce_model_binding
-from ai_api.services.allocations import AllocationService
+from ai_api.proxy.preflight import PreflightRejection, run_preflight
 from ai_api.services.pricing import calculate_cost, lookup_price_for_call
-from ai_api.services.provider_credentials import (
-    ProviderCredentialService,
-    ProviderUnavailableError,
-    ResolvedCredential,
-)
-from ai_api.services.quota import current_month_usage, is_over_quota
 from ai_api.services.records import RecordsService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-async def _resolve_credential(
-    service: ProviderCredentialService, provider: str, settings: Any
-) -> ResolvedCredential:
-    """DB-first credential lookup with Azure env fallback for transitional release."""
-    cred = await service.get_next(provider)
-    if cred is not None:
-        return cred
-    # US4 transitional: legacy Azure env still works while migration is pending.
-    if provider == "azure" and settings.azure_openai_api_key:
-        return ResolvedCredential(
-            id="env-fallback",
-            provider="azure",
-            label="env-fallback",
-            api_key=settings.azure_openai_api_key,
-            base_url=settings.azure_openai_api_base or None,
-            extra_config={"api_version": settings.azure_openai_api_version},
-        )
-    raise ProviderUnavailableError(provider)
 
 
 def _error_payload(code: str, message: str) -> dict[str, Any]:
@@ -72,6 +43,10 @@ def _outcome_for_code(code: str) -> CallOutcome:
         "allocation_quarantined": CallOutcome.rejected_quarantined,
         "allocation_paused": CallOutcome.rejected_paused,
         "quota_exceeded": CallOutcome.rejected_quota_exceeded,
+        "model_forbidden": CallOutcome.rejected_model_forbidden,
+        "model_not_responses_capable": CallOutcome.rejected_model_unsupported,
+        "response_forbidden": CallOutcome.rejected_response_forbidden,
+        "response_not_found": CallOutcome.rejected_response_not_found,
         "upstream_error": CallOutcome.upstream_error,
     }.get(code, CallOutcome.gateway_error)
 
@@ -129,101 +104,22 @@ async def proxy_chat_completions(
             400,
         )
 
-    # Provider allowlist gate (FR-001/002): check before any DB lookups.
+    # 3. Shared pre-flight pipeline (auth/allocation/quota/binding/access/credential).
     settings = get_settings()
-    provider, _ = parse_provider(requested_model)
-    if not check_allowed(provider, settings.allowed_providers):
-        return await record_and_respond(
-            "provider_not_allowed",
-            f"provider '{provider}' is not in the allowlist",
-            403,
-        )
-
-    # 3. Allocation — split lookup from status check so revoked-reject records
-    #    can still attribute to the allocation (FR-011 / SC-004).
-    alloc_service = AllocationService(session)
-    found = await alloc_service.lookup_by_token(token)
-    if found is None:
-        return await record_and_respond("unauthorized", "invalid credential", 401)
-    # Bind to closure now so record_and_respond can attribute the rejection.
-    allocation = found
-    if allocation.status.value == "revoked":
-        return await record_and_respond(
-            "allocation_revoked", "allocation has been revoked", 403
-        )
-    if allocation.status.value == "quarantined":
-        return await record_and_respond(
-            "allocation_quarantined",
-            "allocation is quarantined due to anomalous usage",
-            403,
-        )
-    if allocation.status.value == "paused":
-        return await record_and_respond(
-            "allocation_paused", "allocation is paused", 403
-        )
-
-    # Phase 3a: monthly quota check (FR-007)
-    if allocation.quota_tokens_per_month is not None:
-        usage = await current_month_usage(session, allocation.id)
-        if is_over_quota(allocation, usage):
-            return await record_and_respond(
-                "quota_exceeded",
-                f"monthly quota reached ({usage}/{allocation.quota_tokens_per_month} tokens)",
-                403,
-            )
-
-    # 4. Model binding
-    try:
-        enforce_model_binding(allocation, requested_model)
-    except HTTPException as exc:
-        return await record_and_respond(
-            exc.detail["error"]["code"],  # type: ignore[index]
-            exc.detail["error"]["message"],  # type: ignore[index]
-            exc.status_code,
-        )
-
-    # 4.5 Phase 5 access policy: defensive secondary check (catalog filter is
-    # primary; proxy here defends against direct curl bypassing the UI).
-    from ai_api.models import Member as MemberModel
-    from ai_api.models import ModelCatalog
-    from ai_api.services.model_access import ModelAccessService
-
-    model_row = (
-        await session.execute(
-            select(ModelCatalog).where(ModelCatalog.slug == requested_model)
-        )
-    ).scalar_one_or_none()
-    if model_row is not None:
-        member_row = await session.get(MemberModel, allocation.member_id)
-        if member_row is not None and not await ModelAccessService(session).is_accessible(
-            member_row, model_row
-        ):
-            return await record_and_respond(
-                "model_forbidden",
-                f"model '{requested_model}' is not accessible to this member",
-                403,
-            )
-
-    # 5. Resolve provider credential (Phase 5): DB first, env fallback for azure during
-    # US4 transitional release. Builds the upstream model id with provider prefix.
-    cred_service = ProviderCredentialService(session)
-    try:
-        resolved = await _resolve_credential(cred_service, provider, settings)
-    except ProviderUnavailableError:
-        return await record_and_respond(
-            "provider_unavailable",
-            f"no active credential for provider '{provider}'",
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-        )
-
-    upstream_model = (
-        requested_model if "/" in requested_model else f"{provider}/{requested_model}"
+    result = await run_preflight(
+        session, settings=settings, token=token, requested_model=requested_model
     )
+    if isinstance(result, PreflightRejection):
+        allocation = result.allocation
+        return await record_and_respond(result.code, result.message, result.http_status)
+    allocation = result.allocation
+    provider = result.provider
+    resolved = result.resolved
 
-    # 6. Upstream
+    # 4. Upstream
     try:
-        result = await upstream.acompletion(
-            model=upstream_model,
+        upstream_result = await upstream.acompletion(
+            model=result.upstream_model,
             messages=messages,
             api_key=resolved.api_key,
             api_base=resolved.base_url,
@@ -237,7 +133,7 @@ async def proxy_chat_completions(
             status.HTTP_502_BAD_GATEWAY,
         )
 
-    payload = result if isinstance(result, dict) else result.model_dump()
+    payload = upstream_result if isinstance(upstream_result, dict) else upstream_result.model_dump()
     usage_obj: dict[str, Any] = payload.get("usage") or {}
 
     # Point-in-time pricing: look up the price effective at started_at.
