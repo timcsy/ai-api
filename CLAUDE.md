@@ -23,6 +23,8 @@ Auto-generated from all feature plans. Last updated: 2026-05-28
 - PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表、不新增 migration** (018-member-usage-overview)
 - Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Pydantic v2、shadcn/ui（皆既有，不新增套件） (019-allocation-pause-resume)
 - PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表、不新增 migration**（`AllocationStatus`、`CallOutcome`、`AuditEventType` 皆 `Enum(..., native_enum=False)` 存 VARCHAR，加列舉值不需 schema 變更） (019-allocation-pause-resume)
+- TypeScript strict + React 19 + Vite 6（前端為主）/ Python 3.11+（後端僅 1 處序列化） + TanStack Query、shadcn/ui、FastAPI、SQLAlchemy 2.x async（皆既有） (020-phase10-ux-polish)
+- 不新增表、不新增 migration；display_name 取自既有 `model_catalog` (020-phase10-ux-polish)
 
 - Python 3.11+ + LiteLLM（proxy core）、FastAPI（admin API）、 (001-gateway-core)
 
@@ -43,9 +45,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 020-phase10-ux-polish: Added TypeScript strict + React 19 + Vite 6（前端為主）/ Python 3.11+（後端僅 1 處序列化） + TanStack Query、shadcn/ui、FastAPI、SQLAlchemy 2.x async（皆既有）
 - 019-allocation-pause-resume: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Pydantic v2、shadcn/ui（皆既有，不新增套件）
 - 018-member-usage-overview: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Pydantic v2、TanStack Query、shadcn/ui（皆既有，不新增套件）
-- 017-admin-bootstrap: Added Python 3.11+ + FastAPI、SQLAlchemy 2.x async、Pydantic v2（既有，不新增套件）
 
 
 <!-- MANUAL ADDITIONS START -->

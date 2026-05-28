@@ -38,12 +38,15 @@ async def get_me(member: Member = Depends(current_member)) -> dict[str, Any]:
     return _member_public(member)
 
 
-def _alloc_public(a: Any, price: dict[str, str] | None = None) -> dict[str, Any]:
+def _alloc_public(
+    a: Any, price: dict[str, str] | None = None, display_name: str | None = None
+) -> dict[str, Any]:
     return {
         "id": a.id,
         "member_id": a.member_id,
         "subject_snapshot": a.subject_snapshot,
         "resource_model": a.resource_model,
+        "display_name": display_name,  # catalog display name, or null if orphan
         "status": a.status,
         "origin": a.origin,
         "quota_tokens_per_month": a.quota_tokens_per_month,
@@ -65,12 +68,22 @@ async def list_my_allocations(
 ) -> list[dict[str, Any]]:
     from datetime import UTC, datetime
 
+    from sqlalchemy import select
+
+    from ai_api.models import ModelCatalog
     from ai_api.services import pricing
 
     allocations = await AllocationService(db).list(member_id=member.id)
     price_map = await pricing.current_price_map(db, datetime.now(UTC))
+    # slug → display_name from the catalog (orphan slugs absent → None)
+    name_rows = await db.execute(select(ModelCatalog.slug, ModelCatalog.display_name))
+    name_map = dict(name_rows.all())
     return [
-        _alloc_public(a, pricing.price_for_slug(price_map, _provider_of(a.resource_model), a.resource_model))
+        _alloc_public(
+            a,
+            pricing.price_for_slug(price_map, _provider_of(a.resource_model), a.resource_model),
+            name_map.get(a.resource_model),
+        )
         for a in allocations
     ]
 
