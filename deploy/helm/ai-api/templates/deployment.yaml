@@ -13,6 +13,7 @@ spec:
     metadata:
       labels:
         {{- include "ai-api.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
