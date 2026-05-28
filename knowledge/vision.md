@@ -43,7 +43,7 @@ token 退為 break-glass，正式環境帶預設/空 token 即拒絕啟動；階
 分配配額），嚴格只看自己。ProviderCredential Fernet 加密落 DB，K8s Secret 提供
 金鑰，pod 啟動時即驗證。3b.7 Playwright E2E 仍未開。
 
-下一步：階段 9（成員自助用量總覽）、階段 10（使用體驗打磨）。
+下一步：階段 10（使用體驗打磨）、3b.7（Playwright E2E）。
 
 ## 架構
 
