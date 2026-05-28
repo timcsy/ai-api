@@ -133,7 +133,7 @@ export function DashboardPage() {
         </Card>
         <Alert className="mt-3">
           <AlertDescription>
-            API token 在你**自助領取**或管理員建立分配時一次性顯示；系統僅保存雜湊。
+            API token 在你<strong>自助領取</strong>或管理員建立分配時一次性顯示；系統僅保存雜湊。
             如需取得新 token，請進入單筆分配後點「重新產生 token」（舊 token 立即失效）。
           </AlertDescription>
         </Alert>
