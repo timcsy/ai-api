@@ -265,3 +265,26 @@
 **明確排除：**
 - ❌ 多個首位 admin / 批次 admin 佈建（YAGNI）
 - ❌ 新增 `APP_ENV` 環境變數（重用 `COOKIE_SECURE` 作 production 訊號）
+
+## 階段 9：成員自助用量總覽
+
+完成（2026-05-28；後端 375 / 前端 80 全綠；PR #30）。前置：階段 3a（用量聚合後端）、階段 7（價目 → 估算花費）。
+依據：原則「可追蹤性」的使用端透明化——資源端（admin）與使用端（成員）兩面都該看得到自己的帳。
+交付：成員在自己的儀表板看到個人整體用量總覽，嚴格只看自己的資料。
+
+**成功標準：**
+- [x] 成員可在儀表板看到跨自己所有分配的彙總：總 token（prompt / completion / total）、估算花費、呼叫次數
+- [x] 可按 model／按分配拆分；可選時間區間（本月／近 7 天／近 30 天）
+- [x] 花費沿用 point-in-time 價目（`CallRecord.cost_usd` 逐筆加總，與 admin 同口徑）；含未定價呼叫時 `has_unpriced` 標示低估
+- [x] 配額視角：分配卡片顯示本月已用／配額 + 進度條（含 3c 池動態配額）；無限額顯示無上限
+- [x] **嚴格資料隔離**：`GET /me/usage` 以 `current_member` 限定，無參數能看他人（測試證明 A 取不到 B）
+- [x] 複用既有 `aggregate_usage`（加可選 `member_id`，三分支皆已 join `Allocation`），admin 路徑零退化
+
+**實作要點：**
+- `aggregate_usage(member_id=...)`：base_filter 加 `Allocation.member_id`，`group_by="member"+member_id` 回單列＝摘要
+- `GET /me/usage`：summary（含 `has_unpriced` 由獨立 count 偵測 `cost_usd` NULL/0 且 token>0）+ 可選 `group_by=model|allocation` breakdown；`group_by=member` 回 422
+- 前端 `<UsageSummary>`（degrade quietly on error，不破壞儀表板）+ 分配卡片配額進度條
+
+**明確排除：**
+- ❌ 跨成員比較／排行（admin 才有意義）
+- ❌ 匯出 CSV／JSON、預算告警／超額通知、即時 streaming 用量（YAGNI / 沿用批次聚合）
