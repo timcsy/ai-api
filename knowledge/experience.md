@@ -285,3 +285,21 @@
   誤觸範圍才是 0。沿用既有環境訊號比新增旗標更省心（YAGNI）。
 - **來源**：`src/ai_api/cli/create_admin.py` + `main.py` 啟動防呆 +
   `deploy/helm/ai-api/templates/bootstrap-admin-job.yaml` + `docs/deployment.md`，PR #26
+
+### Docker 沒開時 testcontainers 是 error 不是 skip — 新測試優先走 Docker-free
+
+- **理論說**：整合測試一律靠 testcontainers 起真 Postgres；本機沒 Docker 時它會自動 skip。
+- **實際發生**：階段 9 開工跑 `pytest` 出現 **54 個 error**（非 skip）——`conftest` 只在
+  `testcontainers` import 失敗時 `pytest.skip`，但套件裝得好好的、是 **Docker daemon 沒開**，
+  於是 `PostgresContainer()` 在 fixture setup 階段 raise → error。TDD 的 Red/Green 被環境卡住。
+- **解決方式**：新測試優先走 **Docker-free** 路徑——service 層用自帶 temp-file SQLite engine
+  （`create_async_engine` + `Base.metadata.create_all`）；端點層用既有 contract 套件的
+  in-memory SQLite `app_client`（`reset_engine_for_testing("sqlite+aiosqlite:///:memory:")`）
+  搭配登入 helper 或 `dependency_overrides`。Docker 回來後再跑完整 Postgres 整合測試做最終確認
+  （階段 9 最終 375 passed）。
+- **教訓**：TDD 的測試不該被「Docker 有沒有開」綁架。能用 in-memory / temp SQLite + dependency
+  override 表達的行為，就別硬綁 testcontainers——快、可攜、CI 與本機都穩。testcontainers 留給
+  「真的要驗 Postgres 專屬行為」（如 tz-aware datetime、enum、JSON column）。判斷某測試為何
+  error 時，第一個檢查點就是 `docker info` 是否回應。
+- **來源**：`tests/contract/test_me_usage.py`（in-memory）、`tests/integration/test_usage_member_scope.py`
+  （temp-file SQLite）；階段 9 / PR #30
