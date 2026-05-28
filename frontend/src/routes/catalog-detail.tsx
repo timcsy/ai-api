@@ -47,7 +47,7 @@ interface ModelDetail {
   status: string;
   deprecation_note: string | null;
   example_request: { curl?: string; body?: unknown; [k: string]: unknown };
-  price: { input_per_1k: string; output_per_1k: string } | null;
+  price: { input_per_1k: string; output_per_1k: string; cached_input_per_1k?: string } | null;
 }
 
 export function CatalogDetailPage() {
@@ -194,6 +194,12 @@ export function CatalogDetailPage() {
                 <div className="text-xs text-muted-foreground">輸出</div>
                 <div className="font-mono text-lg tabular-nums">${per1kToPer1m(m.price.output_per_1k)}</div>
               </div>
+              {m.price.cached_input_per_1k && (
+                <div>
+                  <div className="text-xs text-muted-foreground">快取輸入</div>
+                  <div className="font-mono text-lg tabular-nums">${per1kToPer1m(m.price.cached_input_per_1k)}</div>
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">未定價（此模型的用量成本目前會算成 0）</p>

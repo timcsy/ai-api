@@ -59,7 +59,7 @@ interface CatalogModel {
   denied_tags: string[];
   self_service_enabled: boolean;
   self_service_default_quota: number | null;
-  price: { input_per_1k: string; output_per_1k: string } | null;
+  price: { input_per_1k: string; output_per_1k: string; cached_input_per_1k?: string } | null;
   visibility?: Visibility;
 }
 
@@ -187,7 +187,7 @@ export function AdminModelDetailPage() {
             <div className="col-span-3">
               <span className="text-muted-foreground">價格（每 1M）：</span>
               {model.price
-                ? <span className="font-mono">輸入 ${per1kToPer1m(model.price.input_per_1k)} / 輸出 ${per1kToPer1m(model.price.output_per_1k)}</span>
+                ? <span className="font-mono">輸入 ${per1kToPer1m(model.price.input_per_1k)} / 輸出 ${per1kToPer1m(model.price.output_per_1k)}{model.price.cached_input_per_1k && ` / 快取輸入 $${per1kToPer1m(model.price.cached_input_per_1k)}`}</span>
                 : <span className="text-amber-700">未定價</span>}
               <Link to="/admin/model/prices" className="ml-2 text-xs text-primary hover:underline">管理價目 →</Link>
             </div>

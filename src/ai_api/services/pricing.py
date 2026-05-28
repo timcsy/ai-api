@@ -193,10 +193,13 @@ async def current_price_map(
     for key, versions in by_key.items():
         cur = select_current_version(versions, now)
         if cur is not None:
-            out[key] = {
+            entry = {
                 "input_per_1k": _price_str(cur.input_per_1k_tokens_usd),
                 "output_per_1k": _price_str(cur.output_per_1k_tokens_usd),
             }
+            if cur.cached_input_per_1k_tokens_usd is not None:
+                entry["cached_input_per_1k"] = _price_str(cur.cached_input_per_1k_tokens_usd)
+            out[key] = entry
     return out
 
 

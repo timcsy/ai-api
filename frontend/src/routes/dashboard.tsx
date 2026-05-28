@@ -36,7 +36,7 @@ interface Allocation {
   revoked_at: string | null;
   token_prefix: string;
   quota_tokens_per_month?: number | null;
-  price?: { input_per_1k: string; output_per_1k: string } | null;
+  price?: { input_per_1k: string; output_per_1k: string; cached_input_per_1k?: string } | null;
 }
 
 interface UsageByAlloc {
@@ -262,7 +262,7 @@ export function DashboardPage() {
                   <div>
                     現價（每 1M）：
                     {a.price
-                      ? <span className="font-mono">輸入 ${per1kToPer1m(a.price.input_per_1k)} / 輸出 ${per1kToPer1m(a.price.output_per_1k)}</span>
+                      ? <span className="font-mono">輸入 ${per1kToPer1m(a.price.input_per_1k)} / 輸出 ${per1kToPer1m(a.price.output_per_1k)}{a.price.cached_input_per_1k && ` / 快取 $${per1kToPer1m(a.price.cached_input_per_1k)}`}</span>
                       : <span>未定價</span>}
                   </div>
                   <div>建立於 {new Date(a.created_at).toLocaleString("zh-TW")}</div>

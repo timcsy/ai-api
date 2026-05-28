@@ -37,7 +37,7 @@ interface Allocation {
   status: string;
   token_prefix: string;
   quota_tokens_per_month?: number | null;
-  price?: { input_per_1k: string; output_per_1k: string } | null;
+  price?: { input_per_1k: string; output_per_1k: string; cached_input_per_1k?: string } | null;
 }
 
 interface CallItem {
@@ -208,7 +208,7 @@ export function AllocationDetailPage() {
           <div className="text-sm">
             <span className="text-muted-foreground">價格（每 1M tokens）：</span>
             {alloc?.price
-              ? <span className="font-mono">輸入 ${per1kToPer1m(alloc.price.input_per_1k)} / 輸出 ${per1kToPer1m(alloc.price.output_per_1k)}</span>
+              ? <span className="font-mono">輸入 ${per1kToPer1m(alloc.price.input_per_1k)} / 輸出 ${per1kToPer1m(alloc.price.output_per_1k)}{alloc.price.cached_input_per_1k && ` / 快取輸入 $${per1kToPer1m(alloc.price.cached_input_per_1k)}`}</span>
               : <span className="text-muted-foreground">未定價</span>}
             {alloc && (
               <Link to={`/catalog/${alloc.resource_model}`} className="ml-2 text-xs text-primary hover:underline">

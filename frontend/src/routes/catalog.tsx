@@ -31,7 +31,7 @@ interface Model {
   recommended_for: string[];
   tags: string[];
   status: string;
-  price: { input_per_1k: string; output_per_1k: string } | null;
+  price: { input_per_1k: string; output_per_1k: string; cached_input_per_1k?: string } | null;
 }
 
 interface Facets {
@@ -236,7 +236,7 @@ export function CatalogPage() {
                   )}
                   <p className="mt-3 text-xs text-muted-foreground">
                     {m.price
-                      ? `💲 輸入 $${per1kToPer1m(m.price.input_per_1k)} / 輸出 $${per1kToPer1m(m.price.output_per_1k)}（每 1M tokens）`
+                      ? `💲 輸入 $${per1kToPer1m(m.price.input_per_1k)} / 輸出 $${per1kToPer1m(m.price.output_per_1k)}${m.price.cached_input_per_1k ? ` / 快取 $${per1kToPer1m(m.price.cached_input_per_1k)}` : ""}（每 1M tokens）`
                       : "💲 未定價"}
                   </p>
                 </CardContent>

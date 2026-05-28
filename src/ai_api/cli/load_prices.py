@@ -40,6 +40,11 @@ async def _load(path: Path) -> int:
                     model=entry["model"],
                     input_per_1k_tokens_usd=Decimal(str(entry["input_per_1k_tokens_usd"])),
                     output_per_1k_tokens_usd=Decimal(str(entry["output_per_1k_tokens_usd"])),
+                    cached_input_per_1k_tokens_usd=(
+                        Decimal(str(entry["cached_input_per_1k_tokens_usd"]))
+                        if entry.get("cached_input_per_1k_tokens_usd") is not None
+                        else None
+                    ),
                     effective_from=eff,
                     created_at=datetime.now(UTC),
                     created_by=created_by,
