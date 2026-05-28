@@ -79,7 +79,14 @@ const TEMPLATES: { label: string; provider: string; model: string; in1m: string;
   { label: "Gemini — 1.5-pro", provider: "gemini", model: "gemini-1.5-pro", in1m: "1.25", out1m: "5.00" },
 ];
 
-const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("zh-TW");
+const fmtDate = (iso: string) => new Date(iso).toLocaleString("zh-TW");
+
+/** Local "now" formatted for a <input type="datetime-local"> (YYYY-MM-DDTHH:mm). */
+function localNowForInput(): string {
+  const d = new Date();
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
 
 interface DialogState {
   provider: string;
@@ -280,7 +287,7 @@ function AddPriceDialog({
       setInput(state.currentIn ? per1kToPer1m(state.currentIn) : "");
       setOutput(state.currentOut ? per1kToPer1m(state.currentOut) : "");
       setCached(state.currentCached ? per1kToPer1m(state.currentCached) : "");
-      setEffective(new Date().toISOString().slice(0, 10));
+      setEffective(localNowForInput());
       setNote("");
     }
   }, [state]);
@@ -309,7 +316,7 @@ function AddPriceDialog({
           cached_input_per_1k: cached
             ? unit === "per_1m" ? per1mToPer1k(cached) : cached.trim()
             : null,
-          effective_from: new Date(effective + "T00:00:00Z").toISOString(),
+          effective_from: new Date(effective).toISOString(),
           source_note: note || null,
         }),
       }),
@@ -398,8 +405,9 @@ function AddPriceDialog({
           )}
 
           <div>
-            <Label htmlFor="p-eff">生效日</Label>
-            <Input id="p-eff" type="date" className="mt-1" value={effective} onChange={(e) => setEffective(e.target.value)} />
+            <Label htmlFor="p-eff">生效時間</Label>
+            <Input id="p-eff" type="datetime-local" className="mt-1" value={effective} onChange={(e) => setEffective(e.target.value)} />
+            <p className="text-xs text-muted-foreground mt-1">預設為「現在」，可立即生效；同一模型不同時間可各有版本。</p>
           </div>
           <div>
             <Label htmlFor="p-note">來源備註（可選）</Label>
