@@ -39,6 +39,14 @@ spec:
               {{- toYaml .Values.networkPolicy.postgresPodSelector | nindent 14 }}
       ports:
         - { protocol: TCP, port: 5432 }
+    # Frontend nginx reverse-proxies API paths to the backend (single-origin
+    # deploy). Allow egress to the app's own pods on the backend port.
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "ai-api.selectorLabels" . | nindent 14 }}
+      ports:
+        - { protocol: TCP, port: 8000 }
   ingress:
     # Allow any namespace inside the cluster to call the service (Ingress controller)
     - from:
