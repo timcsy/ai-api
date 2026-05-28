@@ -6,7 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.models import (
@@ -47,6 +47,7 @@ async def aggregate_usage(
     from_: datetime,
     to: datetime,
     service_only: bool = False,
+    member_id: str | None = None,
 ) -> list[UsageItem]:
     sum_total = func.coalesce(func.sum(CallRecord.total_tokens), 0).label("total")
     sum_prompt = func.coalesce(func.sum(CallRecord.prompt_tokens), 0).label("prompt")
@@ -59,6 +60,11 @@ async def aggregate_usage(
         CallRecord.started_at >= from_,
         CallRecord.started_at < to,
     ]
+    # Phase 018: member-scope. All three branches join Allocation, so adding the
+    # filter here scopes every group_by to this member. None = existing (admin)
+    # behaviour, unchanged.
+    if member_id is not None:
+        base_filters.append(Allocation.member_id == member_id)
 
     if group_by == "member":
         stmt = (
@@ -158,6 +164,32 @@ async def aggregate_usage(
         )
         for r in model_rows
     ]
+
+
+async def count_unpriced_calls(
+    db: AsyncSession,
+    *,
+    member_id: str,
+    from_: datetime,
+    to: datetime,
+) -> int:
+    """Count a member's successful calls that consumed tokens but recorded no
+    cost (model had no price at call time). Drives the `has_unpriced` flag so the
+    UI can mark the cost summary as an under-estimate (FR-006)."""
+    stmt = (
+        select(func.count())
+        .select_from(CallRecord)
+        .join(Allocation, Allocation.id == CallRecord.allocation_id)
+        .where(
+            CallRecord.outcome == CallOutcome.success,
+            CallRecord.started_at >= from_,
+            CallRecord.started_at < to,
+            Allocation.member_id == member_id,
+            CallRecord.total_tokens > 0,
+            or_(CallRecord.cost_usd.is_(None), CallRecord.cost_usd == 0),
+        )
+    )
+    return int(await db.scalar(stmt) or 0)
 
 
 async def usage_timeseries(

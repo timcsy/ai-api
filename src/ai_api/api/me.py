@@ -1,7 +1,8 @@
 """Member self-service endpoints (/me*)."""
 from __future__ import annotations
 
-from typing import Any
+from datetime import UTC, datetime
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -72,6 +73,72 @@ async def list_my_allocations(
         _alloc_public(a, pricing.price_for_slug(price_map, _provider_of(a.resource_model), a.resource_model))
         for a in allocations
     ]
+
+
+def _summary_dict(row: Any, has_unpriced: bool) -> dict[str, Any]:
+    if row is None:
+        return {
+            "total_tokens": 0, "prompt_tokens": 0, "completion_tokens": 0,
+            "total_cost_usd": 0.0, "call_count": 0, "has_unpriced": False,
+        }
+    return {
+        "total_tokens": row.total_tokens,
+        "prompt_tokens": row.prompt_tokens,
+        "completion_tokens": row.completion_tokens,
+        "total_cost_usd": float(row.total_cost_usd),
+        "call_count": row.call_count,
+        "has_unpriced": has_unpriced,
+    }
+
+
+@router.get("/me/usage")
+async def get_my_usage(
+    from_: datetime | None = Query(default=None, alias="from"),
+    to: datetime | None = Query(default=None),
+    group_by: Literal["model", "allocation"] | None = Query(default=None),
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """This member's own usage, strictly scoped to them (Phase 018).
+
+    Default range = current month (UTC). `group_by` adds a per-model / per-
+    allocation breakdown. Range/scope come from the session — there is no
+    parameter to view another member's usage.
+    """
+    from ai_api.api.usage import _validate_range
+    from ai_api.services.usage import aggregate_usage, count_unpriced_calls
+
+    now = datetime.now(UTC)
+    to = to or now
+    from_ = from_ or now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    _validate_range(from_, to)
+
+    summary_rows = await aggregate_usage(
+        db, group_by="member", from_=from_, to=to, member_id=member.id
+    )
+    unpriced = await count_unpriced_calls(db, member_id=member.id, from_=from_, to=to)
+    result: dict[str, Any] = {
+        "from": from_.isoformat(),
+        "to": to.isoformat(),
+        "summary": _summary_dict(summary_rows[0] if summary_rows else None, unpriced > 0),
+    }
+    if group_by is not None:
+        items = await aggregate_usage(
+            db, group_by=group_by, from_=from_, to=to, member_id=member.id
+        )
+        result["breakdown"] = [
+            {
+                "group_key": it.group_key,
+                "display_name": it.display_name,
+                "total_tokens": it.total_tokens,
+                "prompt_tokens": it.prompt_tokens,
+                "completion_tokens": it.completion_tokens,
+                "total_cost_usd": float(it.total_cost_usd),
+                "call_count": it.call_count,
+            }
+            for it in items
+        ]
+    return result
 
 
 @router.get("/me/claimable-models")
