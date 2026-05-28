@@ -19,7 +19,7 @@ interface AuthContextValue {
   status: AuthStatus;
   member: Member | null;
   login(email: string, password: string): Promise<void>;
-  loginGoogle(): void;
+  loginGoogle(next?: string): void;
   logout(): Promise<void>;
   refresh(): Promise<void>;
 }
@@ -68,9 +68,11 @@ export function AuthProvider({
     [refresh],
   );
 
-  const loginGoogle = React.useCallback(() => {
-    // Redirect to backend-initiated OIDC flow.
-    window.location.href = "/auth/oidc/start";
+  const loginGoogle = React.useCallback((next?: string) => {
+    // Redirect to backend-initiated OIDC flow. Pass `next` so the callback
+    // lands back in the SPA instead of the backend's default /me JSON.
+    const target = next && next.startsWith("/") ? next : "/";
+    window.location.href = `/auth/oidc/start?next=${encodeURIComponent(target)}`;
   }, []);
 
   const logout = React.useCallback(async () => {

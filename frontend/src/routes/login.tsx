@@ -106,7 +106,7 @@ export function LoginPage() {
             </div>
           </div>
 
-          <Button variant="outline" className="w-full" onClick={loginGoogle}>
+          <Button variant="outline" className="w-full" onClick={() => loginGoogle(next)}>
             使用 Google 登入
           </Button>
         </CardContent>
