@@ -70,6 +70,7 @@ def _outcome_for_code(code: str) -> CallOutcome:
         "model_mismatch": CallOutcome.rejected_model_mismatch,
         "provider_not_allowed": CallOutcome.rejected_provider,
         "allocation_quarantined": CallOutcome.rejected_quarantined,
+        "allocation_paused": CallOutcome.rejected_paused,
         "quota_exceeded": CallOutcome.rejected_quota_exceeded,
         "upstream_error": CallOutcome.upstream_error,
     }.get(code, CallOutcome.gateway_error)
@@ -155,6 +156,10 @@ async def proxy_chat_completions(
             "allocation_quarantined",
             "allocation is quarantined due to anomalous usage",
             403,
+        )
+    if allocation.status.value == "paused":
+        return await record_and_respond(
+            "allocation_paused", "allocation is paused", 403
         )
 
     # Phase 3a: monthly quota check (FR-007)

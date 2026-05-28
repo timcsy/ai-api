@@ -123,6 +123,14 @@ export function AdminMemberDetailPage() {
     },
     onError: (e) => toast({ title: "撤回失敗", description: e.message, variant: "destructive" }),
   });
+  const pauseResumeMut = useMutation<unknown, ApiError, { id: string; action: "pause" | "resume" }>({
+    mutationFn: ({ id, action }) => api(`/admin/allocations/${id}/${action}`, { method: "POST" }),
+    onSuccess: (_d, { action }) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "allocations"] });
+      toast({ title: action === "pause" ? "已暫停" : "已恢復" });
+    },
+    onError: (e) => toast({ title: "操作失敗", description: e.message, variant: "destructive" }),
+  });
 
   if (membersQuery.isLoading) return <div className="container mx-auto py-8">載入中…</div>;
   if (!member) {
@@ -270,16 +278,31 @@ export function AdminMemberDetailPage() {
                     </TableCell>
                     <TableCell>{a.quota_tokens_per_month ?? "無限額"}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">{a.token_prefix}…</TableCell>
-                    <TableCell className="text-right">
-                      {a.status === "active" ? (
+                    <TableCell className="text-right space-x-2">
+                      {a.status === "active" && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => pauseResumeMut.mutate({ id: a.id, action: "pause" })}
+                          >
+                            暫停
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => setRevokeTarget(a)}>
+                            撤回
+                          </Button>
+                        </>
+                      )}
+                      {a.status === "paused" && (
                         <Button
                           size="sm"
-                          variant="destructive"
-                          onClick={() => setRevokeTarget(a)}
+                          variant="outline"
+                          onClick={() => pauseResumeMut.mutate({ id: a.id, action: "resume" })}
                         >
-                          撤回
+                          恢復
                         </Button>
-                      ) : (
+                      )}
+                      {a.status === "revoked" && (
                         <span className="text-xs text-muted-foreground">已撤回</span>
                       )}
                     </TableCell>

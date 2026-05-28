@@ -126,6 +126,54 @@ async def unquarantine_allocation(
     return _to_out(allocation)
 
 
+@router.post("/allocations/{allocation_id}/pause", response_model=AllocationOut)
+async def pause_allocation(
+    allocation_id: str,
+    session: AsyncSession = Depends(get_db_session),
+) -> AllocationOut:
+    """Reversibly pause an active allocation (keeps the same token)."""
+    from ai_api.services.allocations import InvalidAllocationState
+
+    service = AllocationService(session)
+    try:
+        allocation = await service.pause(allocation_id)
+    except InvalidAllocationState as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": {"code": "invalid_state", "message": str(exc)}},
+        ) from exc
+    if allocation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "not_found", "message": "allocation not found"}},
+        )
+    return _to_out(allocation)
+
+
+@router.post("/allocations/{allocation_id}/resume", response_model=AllocationOut)
+async def resume_allocation(
+    allocation_id: str,
+    session: AsyncSession = Depends(get_db_session),
+) -> AllocationOut:
+    """Resume a paused allocation back to active (original token works again)."""
+    from ai_api.services.allocations import InvalidAllocationState
+
+    service = AllocationService(session)
+    try:
+        allocation = await service.resume(allocation_id)
+    except InvalidAllocationState as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": {"code": "invalid_state", "message": str(exc)}},
+        ) from exc
+    if allocation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "not_found", "message": "allocation not found"}},
+        )
+    return _to_out(allocation)
+
+
 @router.patch("/allocations/{allocation_id}", response_model=AllocationOut)
 async def patch_allocation(
     allocation_id: str,

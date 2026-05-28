@@ -19,6 +19,7 @@ class AllocationStatus(enum.StrEnum):
     active = "active"
     revoked = "revoked"
     quarantined = "quarantined"
+    paused = "paused"  # admin manual, reversible (vs revoked=terminal, quarantined=auto)
 
 
 class AllocationOrigin(enum.StrEnum):
