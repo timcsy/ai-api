@@ -138,8 +138,9 @@ token 退為 break-glass，正式環境帶預設/空 token 即拒絕啟動；階
 
 > **問題**：本機真實使用者實測（2026-05-27）走通後，盤點出數處摩擦——端點顯示
 > 不一致、資訊要逐張點開才看得到、新手缺引導、admin 局部用瀏覽器原生對話框。
-> 皆不加核心功能，只把既有流程做得更直觀、資訊更易消化。
-> **交付**：一批成員端為主的 UX 打磨。
+> 多為把既有流程做得更直觀、資訊更易消化的打磨；另含一個小能力缺口：admin 想
+> **臨時暫停一把憑證再恢復**（非用限額），目前無乾淨做法。
+> **交付**：一批成員端為主的 UX 打磨 + 憑證暫停/恢復。
 > **前置條件**：階段 6（自助領取）、階段 7（價目顯示）
 
 **更直觀 / 正確：**
@@ -160,6 +161,15 @@ token 退為 break-glass，正式環境帶預設/空 token 即拒絕啟動；階
       `prompt()`/`confirm()`）：風格一致、可驗證輸入、可加單位提示
 - [ ] token 提示文案補上自助情境（`dashboard.tsx` 現文案偏 admin 視角）
 
+**新能力：憑證暫停 / 恢復（管理員）：**
+> **動機**：admin 對無限額（或任何）憑證想「臨時關閉、過陣子再開」，而非用配額=0。
+> 現有狀態只有 active / revoked（終局，且 rotate 會換新 token）/ quarantined（僅異常偵測器自動設），都湊不出「可逆、保留同一 token」的暫停。
+- [ ] `AllocationStatus` 加 `paused`；proxy 將 `paused` 納入拒絕（回明確 `allocation_paused`，比照 revoked）
+- [ ] `AllocationService` 加 `pause()` / `resume()`：**只切 status，不動 token、不建 reclaim lock**（與 revoke 的關鍵差異 = 可逆、保留憑證）
+- [ ] admin UI（分配列 / 詳情）加「暫停 / 恢復」鈕；稽核 `allocation_paused` / `allocation_resumed`
+- [ ] ⚠ 開工先確認 `status` 欄位儲存型別：Postgres native enum 需小 migration（`ALTER TYPE ... ADD VALUE`）；存字串則免
+
 **明確排除（暫擬）：**
 - ❌ 全面視覺改版 / 換 design system（只在既有 shadcn 內打磨）
 - ❌ 成員端用量總覽（屬階段 9，不重複）
+- ❌ 排程自動暫停 / 恢復（首版手動，未來可加）
