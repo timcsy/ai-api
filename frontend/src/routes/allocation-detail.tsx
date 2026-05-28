@@ -235,7 +235,7 @@ export function AllocationDetailPage() {
           )}
           {items.length > 0 && (
             <div className="space-y-2">
-              <div className="grid grid-cols-5 text-xs font-medium text-muted-foreground border-b pb-2">
+              <div className="grid grid-cols-[1.6fr_0.6fr_1fr_0.8fr_1.4fr] gap-3 text-xs font-medium text-muted-foreground border-b pb-2">
                 <span>時間</span>
                 <span>狀態</span>
                 <span>結果</span>
@@ -243,12 +243,12 @@ export function AllocationDetailPage() {
                 <span className="text-right">請求 ID</span>
               </div>
               {items.map((c) => (
-                <div key={c.id} className="grid grid-cols-5 text-sm py-1 border-b border-border/30">
-                  <span>{new Date(c.started_at).toLocaleString("zh-TW")}</span>
+                <div key={c.id} className="grid grid-cols-[1.6fr_0.6fr_1fr_0.8fr_1.4fr] gap-3 text-sm py-1 border-b border-border/30">
+                  <span className="truncate">{new Date(c.started_at).toLocaleString("zh-TW")}</span>
                   <span>{c.status_code}</span>
-                  <span className="text-xs">{c.outcome}</span>
-                  <span className="text-right">{c.total_tokens ?? "—"}</span>
-                  <span className="text-right font-mono text-xs text-muted-foreground truncate">
+                  <span className="text-xs truncate">{c.outcome}</span>
+                  <span className="text-right tabular-nums">{c.total_tokens ?? "—"}</span>
+                  <span className="min-w-0 text-right font-mono text-xs text-muted-foreground truncate" title={c.request_id}>
                     {c.request_id}
                   </span>
                 </div>
