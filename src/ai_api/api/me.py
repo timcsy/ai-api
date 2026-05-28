@@ -77,7 +77,7 @@ async def list_my_allocations(
     price_map = await pricing.current_price_map(db, datetime.now(UTC))
     # slug → display_name from the catalog (orphan slugs absent → None)
     name_rows = await db.execute(select(ModelCatalog.slug, ModelCatalog.display_name))
-    name_map = dict(name_rows.all())
+    name_map: dict[str, str] = {row[0]: row[1] for row in name_rows.all()}
     return [
         _alloc_public(
             a,
