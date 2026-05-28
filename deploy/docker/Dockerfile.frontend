@@ -8,12 +8,14 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-FROM nginx:1.27-alpine AS serve
-# Pull the latest alpine package patches on top of the base image — the upstream
-# nginx:1.27-alpine layer is rebuilt infrequently and may lag behind CVE fixes
-# (e.g. nghttp2-libs, zlib). `--no-cache` keeps the image small.
+# Unprivileged nginx: runs as uid 101, listens on 8080, writes only to /tmp —
+# works under the chart's runAsNonRoot + readOnlyRootFilesystem + drop-ALL-caps
+# hardening (plain nginx:alpine runs as root and can't bind :80 there).
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS serve
+# CVE patches: switch to root just for apk, then back to the non-root user.
+USER root
 RUN apk upgrade --no-cache
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY deploy/nginx/default.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
-# nginx:alpine sets up a non-root nginx user by default at runtime.
+USER 101
+EXPOSE 8080
