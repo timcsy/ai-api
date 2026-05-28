@@ -92,6 +92,17 @@ export function AllocationDetailPage() {
     enabled: !!id,
   });
 
+  // Look up the bound model's catalog entry to know if it supports /responses.
+  // Quiet: a missing/forbidden catalog entry just hides the Responses examples.
+  const modelSlug = allocQuery.data?.resource_model;
+  const modelQuery = useQuery<{ capabilities: string[] }, ApiError>({
+    queryKey: ["catalog", "model", modelSlug],
+    queryFn: () => api<{ capabilities: string[] }>(`/catalog/models/${modelSlug}`),
+    enabled: !!modelSlug,
+    retry: false,
+  });
+  const supportsResponses = !!modelQuery.data?.capabilities?.includes("responses");
+
   const callsQuery = useInfiniteQuery<CallsPage, ApiError>({
     queryKey: ["me", "allocations", id, "calls"],
     initialPageParam: null as string | null,
@@ -176,7 +187,7 @@ export function AllocationDetailPage() {
         </CardContent>
       </Card>
 
-      <ApiUsageExample model={alloc?.resource_model ?? ""} />
+      <ApiUsageExample model={alloc?.resource_model ?? ""} supportsResponses={supportsResponses} />
 
       <Card>
         <CardHeader>

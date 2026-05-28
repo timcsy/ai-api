@@ -12,10 +12,17 @@ import { copyToClipboard } from "@/lib/clipboard";
  * and catalog-detail pages, so the two never drift apart again.
  *
  * - `model`: the full catalog slug (what the API expects, e.g. "azure/gpt-5.4-mini").
+ * - `supportsResponses`: when true, also show /v1/responses + Codex examples.
  * - The token is always shown as the `$TOKEN` placeholder — the real token is
  *   only revealed once at allocation creation, never re-fetchable.
  */
-export function ApiUsageExample({ model }: { model: string }) {
+export function ApiUsageExample({
+  model,
+  supportsResponses = false,
+}: {
+  model: string;
+  supportsResponses?: boolean;
+}) {
   const { toast } = useToast();
   const [tab, setTab] = React.useState("curl");
   const base = apiBaseUrl();
@@ -59,6 +66,53 @@ console.log(data.choices[0].message.content);`,
 }`,
   };
 
+  if (supportsResponses) {
+    snippets.responses = `curl -N -X POST ${base}/responses \\
+  -H "Authorization: Bearer $TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "${m}",
+    "input": "你好",
+    "stream": true
+  }'`;
+    snippets["responses-py"] = `from openai import OpenAI
+
+client = OpenAI(
+    base_url="${base}",
+    api_key="$TOKEN",
+)
+resp = client.responses.create(
+    model="${m}",
+    input="你好",
+)
+print(resp.output_text)`;
+    snippets.codex = `# ~/.codex/config.toml
+model = "${m}"
+model_provider = "ccsh"
+
+[model_providers.ccsh]
+name = "CCSH AI Gateway"
+base_url = "${base}"
+wire_api = "responses"
+env_key = "CCSH_AI_TOKEN"
+
+# then:  export CCSH_AI_TOKEN="$TOKEN"  &&  codex "你的指令"`;
+  }
+
+  const tabKeys = supportsResponses
+    ? (["curl", "python", "javascript", "json", "responses", "responses-py", "codex"] as const)
+    : (["curl", "python", "javascript", "json"] as const);
+
+  const TAB_LABEL: Record<string, string> = {
+    curl: "curl",
+    python: "Python",
+    javascript: "JavaScript",
+    json: "JSON body",
+    responses: "Responses (curl)",
+    "responses-py": "Responses (Py)",
+    codex: "Codex",
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -67,6 +121,11 @@ console.log(data.choices[0].message.content);`,
             <CardTitle className="text-lg">如何呼叫</CardTitle>
             <CardDescription>
               端點 <code className="text-xs">{base}</code>；把 <code className="text-xs">$TOKEN</code> 換成你的分配 token（放 Authorization: Bearer）。
+              {supportsResponses && (
+                <>
+                  {" "}此模型支援 <code className="text-xs">/responses</code>，可給 OpenAI Codex 等 agent 工具使用（見 Codex 分頁）。
+                </>
+              )}
             </CardDescription>
           </div>
           <Button
@@ -88,13 +147,12 @@ console.log(data.choices[0].message.content);`,
       </CardHeader>
       <CardContent>
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="curl">curl</TabsTrigger>
-            <TabsTrigger value="python">Python</TabsTrigger>
-            <TabsTrigger value="javascript">JavaScript</TabsTrigger>
-            <TabsTrigger value="json">JSON body</TabsTrigger>
+          <TabsList className="flex-wrap h-auto">
+            {tabKeys.map((k) => (
+              <TabsTrigger key={k} value={k}>{TAB_LABEL[k]}</TabsTrigger>
+            ))}
           </TabsList>
-          {(["curl", "python", "javascript", "json"] as const).map((k) => (
+          {tabKeys.map((k) => (
             <TabsContent key={k} value={k}>
               <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">{snippets[k]}</pre>
             </TabsContent>

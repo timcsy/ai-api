@@ -210,7 +210,7 @@ export function CatalogDetailPage() {
         </CardContent>
       </Card>
 
-      <ApiUsageExample model={m.slug} />
+      <ApiUsageExample model={m.slug} supportsResponses={m.capabilities.includes("responses")} />
 
       {m.official_doc_url && (
         <p className="text-sm">
