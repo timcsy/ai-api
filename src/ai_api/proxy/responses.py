@@ -252,12 +252,18 @@ async def proxy_responses(
                         if hasattr(event, "model_dump_json")
                         else json.dumps(event, default=str)
                     )
-                    etype = getattr(event, "type", None) or (
-                        event.get("type") if isinstance(event, dict) else None
-                    )
+                    # Derive the SSE event type from the serialized payload's
+                    # `type` (the OpenAI wire value, e.g. "response.completed").
+                    # litellm's event.type is an enum whose repr would otherwise
+                    # leak (e.g. "ResponsesAPIStreamEvents.RESPONSE_COMPLETED")
+                    # and break Codex + usage capture.
+                    try:
+                        payload_obj = json.loads(data)
+                    except (ValueError, TypeError):
+                        payload_obj = {}
+                    etype = payload_obj.get("type")
                     if etype == "response.completed":
-                        resp = _as_dict(getattr(event, "response", None) or
-                                        (event.get("response") if isinstance(event, dict) else None))
+                        resp = _as_dict(payload_obj.get("response"))
                         captured_usage = resp.get("usage")
                         captured_resp_id = resp.get("id")
                     yield _sse(etype, data)
