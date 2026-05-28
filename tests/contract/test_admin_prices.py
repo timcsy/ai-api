@@ -99,6 +99,45 @@ async def test_create_version(app_client: AsyncClient, admin_headers: dict[str, 
     assert rows["azure/gpt-5.4-mini"]["priced"] is True
 
 
+# Phase 11 — cached input price flows through create + list + history
+@pytest.mark.asyncio
+async def test_create_with_cached_input_price(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    await _seed_model("azure/gpt-5.4")
+    r = await app_client.post(
+        "/admin/prices", headers=admin_headers,
+        json={"provider": "azure", "model": "gpt-5.4",
+              "input_per_1k": "0.0003", "output_per_1k": "0.0012",
+              "cached_input_per_1k": "0.0000375",
+              "effective_from": "2026-05-01T00:00:00+00:00"},
+    )
+    assert r.status_code == 201, r.text
+    assert Decimal(r.json()["cached_input_per_1k"]) == Decimal("0.0000375")
+    # current price surfaces cached
+    rows = {x["slug"]: x for x in (await app_client.get("/admin/prices", headers=admin_headers)).json()}
+    assert Decimal(rows["azure/gpt-5.4"]["current"]["cached_input_per_1k"]) == Decimal("0.0000375")
+    # history surfaces cached
+    hist = (await app_client.get(
+        "/admin/prices/history?provider=azure&model=gpt-5.4", headers=admin_headers
+    )).json()
+    assert Decimal(hist[0]["cached_input_per_1k"]) == Decimal("0.0000375")
+
+
+@pytest.mark.asyncio
+async def test_create_without_cached_is_null(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    await _seed_model("azure/no-cache")
+    r = await app_client.post(
+        "/admin/prices", headers=admin_headers,
+        json={"provider": "azure", "model": "no-cache", "input_per_1k": "0.001",
+              "output_per_1k": "0.002", "effective_from": "2026-05-01T00:00:00+00:00"},
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["cached_input_per_1k"] is None
+
+
 @pytest.mark.asyncio
 async def test_create_duplicate_409(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
     body = {"provider": "azure", "model": "dup-m", "input_per_1k": "0.001",

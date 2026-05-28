@@ -43,6 +43,7 @@ import {
 interface CurrentPrice {
   input_per_1k: string;
   output_per_1k: string;
+  cached_input_per_1k: string | null;
   effective_from: string;
 }
 interface CatalogPriceRow {
@@ -58,6 +59,7 @@ interface PriceVersion {
   id: string;
   input_per_1k: string;
   output_per_1k: string;
+  cached_input_per_1k: string | null;
   effective_from: string;
   source_note: string | null;
   created_at: string;
@@ -85,6 +87,7 @@ interface DialogState {
   lockKey: boolean; // true when opened from a catalog row
   currentIn?: string | null; // current per-1K input price, to prefill when editing
   currentOut?: string | null;
+  currentCached?: string | null; // current per-1K cached-input price
 }
 
 export function AdminPricesPage() {
@@ -184,6 +187,7 @@ export function AdminPricesPage() {
                           lockKey: true,
                           currentIn: row.current?.input_per_1k ?? null,
                           currentOut: row.current?.output_per_1k ?? null,
+                          currentCached: row.current?.cached_input_per_1k ?? null,
                         })}
                       >{row.priced ? "編輯價格" : "設定價格"}</Button>
                     </TableCell>
@@ -234,7 +238,10 @@ function PriceHistory({ provider, model, unit }: { provider: string; model: stri
         return (
           <li key={v.id} className="flex items-center gap-2">
             <span className="font-mono">{fmtDate(v.effective_from)}</span>
-            <span className="font-mono">in ${displayPrice(v.input_per_1k, unit)} / out ${displayPrice(v.output_per_1k, unit)}</span>
+            <span className="font-mono">
+              in ${displayPrice(v.input_per_1k, unit)} / out ${displayPrice(v.output_per_1k, unit)}
+              {v.cached_input_per_1k != null && ` / cached ${displayPrice(v.cached_input_per_1k, unit)}`}
+            </span>
             {v.is_current && <Badge variant="default" className="text-[10px]">目前生效</Badge>}
             {future && <Badge variant="outline" className="text-[10px]">排程生效</Badge>}
             {v.source_note && <span className="text-muted-foreground">— {v.source_note}</span>}
@@ -260,6 +267,7 @@ function AddPriceDialog({
   const [unit, setUnit] = React.useState<Unit>("per_1m");
   const [input, setInput] = React.useState("");
   const [output, setOutput] = React.useState("");
+  const [cached, setCached] = React.useState("");
   const [effective, setEffective] = React.useState("");
   const [note, setNote] = React.useState("");
 
@@ -271,6 +279,7 @@ function AddPriceDialog({
       // prefill current price (per-1K → per-1M) when editing an existing one
       setInput(state.currentIn ? per1kToPer1m(state.currentIn) : "");
       setOutput(state.currentOut ? per1kToPer1m(state.currentOut) : "");
+      setCached(state.currentCached ? per1kToPer1m(state.currentCached) : "");
       setEffective(new Date().toISOString().slice(0, 10));
       setNote("");
     }
@@ -297,6 +306,9 @@ function AddPriceDialog({
           model: model.trim(),
           input_per_1k: unit === "per_1m" ? per1mToPer1k(input) : input.trim(),
           output_per_1k: unit === "per_1m" ? per1mToPer1k(output) : output.trim(),
+          cached_input_per_1k: cached
+            ? unit === "per_1m" ? per1mToPer1k(cached) : cached.trim()
+            : null,
           effective_from: new Date(effective + "T00:00:00Z").toISOString(),
           source_note: note || null,
         }),
@@ -370,9 +382,18 @@ function AddPriceDialog({
                 value={output} onChange={(e) => setOutput(e.target.value)} />
             </div>
           </div>
-          {unit === "per_1m" && (input || output) && (
+          <div>
+            <Label htmlFor="p-cached">快取輸入單價 / {unitLabel}（USD，可選）</Label>
+            <Input id="p-cached" className="mt-1 font-mono" placeholder={unit === "per_1m" ? "0.0375（留空＝不打折）" : "0.0000375"}
+              value={cached} onChange={(e) => setCached(e.target.value)} />
+            <p className="text-xs text-muted-foreground mt-1">
+              命中提示快取的輸入 token 套此折扣價；留空則以一般輸入價計。
+            </p>
+          </div>
+          {unit === "per_1m" && (input || output || cached) && (
             <p className="text-xs text-muted-foreground">
               換算後（每 1K）：in ${input ? per1mToPer1k(input) : "—"} / out ${output ? per1mToPer1k(output) : "—"}
+              {cached && ` / cached $${per1mToPer1k(cached)}`}
             </p>
           )}
 

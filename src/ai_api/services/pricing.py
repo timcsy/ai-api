@@ -138,6 +138,11 @@ async def list_catalog_prices(db: AsyncSession, now: datetime) -> list[dict[str,
         return {
             "input_per_1k": _price_str(current.input_per_1k_tokens_usd),
             "output_per_1k": _price_str(current.output_per_1k_tokens_usd),
+            "cached_input_per_1k": (
+                _price_str(current.cached_input_per_1k_tokens_usd)
+                if current.cached_input_per_1k_tokens_usd is not None
+                else None
+            ),
             "effective_from": current.effective_from.isoformat(),
         }
 
@@ -217,6 +222,11 @@ async def list_history(db: AsyncSession, provider: str, model: str) -> list[dict
             "id": v.id,
             "input_per_1k": _price_str(v.input_per_1k_tokens_usd),
             "output_per_1k": _price_str(v.output_per_1k_tokens_usd),
+            "cached_input_per_1k": (
+                _price_str(v.cached_input_per_1k_tokens_usd)
+                if v.cached_input_per_1k_tokens_usd is not None
+                else None
+            ),
             "effective_from": v.effective_from.isoformat(),
             "source_note": v.source_note,
             "created_at": v.created_at.isoformat(),
@@ -235,6 +245,7 @@ async def create_version(
     input_per_1k: str | Decimal,
     output_per_1k: str | Decimal,
     effective_from: datetime,
+    cached_input_per_1k: str | Decimal | None = None,
     source_note: str | None = None,
     created_by: str = "admin",
 ) -> dict[str, Any]:
@@ -242,9 +253,14 @@ async def create_version(
     try:
         inp = Decimal(str(input_per_1k))
         outp = Decimal(str(output_per_1k))
+        cached = (
+            Decimal(str(cached_input_per_1k))
+            if cached_input_per_1k is not None and str(cached_input_per_1k) != ""
+            else None
+        )
     except (InvalidOperation, ValueError) as exc:
         raise InvalidPriceError("unit price is not a valid number") from exc
-    if inp < 0 or outp < 0:
+    if inp < 0 or outp < 0 or (cached is not None and cached < 0):
         raise InvalidPriceError("unit price must be non-negative")
     if effective_from.tzinfo is None:
         effective_from = effective_from.replace(tzinfo=UTC)
@@ -255,6 +271,7 @@ async def create_version(
         model=model,
         input_per_1k_tokens_usd=inp,
         output_per_1k_tokens_usd=outp,
+        cached_input_per_1k_tokens_usd=cached,
         effective_from=effective_from,
         created_at=datetime.now(UTC),
         created_by=created_by,
@@ -283,6 +300,11 @@ async def create_version(
         "id": row.id,
         "input_per_1k": _price_str(row.input_per_1k_tokens_usd),
         "output_per_1k": _price_str(row.output_per_1k_tokens_usd),
+        "cached_input_per_1k": (
+            _price_str(row.cached_input_per_1k_tokens_usd)
+            if row.cached_input_per_1k_tokens_usd is not None
+            else None
+        ),
         "effective_from": row.effective_from.isoformat(),
         "source_note": row.source_note,
         "created_at": row.created_at.isoformat(),

@@ -41,6 +41,7 @@ class PriceCreateRequest(BaseModel):
     model: str
     input_per_1k: str
     output_per_1k: str
+    cached_input_per_1k: str | None = None
     effective_from: datetime
     source_note: str | None = None
 
@@ -57,6 +58,7 @@ async def create_price(
             model=payload.model,
             input_per_1k=payload.input_per_1k,
             output_per_1k=payload.output_per_1k,
+            cached_input_per_1k=payload.cached_input_per_1k,
             effective_from=payload.effective_from,
             source_note=payload.source_note,
         )
