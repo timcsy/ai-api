@@ -11,6 +11,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from ai_api.auth import policy
 from ai_api.cli.create_admin import ProvisionResult, provision, result_to_exit_code
 from ai_api.db import Base
 from ai_api.models import Member, MemberProvider, MemberStatus
@@ -137,6 +138,53 @@ async def test_provision_promotes_existing_non_admin(sm) -> None:
     assert result_to_exit_code(res) == 0
     m = await _get(sm, "member@org.edu")
     assert m is not None and m.is_admin is True
+
+
+# T008 — provisioning whitelists the admin so login passes the policy gate
+@pytest.mark.asyncio
+async def test_provision_whitelists_admin_email(sm) -> None:
+    async with sm() as s:
+        res = await provision(s, email="Admin@Org.edu", provider="google_oidc")
+        await s.commit()
+    assert res.status == "created"
+    async with sm() as s:
+        assert await policy.is_email_allowed(s, "admin@org.edu") is True
+
+
+# T008b — promoting an existing member also whitelists them
+@pytest.mark.asyncio
+async def test_provision_promote_whitelists_email(sm) -> None:
+    async with sm() as s:
+        await MemberService(s).create(
+            email="member@org.edu",
+            provider=MemberProvider.google_oidc,
+            send_invitation=False,
+        )
+        await s.commit()
+    async with sm() as s:
+        res = await provision(s, email="member@org.edu", provider="google_oidc")
+        await s.commit()
+    assert res.status == "promoted"
+    async with sm() as s:
+        assert await policy.is_email_allowed(s, "member@org.edu") is True
+
+
+# T008c — a provider conflict must NOT whitelist the email
+@pytest.mark.asyncio
+async def test_provision_conflict_does_not_whitelist(sm) -> None:
+    async with sm() as s:
+        await MemberService(s).create(
+            email="admin@org.edu",
+            provider=MemberProvider.local_password,
+            initial_password="VerySafePass123",
+        )
+        await s.commit()
+    async with sm() as s:
+        res = await provision(s, email="admin@org.edu", provider="google_oidc")
+        await s.commit()
+    assert res.status == "conflict"
+    async with sm() as s:
+        assert await policy.is_email_allowed(s, "admin@org.edu") is False
 
 
 def test_result_to_exit_code_mapping() -> None:

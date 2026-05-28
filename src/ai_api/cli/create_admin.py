@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ai_api.db import dispose_engine, get_sessionmaker
 from ai_api.models import MemberProvider
 from ai_api.observability.logging import setup_logging
+from ai_api.services.access_control import WhitelistService
 from ai_api.services.members import MemberService
 
 ProvisionStatus = Literal["created", "promoted", "unchanged", "conflict"]
@@ -67,18 +68,26 @@ async def provision(
     svc = MemberService(session)
 
     existing = await svc.get_by_email(email_n)
+    if existing is not None and existing.provider != prov:
+        return ProvisionResult(
+            status="conflict",
+            email=email_n,
+            member_id=existing.id,
+            provider=existing.provider.value,
+            message=(
+                f"refusing: {email_n} already exists with provider "
+                f"{existing.provider.value}, not {prov.value}"
+            ),
+        )
+
+    # Whitelist the admin so the OIDC/local policy gate lets them log in.
+    # Without this, login fails the is_email_allowed() check even though the
+    # member + is_admin flag exist. Idempotent — safe on every (re-)run.
+    await WhitelistService(session).add(
+        email_n, added_by=_CREATED_BY, note="bootstrap admin"
+    )
+
     if existing is not None:
-        if existing.provider != prov:
-            return ProvisionResult(
-                status="conflict",
-                email=email_n,
-                member_id=existing.id,
-                provider=existing.provider.value,
-                message=(
-                    f"refusing: {email_n} already exists with provider "
-                    f"{existing.provider.value}, not {prov.value}"
-                ),
-            )
         if existing.is_admin:
             return ProvisionResult(
                 status="unchanged",
