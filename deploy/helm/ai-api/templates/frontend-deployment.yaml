@@ -30,6 +30,11 @@ spec:
         - name: nginx
           image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
           imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          env:
+            # Backend service FQDN for nginx's API reverse proxy (envsubst into
+            # the conf template at start). Single-origin: domain → frontend only.
+            - name: BACKEND_UPSTREAM
+              value: "{{ include "ai-api.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local"
           ports:
             - name: http
               containerPort: 8080

@@ -1,0 +1,56 @@
+# Single-origin SPA + API reverse proxy.
+# The frontend nginx serves the SPA and proxies API paths to the backend, so a
+# domain manager that maps one host → one service still gets the whole app.
+# ${BACKEND_UPSTREAM} is substituted at container start (nginx envsubst) from the
+# deployment env, e.g. ai-api-ai-api.ai-ccsh.svc.cluster.local — keeps this image
+# generic (no hard-coded release/namespace). Only env vars are substituted, so
+# nginx runtime vars ($host, $uri, …) are preserved.
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # security headers
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # proxy headers (inherited by all proxy_pass locations below)
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # Backend-only API paths (Phase 3b.0 routing contract)
+    location /health      { proxy_pass http://${BACKEND_UPSTREAM}; }
+    location /healthz     { proxy_pass http://${BACKEND_UPSTREAM}; }
+    location /auth        { proxy_pass http://${BACKEND_UPSTREAM}; }
+    location /me          { proxy_pass http://${BACKEND_UPSTREAM}; }
+    location /v1          { proxy_pass http://${BACKEND_UPSTREAM}; }
+    location /docs        { proxy_pass http://${BACKEND_UPSTREAM}; }
+    location /openapi.json { proxy_pass http://${BACKEND_UPSTREAM}; }
+
+    # /admin and /catalog are BOTH SPA routes and backend APIs: browser
+    # navigations (Accept: text/html) get the SPA; XHR/JSON go to the backend.
+    location /admin {
+        if ($http_accept !~ text/html) { proxy_pass http://${BACKEND_UPSTREAM}; }
+        try_files $uri /index.html;
+    }
+    location /catalog {
+        if ($http_accept !~ text/html) { proxy_pass http://${BACKEND_UPSTREAM}; }
+        try_files $uri /index.html;
+    }
+
+    # hashed asset bundles — safe to cache for a year
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    # SPA fallback — any unmatched path goes to React Router
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
