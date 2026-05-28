@@ -29,5 +29,8 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ include "ai-api.fullname" . }}-secrets
-          command: ["alembic", "upgrade", "head"]
+          # distroless image ENTRYPOINT is python3; the bare `alembic` console
+          # script isn't resolvable here, so invoke the module (same form as the
+          # bootstrap-admin job's `python -m ai_api.cli.create_admin`).
+          command: ["python3", "-m", "alembic", "upgrade", "head"]
 {{- end }}

@@ -282,8 +282,12 @@ def upgrade() -> None:
             ["id"],
             ondelete="RESTRICT",
         )
-        batch.drop_column("subject")
+        # Drop the index BEFORE the column it covers. On Postgres (in-place
+        # ALTER) dropping `subject` auto-drops its dependent index, so a later
+        # explicit drop_index fails "does not exist". SQLite (batch table-copy)
+        # tolerated the reverse order, which is why this only bit on Postgres.
         batch.drop_index("idx_allocation_subject")
+        batch.drop_column("subject")
         batch.create_index("idx_allocation_member", ["member_id", "created_at"])
 
 
