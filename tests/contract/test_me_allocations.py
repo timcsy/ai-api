@@ -71,6 +71,48 @@ async def test_claim_success(
     assert body["allocation"]["status"] == "active"
 
 
+# Phase 11 — member self-service pause / resume of own allocation
+@pytest.mark.asyncio
+async def test_member_pause_and_resume_own_allocation(
+    app_client: AsyncClient, admin_headers: dict[str, str], make_provider_credential
+) -> None:
+    await make_provider_credential(provider="azure", api_key="sk-az-pr")
+    await _seed_model("azure/pr-model")
+    await _login(app_client, admin_headers)
+    claim = await app_client.post(
+        "/me/allocations", headers=_csrf(app_client), json={"model": "azure/pr-model"}
+    )
+    alloc_id = claim.json()["allocation"]["id"]
+
+    # pause → paused
+    r = await app_client.post(f"/me/allocations/{alloc_id}/pause", headers=_csrf(app_client))
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "paused"
+    # resume → active
+    r = await app_client.post(f"/me/allocations/{alloc_id}/resume", headers=_csrf(app_client))
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "active"
+
+
+@pytest.mark.asyncio
+async def test_member_cannot_pause_others_allocation(
+    app_client: AsyncClient, admin_headers: dict[str, str], make_provider_credential
+) -> None:
+    await make_provider_credential(provider="azure", api_key="sk-az-pr2")
+    await _seed_model("azure/pr-model2")
+    # member A claims
+    await _login(app_client, admin_headers, email="owner@x.com")
+    claim = await app_client.post(
+        "/me/allocations", headers=_csrf(app_client), json={"model": "azure/pr-model2"}
+    )
+    alloc_id = claim.json()["allocation"]["id"]
+    # member B logs in, tries to pause A's allocation
+    await _login(app_client, admin_headers, email="intruder@x.com")
+    r = await app_client.post(f"/me/allocations/{alloc_id}/pause", headers=_csrf(app_client))
+    assert r.status_code == 403
+    assert r.json()["detail"]["error"]["code"] == "forbidden"
+
+
 @pytest.mark.asyncio
 async def test_claim_model_not_self_service(
     app_client: AsyncClient, admin_headers: dict[str, str], make_provider_credential

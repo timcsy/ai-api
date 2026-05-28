@@ -25,6 +25,8 @@ interface UsageItem {
   total_tokens: number;
   prompt_tokens: number;
   completion_tokens: number;
+  reasoning_tokens: number;
+  cached_tokens: number;
   total_cost_usd: number;
   call_count: number;
 }
@@ -175,6 +177,8 @@ export function AdminUsagePage() {
               </TableHead>
               <TableHead className="text-right">輸入 tokens</TableHead>
               <TableHead className="text-right">輸出 tokens</TableHead>
+              <TableHead className="text-right">推理 tokens</TableHead>
+              <TableHead className="text-right">快取 tokens</TableHead>
               <TableHead className="text-right">總 tokens</TableHead>
               <TableHead className="text-right">費用 (USD)</TableHead>
               <TableHead className="text-right">呼叫次數</TableHead>
@@ -186,6 +190,8 @@ export function AdminUsagePage() {
                 <TableCell className="font-medium">{it.display_name ?? it.group_key}</TableCell>
                 <TableCell className="text-right">{it.prompt_tokens.toLocaleString()}</TableCell>
                 <TableCell className="text-right">{it.completion_tokens.toLocaleString()}</TableCell>
+                <TableCell className="text-right text-muted-foreground">{it.reasoning_tokens.toLocaleString()}</TableCell>
+                <TableCell className="text-right text-muted-foreground">{it.cached_tokens.toLocaleString()}</TableCell>
                 <TableCell className="text-right">{it.total_tokens.toLocaleString()}</TableCell>
                 <TableCell className="text-right">${it.total_cost_usd.toFixed(4)}</TableCell>
                 <TableCell className="text-right">{it.call_count}</TableCell>
@@ -193,7 +199,7 @@ export function AdminUsagePage() {
             ))}
             {query.data.items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                   此區間沒有使用紀錄
                 </TableCell>
               </TableRow>

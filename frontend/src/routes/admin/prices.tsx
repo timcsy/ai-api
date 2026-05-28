@@ -145,16 +145,17 @@ export function AdminPricesPage() {
                 <TableHead className="pl-6">模型</TableHead>
                 <TableHead className="text-right">輸入 / {unitLabel}</TableHead>
                 <TableHead className="text-right">輸出 / {unitLabel}</TableHead>
+                <TableHead className="text-right">快取輸入 / {unitLabel}</TableHead>
                 <TableHead className="text-right">生效日</TableHead>
                 <TableHead className="pr-6 text-right">動作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {pricesQuery.isLoading && (
-                <TableRow><TableCell colSpan={5} className="pl-6 text-muted-foreground">載入中…</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="pl-6 text-muted-foreground">載入中…</TableCell></TableRow>
               )}
               {pricesQuery.data?.length === 0 && !pricesQuery.isLoading && (
-                <TableRow><TableCell colSpan={5} className="pl-6 py-8 text-center text-muted-foreground">catalog 沒有任何模型</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="pl-6 py-8 text-center text-muted-foreground">catalog 沒有任何模型</TableCell></TableRow>
               )}
               {pricesQuery.data?.map((row) => (
                 <React.Fragment key={row.slug}>
@@ -177,10 +178,13 @@ export function AdminPricesPage() {
                       <>
                         <TableCell className="text-right font-mono text-sm tabular-nums">${displayPrice(row.current.input_per_1k, displayUnit)}</TableCell>
                         <TableCell className="text-right font-mono text-sm tabular-nums">${displayPrice(row.current.output_per_1k, displayUnit)}</TableCell>
+                        <TableCell className="text-right font-mono text-sm tabular-nums text-muted-foreground">
+                          {row.current.cached_input_per_1k ? `$${displayPrice(row.current.cached_input_per_1k, displayUnit)}` : "—"}
+                        </TableCell>
                         <TableCell className="text-right text-xs text-muted-foreground tabular-nums">{fmtDate(row.current.effective_from)}</TableCell>
                       </>
                     ) : (
-                      <TableCell colSpan={3} className="text-right">
+                      <TableCell colSpan={4} className="text-right">
                         <Badge variant="outline" className="text-amber-700 border-amber-500">未定價</Badge>
                       </TableCell>
                     )}
@@ -201,7 +205,7 @@ export function AdminPricesPage() {
                   </TableRow>
                   {expanded === row.slug && (
                     <TableRow className="border-0">
-                      <TableCell colSpan={5} className="px-6 pb-3 pt-0">
+                      <TableCell colSpan={6} className="px-6 pb-3 pt-0">
                         <div className="rounded-md bg-muted/40 p-3">
                           <PriceHistory provider={row.provider} model={row.model} unit={displayUnit} />
                         </div>

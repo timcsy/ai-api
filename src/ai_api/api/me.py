@@ -304,6 +304,67 @@ async def rotate_my_allocation_token(
     return {"token": token.plaintext, "token_prefix": token.prefix}
 
 
+async def _own_allocation_or_error(
+    service: AllocationService, allocation_id: str, member: Member
+) -> Any:
+    allocation = await service.get(allocation_id)
+    if allocation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "not_found", "message": "allocation not found"}},
+        )
+    if allocation.member_id != member.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"error": {"code": "forbidden", "message": "not your allocation"}},
+        )
+    return allocation
+
+
+@router.post("/me/allocations/{allocation_id}/pause", dependencies=[Depends(require_csrf)])
+async def pause_my_allocation(
+    allocation_id: str,
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Reversibly pause one's own allocation (keeps the same token)."""
+    from ai_api.services.allocations import InvalidAllocationState
+
+    service = AllocationService(db)
+    await _own_allocation_or_error(service, allocation_id, member)
+    try:
+        allocation = await service.pause(allocation_id, paused_by=member.id)
+    except InvalidAllocationState as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": {"code": "invalid_state", "message": str(exc)}},
+        ) from exc
+    assert allocation is not None
+    return _alloc_public(allocation)
+
+
+@router.post("/me/allocations/{allocation_id}/resume", dependencies=[Depends(require_csrf)])
+async def resume_my_allocation(
+    allocation_id: str,
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Resume one's own paused allocation back to active (original token works)."""
+    from ai_api.services.allocations import InvalidAllocationState
+
+    service = AllocationService(db)
+    await _own_allocation_or_error(service, allocation_id, member)
+    try:
+        allocation = await service.resume(allocation_id, resumed_by=member.id)
+    except InvalidAllocationState as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": {"code": "invalid_state", "message": str(exc)}},
+        ) from exc
+    assert allocation is not None
+    return _alloc_public(allocation)
+
+
 class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str

@@ -56,6 +56,8 @@ def _serialize_items(items: list[Any]) -> list[dict[str, Any]]:
             "total_tokens": it.total_tokens,
             "prompt_tokens": it.prompt_tokens,
             "completion_tokens": it.completion_tokens,
+            "reasoning_tokens": it.reasoning_tokens,
+            "cached_tokens": it.cached_tokens,
             "total_cost_usd": float(it.total_cost_usd),
             "call_count": it.call_count,
         }
@@ -122,6 +124,8 @@ async def get_usage_csv(
             "total_tokens",
             "prompt_tokens",
             "completion_tokens",
+            "reasoning_tokens",
+            "cached_tokens",
             "total_cost_usd",
             "call_count",
         ]
@@ -139,6 +143,8 @@ async def get_usage_csv(
                 it.total_tokens,
                 it.prompt_tokens,
                 it.completion_tokens,
+                it.reasoning_tokens,
+                it.cached_tokens,
                 float(it.total_cost_usd),
                 it.call_count,
             ]

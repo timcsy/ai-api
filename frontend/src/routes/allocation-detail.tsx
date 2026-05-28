@@ -81,6 +81,23 @@ export function AllocationDetailPage() {
     },
   });
 
+  const csrf = () => document.cookie.match(/aiapi_csrf=([^;]+)/)?.[1] ?? "";
+  const pauseResumeMut = useMutation({
+    mutationFn: (action: "pause" | "resume") =>
+      api(`/me/allocations/${id}/${action}`, {
+        method: "POST",
+        headers: { "X-CSRF-Token": csrf() },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["me", "allocations"] });
+      queryClient.invalidateQueries({ queryKey: ["me", "allocation-detail", id] });
+      toast({ title: "已更新狀態" });
+    },
+    onError: (err: ApiError) => {
+      toast({ title: "操作失敗", description: err.message, variant: "destructive" });
+    },
+  });
+
   const allocQuery = useQuery<Allocation | null, ApiError>({
     // distinct key from the dashboard list ("me","allocations") — sharing it
     // made this read the cached array instead of a single allocation.
@@ -170,15 +187,36 @@ export function AllocationDetailPage() {
               <CardTitle className="text-lg">你的憑證</CardTitle>
               <CardDescription>token 僅在建立時顯示一次；系統只存雜湊</CardDescription>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-              onClick={() => setRotateConfirmOpen(true)}
-              disabled={rotateMut.isPending || alloc?.status !== "active"}
-            >
-              {rotateMut.isPending ? "產生中…" : "重新產生 token"}
-            </Button>
+            <div className="flex shrink-0 gap-2">
+              {alloc?.status === "active" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => pauseResumeMut.mutate("pause")}
+                  disabled={pauseResumeMut.isPending}
+                >
+                  {pauseResumeMut.isPending ? "處理中…" : "暫停"}
+                </Button>
+              )}
+              {alloc?.status === "paused" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => pauseResumeMut.mutate("resume")}
+                  disabled={pauseResumeMut.isPending}
+                >
+                  {pauseResumeMut.isPending ? "處理中…" : "恢復"}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRotateConfirmOpen(true)}
+                disabled={rotateMut.isPending || alloc?.status !== "active"}
+              >
+                {rotateMut.isPending ? "產生中…" : "重新產生 token"}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
