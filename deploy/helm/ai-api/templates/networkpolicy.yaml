@@ -44,5 +44,6 @@ spec:
     - from:
         - namespaceSelector: {}
       ports:
-        - { protocol: TCP, port: 8000 }
+        - { protocol: TCP, port: 8000 }   # backend (uvicorn)
+        - { protocol: TCP, port: 8080 }   # frontend (unprivileged nginx)
 {{- end }}
