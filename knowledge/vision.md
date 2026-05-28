@@ -31,15 +31,17 @@
 
 ## 現狀
 
-**2026-05-27：階段 8（部署強化 / 首位管理員 bootstrap）完成。**
-後端 364 tests + 前端 74 tests 全綠；upstream 用 `litellm` library form 支援
+**2026-05-28：階段 9（成員自助用量總覽）完成。**
+後端 375 tests + 前端 80 tests 全綠；upstream 用 `litellm` library form 支援
 4 家 provider（Azure / OpenAI / Anthropic / Gemini）；admin UI 經階段 5.1 從
 11 個入口整併為 6 個（journey-oriented）；階段 5.2 起新成員首次註冊可依 admin
 規則自動貼 tag；階段 6 起被允許的成員可對 admin 開放的 model 自助領取憑證；
 階段 7 起 admin 在 Model 區管理價目（point-in-time），會員/管理員的模型目錄與
 分配詳情皆顯示現價；階段 8 起首位管理員可經 CLI / helm Job 自動佈建，bootstrap
-token 退為 break-glass，正式環境帶預設/空 token 即拒絕啟動。ProviderCredential
-Fernet 加密落 DB，K8s Secret 提供金鑰，pod 啟動時即驗證。3b.7 Playwright E2E 仍未開。
+token 退為 break-glass，正式環境帶預設/空 token 即拒絕啟動；階段 9 起成員在
+儀表板看到自己的整體用量總覽（token / 估算花費 / 次數 + model 拆分 + 區間 +
+分配配額），嚴格只看自己。ProviderCredential Fernet 加密落 DB，K8s Secret 提供
+金鑰，pod 啟動時即驗證。3b.7 Playwright E2E 仍未開。
 
 下一步：階段 9（成員自助用量總覽）、階段 10（使用體驗打磨）。
 
@@ -128,34 +130,8 @@ Fernet 加密落 DB，K8s Secret 提供金鑰，pod 啟動時即驗證。3b.7 Pl
 ### 階段 8：部署強化 / 首位管理員 bootstrap ✅
 - [x] 完成（2026-05-27；PR #26）— `create_admin` CLI（idempotent，helm hook Job 佈建首位 admin）+ 預設/空 token 在 production 啟動防呆 + `docs/deployment.md`；bootstrap token 退為 break-glass。
 
-### 階段 9：成員自助用量總覽 ⏳（規劃中）
-- [ ] 待開
-
-> **問題**：成員目前只能在分配詳情頁逐張看「最近呼叫」與單張配額，看不到
-> 「我整體用了多少」——跨自己所有分配的 token 總量、估算花費、趨勢、各 model
-> 佔比。用量聚合（`aggregate_usage` / `/admin/usage`）目前是 admin 專屬。
-> **交付**：成員在自己的儀表板看到個人整體用量總覽（嚴格只看自己的資料）。
-> **前置條件**：階段 3a（用量聚合後端）、階段 7（價目 → 估算花費）
-> **依據**：原則「可追蹤性」的使用端透明化——資源端（admin）與使用端（成員）
-> 兩面都該看得到自己的帳。
-
-**成功標準（暫擬，可調）：**
-- [ ] 成員可在儀表板看到跨自己所有分配的彙總：總 token（prompt / completion /
-      total）、估算花費、呼叫次數
-- [ ] 可按 model／按分配拆分；可選時間區間（本月／近 N 天）
-- [ ] 花費沿用 point-in-time 價目（與 admin 計費同一套）；缺價目的 model 標
-      「未定價」而非算成 0
-- [ ] 配額視角：本月已用／配額（含 3c 池動態配額）一目了然
-- [ ] **嚴格資料隔離**：新增 `/me/usage` 以 `current_member` 限定，成員不可跨看他人
-- [ ] 複用既有 `aggregate_usage` 聚合邏輯，僅加 member-scope，不重寫
-
-**明確排除（暫擬）：**
-- ❌ 跨成員比較／排行（admin 才有意義）
-- ❌ 匯出 CSV／JSON（先看，需要再加）
-- ❌ 預算告警／超額 email 通知（YAGNI，未來可加）
-- ❌ 即時 streaming 用量（沿用既有 CallRecord 批次聚合）
-
-> **可輕量版先行**：先在儀表板頂部放「總 token + 估算花費」一行摘要，圖表/拆分留完整版。
+### 階段 9：成員自助用量總覽 ✅
+- [x] 完成（2026-05-28；後端 375 / 前端 80 全綠；PR #30）— `aggregate_usage` 加 `member_id`（admin 路徑零退化）+ `GET /me/usage`（summary + model/allocation 拆分 + 區間 + `has_unpriced`，嚴格 `current_member` 隔離）；儀表板 `<UsageSummary>` + 分配卡片「本月已用/配額」。依據原則「可追蹤性」的使用端透明化。
 
 ### 階段 10：使用體驗打磨（成員端為主）⏳（規劃中）
 - [ ] 待開
@@ -168,15 +144,15 @@ Fernet 加密落 DB，K8s Secret 提供金鑰，pod 啟動時即驗證。3b.7 Pl
 
 **更直觀 / 正確：**
 - [ ] **呼叫端點單一可信來源**：儀表板（`dashboard.tsx` 用 `window.location.origin`）
-      與「如何呼叫」範例（`ApiUsageExample` 用 `gateway_base_url`）目前給不同網址，
-      易混淆；統一為後端正規化的 gateway base URL，並修正 dev `BASE_URL`（:8000 → 實際埠）
+      與「如何呼叫」範例（`ApiUsageExample` 用 `gateway_base_url`）仍各自取值；統一為
+      後端正規化的 gateway base URL。（dev `BASE_URL` :8000 → :47822 已先修，2026-05-28）
 - [ ] **可自助領取卡片可點進模型詳情**（`dashboard.tsx`）：領取前能先看能力 / 價格 / 說明
 - [ ] **首次登入極簡引導**：空狀態加「① 領取憑證 ② 複製 ③ 貼進 Authorization」三步，
       降低 LLM 新手門檻（呼應「讓不會寫程式的人也能用」）
 
 **資訊更豐富 / 易消化：**
-- [ ] **「我的分配」卡片帶用量 + 價格**（`dashboard.tsx`）：卡面直接顯示本月已用 / 配額
-      （進度條）+ 現價，不必逐張點開
+- [x] ~~**「我的分配」卡片帶用量**~~：本月已用 / 配額 + 進度條已於階段 9（PR #30）完成；
+      尚缺卡面直接顯示**現價**（不必逐張點開）
 - [ ] 卡片以 `display_name` 為主、slug 為輔（比照「可自助領取」卡片），不再只給技術 slug
 
 **一致性 / polish：**
