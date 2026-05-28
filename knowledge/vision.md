@@ -31,8 +31,8 @@
 
 ## 現狀
 
-**2026-05-28：階段 9（成員自助用量總覽）完成。**
-後端 375 tests + 前端 80 tests 全綠；upstream 用 `litellm` library form 支援
+**2026-05-28：階段 9（成員自助用量總覽）+ 階段 019（憑證暫停/恢復）完成。**
+後端 383 tests + 前端 83 tests 全綠；upstream 用 `litellm` library form 支援
 4 家 provider（Azure / OpenAI / Anthropic / Gemini）；admin UI 經階段 5.1 從
 11 個入口整併為 6 個（journey-oriented）；階段 5.2 起新成員首次註冊可依 admin
 規則自動貼 tag；階段 6 起被允許的成員可對 admin 開放的 model 自助領取憑證；
