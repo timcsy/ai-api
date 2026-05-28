@@ -15,8 +15,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
+import { UsageSummary } from "@/components/usage-summary";
 import { useAuth } from "@/contexts/auth";
 import { ApiError, api } from "@/lib/api-client";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -30,6 +32,11 @@ interface Allocation {
   created_at: string;
   revoked_at: string | null;
   token_prefix: string;
+  quota_tokens_per_month?: number | null;
+}
+
+interface UsageByAlloc {
+  breakdown?: { group_key: string; total_tokens: number }[];
 }
 
 interface ClaimableModel {
@@ -52,6 +59,18 @@ export function DashboardPage() {
     queryKey: ["me", "allocations"],
     queryFn: () => api<Allocation[]>("/me/allocations"),
   });
+
+  // This-month usage per allocation, for the quota view on each card. Degrades
+  // quietly (empty map) on error — quota line just falls back to "—".
+  const usageByAlloc = useQuery<UsageByAlloc, ApiError>({
+    queryKey: ["me", "usage", "by-allocation"],
+    queryFn: () => api<UsageByAlloc>("/me/usage?group_by=allocation"),
+  });
+  const usedByAlloc = React.useMemo(() => {
+    const m = new Map<string, number>();
+    for (const b of usageByAlloc.data?.breakdown ?? []) m.set(b.group_key, b.total_tokens);
+    return m;
+  }, [usageByAlloc.data]);
 
   const claimableQuery = useQuery<ClaimableModel[], ApiError>({
     queryKey: ["me", "claimable-models"],
@@ -114,6 +133,10 @@ export function DashboardPage() {
             請進入單筆分配後點「重新產生 token」（舊 token 立即失效）。
           </AlertDescription>
         </Alert>
+      </section>
+
+      <section>
+        <UsageSummary />
       </section>
 
       {(claimableQuery.data?.length ?? 0) > 0 && (
@@ -206,8 +229,22 @@ export function DashboardPage() {
                     {a.token_prefix}…
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="text-xs text-muted-foreground">
-                  建立於 {new Date(a.created_at).toLocaleString("zh-TW")}
+                <CardContent className="space-y-2 text-xs text-muted-foreground">
+                  {a.status === "active" && (
+                    a.quota_tokens_per_month != null ? (
+                      <div className="space-y-1">
+                        <div className="text-foreground">
+                          本月已用 {(usedByAlloc.get(a.id) ?? 0).toLocaleString()} / {a.quota_tokens_per_month.toLocaleString()}
+                        </div>
+                        <Progress
+                          value={Math.min(100, Math.round(((usedByAlloc.get(a.id) ?? 0) / a.quota_tokens_per_month) * 100))}
+                        />
+                      </div>
+                    ) : (
+                      <div>配額：無上限</div>
+                    )
+                  )}
+                  <div>建立於 {new Date(a.created_at).toLocaleString("zh-TW")}</div>
                 </CardContent>
               </Card>
             </Link>
