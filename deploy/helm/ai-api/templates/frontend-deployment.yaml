@@ -52,6 +52,10 @@ spec:
               mountPath: /var/run
             - name: tmp
               mountPath: /tmp
+            # nginx entrypoint envsubst's the template into here at start; needs
+            # to be writable under readOnlyRootFilesystem.
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d
           livenessProbe:
             httpGet:
               path: /
@@ -72,5 +76,7 @@ spec:
         - name: nginx-run
           emptyDir: {}
         - name: tmp
+          emptyDir: {}
+        - name: nginx-conf
           emptyDir: {}
 {{- end }}
