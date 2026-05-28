@@ -31,8 +31,8 @@
 
 ## 現狀
 
-**2026-05-28：階段 9（成員自助用量總覽）+ 階段 019（憑證暫停/恢復）完成。**
-後端 383 tests + 前端 83 tests 全綠；upstream 用 `litellm` library form 支援
+**2026-05-28：階段 10（使用體驗打磨）完成——含階段 9 用量總覽、階段 019 暫停/恢復。**
+後端 385 tests + 前端 96 tests 全綠；upstream 用 `litellm` library form 支援
 4 家 provider（Azure / OpenAI / Anthropic / Gemini）；admin UI 經階段 5.1 從
 11 個入口整併為 6 個（journey-oriented）；階段 5.2 起新成員首次註冊可依 admin
 規則自動貼 tag；階段 6 起被允許的成員可對 admin 開放的 model 自助領取憑證；
@@ -41,8 +41,9 @@
 token 退為 break-glass，正式環境帶預設/空 token 即拒絕啟動；階段 9 起成員在
 儀表板看到自己的整體用量總覽（token / 估算花費 / 次數 + model 拆分 + 區間 +
 分配配額），嚴格只看自己；admin 另可**暫停/恢復**一把憑證（可逆、保留 token，非配額=0；
-階段 019 / PR #34）。ProviderCredential Fernet 加密落 DB，K8s Secret 提供
-金鑰，pod 啟動時即驗證。3b.7 Playwright E2E 仍未開。
+階段 019 / PR #34）；階段 10 把成員儀表板打磨到「好懂」（卡片顯示模型名稱+現價、可自助領取
+卡片可點進詳情、新成員三步引導、呼叫端點單一來源、admin 配額改站內對話框）。ProviderCredential
+Fernet 加密落 DB，K8s Secret 提供金鑰，pod 啟動時即驗證。3b.7 Playwright E2E 仍未開（暫緩）。
 
 下一步：階段 10（使用體驗打磨）、3b.7（Playwright E2E）。
 
@@ -134,38 +135,8 @@ token 退為 break-glass，正式環境帶預設/空 token 即拒絕啟動；階
 ### 階段 9：成員自助用量總覽 ✅
 - [x] 完成（2026-05-28；後端 375 / 前端 80 全綠；PR #30）— `aggregate_usage` 加 `member_id`（admin 路徑零退化）+ `GET /me/usage`（summary + model/allocation 拆分 + 區間 + `has_unpriced`，嚴格 `current_member` 隔離）；儀表板 `<UsageSummary>` + 分配卡片「本月已用/配額」。依據原則「可追蹤性」的使用端透明化。
 
-### 階段 10：使用體驗打磨（成員端為主）⏳（規劃中）
-- [ ] 待開
+### 階段 10：使用體驗打磨（成員端為主）✅
+- [x] 完成（2026-05-28；PR #30/#34/#37/#38）— 分配卡片顯示 display_name + 現價 + 本月已用/配額；可自助領取卡片可點進詳情；新成員三步上手引導；呼叫端點單一來源 `apiBaseUrl()`；admin 配額改 shadcn Dialog；token 文案涵蓋自助；admin 可暫停/恢復憑證（階段 019）。dev `BASE_URL` 修正。細節見 `history/completed-phases-detail.md`。
 
-> **問題**：本機真實使用者實測（2026-05-27）走通後，盤點出數處摩擦——端點顯示
-> 不一致、資訊要逐張點開才看得到、新手缺引導、admin 局部用瀏覽器原生對話框。
-> 多為把既有流程做得更直觀、資訊更易消化的打磨；另含一個小能力缺口：admin 想
-> **臨時暫停一把憑證再恢復**（非用限額），目前無乾淨做法。
-> **交付**：一批成員端為主的 UX 打磨 + 憑證暫停/恢復。
-> **前置條件**：階段 6（自助領取）、階段 7（價目顯示）
-
-**更直觀 / 正確：**
-- [ ] **呼叫端點單一可信來源**：儀表板（`dashboard.tsx` 用 `window.location.origin`）
-      與「如何呼叫」範例（`ApiUsageExample` 用 `gateway_base_url`）仍各自取值；統一為
-      後端正規化的 gateway base URL。（dev `BASE_URL` :8000 → :47822 已先修，2026-05-28）
-- [ ] **可自助領取卡片可點進模型詳情**（`dashboard.tsx`）：領取前能先看能力 / 價格 / 說明
-- [ ] **首次登入極簡引導**：空狀態加「① 領取憑證 ② 複製 ③ 貼進 Authorization」三步，
-      降低 LLM 新手門檻（呼應「讓不會寫程式的人也能用」）
-
-**資訊更豐富 / 易消化：**
-- [x] ~~**「我的分配」卡片帶用量**~~：本月已用 / 配額 + 進度條已於階段 9（PR #30）完成；
-      尚缺卡面直接顯示**現價**（不必逐張點開）
-- [ ] 卡片以 `display_name` 為主、slug 為輔（比照「可自助領取」卡片），不再只給技術 slug
-
-**一致性 / polish：**
-- [ ] **admin 調整配額改用 shadcn Dialog**（`admin/allocations.tsx` 現用原生
-      `prompt()`/`confirm()`）：風格一致、可驗證輸入、可加單位提示
-- [ ] token 提示文案補上自助情境（`dashboard.tsx` 現文案偏 admin 視角）
-
-**新能力：憑證暫停 / 恢復（管理員）：**
-- [x] ✅ 已於**階段 019**（PR #34）完成 — `paused` 狀態 + `pause()`/`resume()`（只切 status、保留 token、不建 reclaim lock；可逆，與 revoke 終局有別）、proxy 回 `allocation_paused`、admin UI 暫停/恢復鈕。三 enum 皆 `native_enum=False`，無 migration。細節見 `history/completed-phases-detail.md`。
-
-**明確排除（暫擬）：**
-- ❌ 全面視覺改版 / 換 design system（只在既有 shadcn 內打磨）
-- ❌ 成員端用量總覽（屬階段 9，不重複）
-- ❌ 排程自動暫停 / 恢復（首版手動，未來可加）
+### 待辦：3b.7 Playwright E2E ⏳
+- [ ] 唯一未完成的舊子階段（端到端瀏覽器測試 + final polish）；獨立 test-infra，與 UX 打磨性質不同，暫緩。
