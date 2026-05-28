@@ -119,6 +119,14 @@ export function AdminAllocationsPage() {
       toast({ title: "已撤回" });
     },
   });
+  const pauseResumeMut = useMutation<unknown, ApiError, { id: string; action: "pause" | "resume" }>({
+    mutationFn: ({ id, action }) => api(`/admin/allocations/${id}/${action}`, { method: "POST" }),
+    onSuccess: (_d, { action }) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "allocations"] });
+      toast({ title: action === "pause" ? "已暫停" : "已恢復" });
+    },
+    onError: (e) => toast({ title: "操作失敗", description: e.message, variant: "destructive" }),
+  });
 
   const locksQuery = useQuery<ReclaimLock[], ApiError>({
     queryKey: ["admin", "self-service-locks"],
@@ -216,7 +224,7 @@ export function AdminAllocationsPage() {
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" aria-label="操作">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -248,13 +256,27 @@ export function AdminAllocationsPage() {
                       >
                         切換服務型
                       </DropdownMenuItem>
+                      {a.status === "active" && (
+                        <DropdownMenuItem
+                          onClick={() => pauseResumeMut.mutate({ id: a.id, action: "pause" })}
+                        >
+                          暫停（可恢復、保留 token）
+                        </DropdownMenuItem>
+                      )}
+                      {a.status === "paused" && (
+                        <DropdownMenuItem
+                          onClick={() => pauseResumeMut.mutate({ id: a.id, action: "resume" })}
+                        >
+                          恢復
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem
                         className="text-destructive"
                         onClick={() => {
-                          if (confirm(`撤回 ${a.token_prefix}… ？`)) revokeMut.mutate(a.id);
+                          if (confirm(`撤回 ${a.token_prefix}… ？此為終局，token 將失效。`)) revokeMut.mutate(a.id);
                         }}
                       >
-                        撤回
+                        撤回（終局）
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

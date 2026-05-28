@@ -28,6 +28,7 @@ class CallOutcome(enum.StrEnum):
     rejected_model_mismatch = "rejected_model_mismatch"
     rejected_provider = "rejected_provider"
     rejected_quarantined = "rejected_quarantined"
+    rejected_paused = "rejected_paused"
     rejected_quota_exceeded = "rejected_quota_exceeded"
     upstream_error = "upstream_error"
     gateway_error = "gateway_error"

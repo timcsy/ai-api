@@ -55,6 +55,9 @@ class AuditEventType(enum.StrEnum):
     self_service_unlocked = "self_service_unlocked"
     # Phase 7: price list admin
     price_version_added = "price_version_added"
+    # Phase 019: allocation pause/resume (reversible, token-preserving)
+    allocation_paused = "allocation_paused"
+    allocation_resumed = "allocation_resumed"
 
 
 class ActorType(enum.StrEnum):

@@ -25,6 +25,16 @@ from ai_api.models import (
 from ai_api.services.credentials import GeneratedToken, fingerprint_for, generate_token
 
 
+class InvalidAllocationState(Exception):
+    """Raised when a state transition (pause/resume) is attempted from an
+    incompatible status. Carries the current status for a clear 409 message."""
+
+    def __init__(self, current: AllocationStatus, action: str) -> None:
+        self.current = current
+        self.action = action
+        super().__init__(f"allocation is {current.value}, cannot {action}")
+
+
 @dataclass(frozen=True)
 class AllocationCreated:
     allocation: Allocation
@@ -126,6 +136,48 @@ class AllocationService:
             # re-claiming this model until an admin unlocks.
             if allocation.origin == AllocationOrigin.self_service:
                 await self._lock_reclaim(allocation, revoked_by=revoked_by)
+        return allocation
+
+    async def pause(self, allocation_id: str, *, paused_by: str | None = None) -> Allocation | None:
+        """Reversibly pause an active allocation. Status-only — token, quota and
+        reclaim locks are untouched (the key difference from revoke). Returns
+        None if not found; raises InvalidAllocationState if not active."""
+        allocation = await self.get(allocation_id)
+        if allocation is None:
+            return None
+        if allocation.status != AllocationStatus.active:
+            raise InvalidAllocationState(allocation.status, "pause")
+        allocation.status = AllocationStatus.paused
+        await self._s.flush()
+        await audit_record(
+            self._s,
+            event_type=AuditEventType.allocation_paused,
+            actor_type=ActorType.admin,
+            actor_id=paused_by,
+            target_type="allocation",
+            target_id=allocation.id,
+        )
+        return allocation
+
+    async def resume(self, allocation_id: str, *, resumed_by: str | None = None) -> Allocation | None:
+        """Resume a paused allocation back to active. The original token works
+        again immediately. Returns None if not found; raises
+        InvalidAllocationState if not paused."""
+        allocation = await self.get(allocation_id)
+        if allocation is None:
+            return None
+        if allocation.status != AllocationStatus.paused:
+            raise InvalidAllocationState(allocation.status, "resume")
+        allocation.status = AllocationStatus.active
+        await self._s.flush()
+        await audit_record(
+            self._s,
+            event_type=AuditEventType.allocation_resumed,
+            actor_type=ActorType.admin,
+            actor_id=resumed_by,
+            target_type="allocation",
+            target_id=allocation.id,
+        )
         return allocation
 
     async def _lock_reclaim(self, allocation: Allocation, *, revoked_by: str | None) -> None:
