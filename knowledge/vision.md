@@ -83,9 +83,9 @@ Fernet 加密落 DB，K8s Secret 提供金鑰，pod 啟動時即驗證。3b.7 Pl
 
 ## 路線圖
 
-> 已完成階段（1–8）只列標題、完成標記與「交付」一句；**細部成功標準 / 核心原則 /
+> 已完成階段只列標題、完成標記與「交付」一句；**細部成功標準 / 核心原則 /
 > 明確排除已封存於 [`knowledge/history/completed-phases-detail.md`](history/completed-phases-detail.md)**。
-> 規劃中 / 未完成的階段（3b.7、9、10）保留完整細節於下方。
+> 唯一未完成項為 **3b.7 Playwright E2E**（見階段 3b）。
 
 ### 階段 1：分流核心可運作 ✅
 - [x] 完成（2026-05-21；本機 + k3s-tew 叢集全 SC 達標）— 自製 gateway 可代理 Azure OpenAI、可發行可撤回的憑證。
@@ -138,5 +138,4 @@ Fernet 加密落 DB，K8s Secret 提供金鑰，pod 啟動時即驗證。3b.7 Pl
 ### 階段 10：使用體驗打磨（成員端為主）✅
 - [x] 完成（2026-05-28；PR #30/#34/#37/#38）— 分配卡片顯示 display_name + 現價 + 本月已用/配額；可自助領取卡片可點進詳情；新成員三步上手引導；呼叫端點單一來源 `apiBaseUrl()`；admin 配額改 shadcn Dialog；token 文案涵蓋自助；admin 可暫停/恢復憑證（階段 019）。dev `BASE_URL` 修正。細節見 `history/completed-phases-detail.md`。
 
-### 待辦：3b.7 Playwright E2E ⏳
-- [ ] 唯一未完成的舊子階段（端到端瀏覽器測試 + final polish）；獨立 test-infra，與 UX 打磨性質不同，暫緩。
+> **唯一未完成項**：3b.7 Playwright E2E（見上方階段 3b）——獨立 test-infra，暫緩。
