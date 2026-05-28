@@ -22,6 +22,8 @@ interface UsageResp {
     total_tokens: number;
     prompt_tokens: number;
     completion_tokens: number;
+    reasoning_tokens: number;
+    cached_tokens: number;
     total_cost_usd: number;
     call_count: number;
     has_unpriced: boolean;
@@ -84,6 +86,12 @@ export function UsageSummary() {
               <Stat label="估算花費" value={money(s.total_cost_usd)} />
               <Stat label="呼叫次數" value={s.call_count.toLocaleString()} />
             </div>
+            {(s.reasoning_tokens > 0 || s.cached_tokens > 0) && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                其中 推理 {s.reasoning_tokens.toLocaleString()} tokens
+                ・快取輸入 {s.cached_tokens.toLocaleString()} tokens（折扣計費）
+              </p>
+            )}
             {s.has_unpriced && (
               <p className="mt-2 text-xs text-amber-700">⚠ 含未定價項目，花費為低估</p>
             )}

@@ -19,6 +19,10 @@
 - **存取規則以 Tag 為主**：admin 為 member 打 tag（組織 / 角色 / 試用群 ...），
   每個 model 設定允許 / 禁止的 tag；改規則 = 改 tag，不必逐一指定
 - 開發者透過分配到的憑證直接呼叫 API
+- **主流 agent 工具開箱即用**：以 OpenAI Responses API（業界正在收斂的事實
+  入口標準）對外開放，讓 OpenAI Codex 等 agent CLI 只要把 base URL 指向本平台、
+  填入分配到的憑證即可使用——成員不必各自申請 OpenAI 帳號，用量／成本仍統一
+  歸戶到平台。背後仍走多 provider 抽象（OpenAI/Azure 原生高保真，其他家自動橋接）
 - 不會寫程式的成員透過外部的「行政輔助服務」間接享受 AI——這些服務以
   管理員授予的高額度憑證呼叫本平台
 - 認證以彈性為本：Google Workspace SSO 最方便，但管理員也可以用白名單、
@@ -45,7 +49,7 @@ token 退為 break-glass，正式環境帶預設/空 token 即拒絕啟動；階
 卡片可點進詳情、新成員三步引導、呼叫端點單一來源、admin 配額改站內對話框）。ProviderCredential
 Fernet 加密落 DB，K8s Secret 提供金鑰，pod 啟動時即驗證。3b.7 Playwright E2E 仍未開（暫緩）。
 
-下一步：階段 10（使用體驗打磨）、3b.7（Playwright E2E）。
+下一步：**階段 11（Responses API / Agent 工具相容）**、3b.7（Playwright E2E）。
 
 ## 架構
 
@@ -57,6 +61,18 @@ Fernet 加密落 DB，K8s Secret 提供金鑰，pod 啟動時即驗證。3b.7 Pl
   顯示 fingerprint
 - **路由**：`model_catalog.provider` 指明每個 model 走哪家；呼叫時依 model
   查 catalog → 取對應 `ProviderCredential` → 經 litellm 發送
+- **對外 API 介面**：OpenAI 相容端點共用同一條前置 pipeline（憑證 / 分配 /
+  狀態 / 配額 / model binding / 存取政策 / 計費記錄）——
+  - `/v1/chat/completions`（既有，非串流）
+  - `/v1/responses`（agent 工具如 Codex 需要；**支援 SSE streaming、tool calls、
+    server-side 對話狀態**）。路由**統一經 litellm `aresponses`**：
+    - **OpenAI / Azure**：litellm 直呼原生 responses，加密 reasoning 跨輪 replay
+      等專屬語意高保真
+    - **Anthropic / Gemini 等**：litellm 自動橋接（含 streaming）；OpenAI 專屬語意
+      為協定物理限制而等效降級，基本對話／工具呼叫完整可用
+  - **對話狀態**：支援 `store=true` 與 `previous_response_id`——gateway 端持久化
+    response 供跨輪鏈接（含 TTL／清理），服務不自帶 context 的 client；Codex 走
+    `store=false` 自帶 context 則不經此路徑
 - **部署**：以 Kubernetes 為部署目標；資源以宣告式（Helm chart 或 Kustomize）
   管理。本機開發走輕量路線（直接執行 uvicorn + Vite），不要求本機跑 K8s。
 - **相依套件追蹤**：以 Renovate / Dependabot 自動監看 `litellm`、`openai`
@@ -138,4 +154,58 @@ Fernet 加密落 DB，K8s Secret 提供金鑰，pod 啟動時即驗證。3b.7 Pl
 ### 階段 10：使用體驗打磨（成員端為主）✅
 - [x] 完成（2026-05-28；PR #30/#34/#37/#38）— 分配卡片顯示 display_name + 現價 + 本月已用/配額；可自助領取卡片可點進詳情；新成員三步上手引導；呼叫端點單一來源 `apiBaseUrl()`；admin 配額改 shadcn Dialog；token 文案涵蓋自助；admin 可暫停/恢復憑證（階段 019）。dev `BASE_URL` 修正。細節見 `history/completed-phases-detail.md`。
 
-> **唯一未完成項**：3b.7 Playwright E2E（見上方階段 3b）——獨立 test-infra，暫緩。
+### 階段 11：Responses API / Agent 工具（Codex）相容 ⏳（後端完成，待真機驗證）
+
+**動機**：延伸「單一入口」到主流 agent 開發工具。OpenAI Codex 等 CLI 預設講
+Responses API（`wire_api = "responses"`），且全程依賴 SSE streaming。支援後，
+組織開發者可把 Codex 的 base URL 指向本平台、填入分配憑證即用，用量與成本
+照常統一歸戶——不必各自申請 OpenAI 帳號。**第一版即交付完整能力，不留半成品。**
+
+**成功標準**：
+- Codex CLI 指向 `https://<平台>/v1` + 平台憑證後，能完成含工具呼叫的多輪
+  agent 任務（含 reasoning model 的加密 reasoning 跨輪 replay）；該次用量
+  **精確**歸戶並計費（reasoning / cached token 分項可見）。
+- 所有已上架 provider（Azure / OpenAI / Anthropic / Gemini）皆可經 `/v1/responses`
+  呼叫（OpenAI-family 全保真，其他家 litellm 橋接，進階語意等效降級）。
+- 用 `store=true` 的第三方 client 能以 `previous_response_id` 跨輪鏈接。
+
+**核心設計**（plan R1 精煉後實作）：
+- **統一 litellm 路由**：所有 provider 走 `litellm.aresponses()`——OpenAI/Azure 原生
+  高保真（等同 pass-through）、其他家自動橋接（含 streaming）。實測 `aresponses` 已涵蓋
+  完整 Responses 介面（`include`/`reasoning`/`store`/`previous_response_id`），故不需
+  另寫 raw pass-through（YAGNI）；保留為 fallback 若真機發現失真
+- 與 `/chat/completions` **共用** `proxy/preflight.py` 前置 pipeline，auth／配額／計費不複製
+
+**Checklist**：
+
+*基礎 / 路由*
+- [x] 抽出共用 pre-flight pipeline（bearer / allocation / 狀態 / 配額 / model binding / access），`/chat/completions` 一併改用
+- [x] `POST /v1/responses` 端點：請求驗證（`input` / `instructions` / `tools` / `reasoning` / `include` …）+ 套用共用 pipeline
+- [x] OpenAI/Azure 高保真（經 litellm 原生 responses；保留 encrypted reasoning / tool calls 等透傳）
+- [x] 其他 provider 經 `upstream.aresponses()` litellm 橋接（`stream=True`）
+- [x] catalog `capabilities: ["responses"]` 路由 gate——標記哪些 model 開放 responses
+
+*Streaming*
+- [x] **SSE streaming 串流轉發**（FastAPI `StreamingResponse`）：完整 SSE 事件序列（`response.output_text.delta` / `function_call_arguments.*` / `output_item.done` / `response.completed` …）
+- [x] 串流時 tee `response.completed` 事件取 usage；串流結束 / client 斷線兩路徑都 `record_call`
+- [x] nginx / ingress **SSE 不緩衝**驗證（`proxy_buffering off`；實測過往 Codex+proxy 常踩 SSE 502/timeout）
+
+*精確計費（需 migration）*
+- [x] `CallRecord` 加 `reasoning_tokens`、`cached_tokens` 欄位（Alembic migration）
+- [x] 價目表加 cached input 折扣價；`calculate_cost` 納入 reasoning（含於 output）與 cached（折扣）
+- [x] usage 對應：`input_tokens→prompt`、`output_tokens→completion`、`output_tokens_details.reasoning_tokens`、`input_tokens_details.cached_tokens` 分項落帳
+
+*Server-side 對話狀態*
+- [x] `store=true` 持久化：新表存 response payload（`response_id` / `allocation_id` / payload / `created_at` / `expires_at`），含 TTL 與清理
+- [x] `previous_response_id` 跨輪鏈接 + 嚴格歸屬檢查（只能鏈接自己分配的 response）
+
+*驗證*
+- [ ] Codex **真機驗證**（`config.toml`：`base_url` + `wire_api=responses` + `env_key` 帶平台憑證；多輪 + 工具 + reasoning）
+- [x] 多 provider responses 驗證（Azure pass-through、Anthropic/Gemini 橋接）
+- [x] 測試：契約 + 計費正確性（reasoning/cached 分項）+ SSE mock 上游 + 斷線處理 + store/previous_response_id 鏈接與歸屬隔離
+
+**明確排除**：
+- 非 OpenAI provider 模擬 OpenAI 專屬語意（加密 reasoning replay）的**完全對等**
+  ——屬協定物理限制，等效降級可接受（基本對話／工具呼叫仍完整）
+
+> **未完成項**：階段 11（Responses API / Agent 工具相容，規劃中）、3b.7 Playwright E2E（獨立 test-infra，暫緩）。

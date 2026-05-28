@@ -11,7 +11,7 @@ models:
       OpenAI 雲端版 GPT-4o；與 Azure 部署同模型族，計費走 OpenAI 帳號。
     modality_input: [text, image]
     modality_output: [text]
-    capabilities: [chat, vision, function-calling, json-mode, tool-use, streaming]
+    capabilities: [chat, vision, function-calling, json-mode, tool-use, streaming, responses]
     context_window: 128000
     cost_tier: high
     recommended_for: [chat, agent, code]

@@ -1,0 +1,35 @@
+{{- if .Values.storedResponseCleanup.enabled -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "ai-api.fullname" . }}-stored-responses-cleanup
+  labels:
+    {{- include "ai-api.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.storedResponseCleanup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            {{- include "ai-api.selectorLabels" . | nindent 12 }}
+            job: stored-responses-cleanup
+        spec:
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          restartPolicy: Never
+          containers:
+            - name: stored-responses-cleanup
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              envFrom:
+                - secretRef:
+                    name: {{ include "ai-api.fullname" . }}-secrets
+              command: ["python3", "-m", "ai_api.cli.cleanup_stored_responses"]
+{{- end }}

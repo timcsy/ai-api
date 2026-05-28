@@ -30,6 +30,10 @@ class CallOutcome(enum.StrEnum):
     rejected_quarantined = "rejected_quarantined"
     rejected_paused = "rejected_paused"
     rejected_quota_exceeded = "rejected_quota_exceeded"
+    rejected_model_forbidden = "rejected_model_forbidden"
+    rejected_model_unsupported = "rejected_model_unsupported"
+    rejected_response_forbidden = "rejected_response_forbidden"
+    rejected_response_not_found = "rejected_response_not_found"
     upstream_error = "upstream_error"
     gateway_error = "gateway_error"
 
@@ -53,6 +57,11 @@ class CallRecord(Base):
     prompt_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     completion_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Phase 11: Responses API token breakdown. reasoning_tokens is a subset of
+    # completion/output tokens (kept for analytics; not double-counted in billing).
+    # cached_tokens is a subset of prompt/input tokens (billed at a discount).
+    reasoning_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cached_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Phase 3a: point-in-time cost. NULL when no PriceList match was found.
     cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)

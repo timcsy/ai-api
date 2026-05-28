@@ -73,6 +73,36 @@ async def test_me_usage_summary(app_client: AsyncClient, admin_headers) -> None:
     assert s["has_unpriced"] is False
 
 
+# Phase 11 — summary surfaces reasoning/cached token breakdown
+@pytest.mark.asyncio
+async def test_me_usage_summary_includes_reasoning_cached(
+    app_client: AsyncClient, admin_headers
+) -> None:
+    mid = await _login(app_client, admin_headers, "rc@x.com")
+    sm = get_sessionmaker()
+    async with sm() as s:
+        alloc_id = str(ULID())
+        s.add(Allocation(
+            id=alloc_id, member_id=mid, subject_snapshot="azure/gpt-5",
+            resource_model="azure/gpt-5", status=AllocationStatus.active, created_at=NOW,
+            revoked_at=None, created_by="test", note=None, quota_tokens_per_month=None,
+            is_service_allocation=False, quota_locked=False, origin=AllocationOrigin.admin,
+        ))
+        s.add(CallRecord(
+            id=str(ULID()), request_id=str(ULID()), allocation_id=alloc_id,
+            subject="azure/gpt-5", model="azure/gpt-5", started_at=NOW, finished_at=NOW,
+            status_code=200, outcome=CallOutcome.success,
+            prompt_tokens=100, completion_tokens=200, total_tokens=300,
+            reasoning_tokens=60, cached_tokens=40, cost_usd=None, error_message=None,
+        ))
+        await s.commit()
+    r = await app_client.get("/me/usage")
+    assert r.status_code == 200
+    summ = r.json()["summary"]
+    assert summ["reasoning_tokens"] == 60
+    assert summ["cached_tokens"] == 40
+
+
 @pytest.mark.asyncio
 async def test_me_usage_empty_is_zero(app_client: AsyncClient, admin_headers) -> None:
     await _login(app_client, admin_headers, "empty@x.com")

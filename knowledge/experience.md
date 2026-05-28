@@ -303,3 +303,51 @@
   error 時，第一個檢查點就是 `docker info` 是否回應。
 - **來源**：`tests/contract/test_me_usage.py`（in-memory）、`tests/integration/test_usage_member_scope.py`
   （temp-file SQLite）；階段 9 / PR #30
+
+### 採用前先驗證 SDK 的能力邊界，別憑印象決定「自寫 vs 套件」
+
+- **理論說**：要支援 Codex 的 Responses API（加密 reasoning、store、完整 SSE 事件），
+  litellm 這種抽象層八成會 normalize 掉進階欄位，所以「保險起見」要對 OpenAI/Azure 自寫
+  raw pass-through，其他 provider 才走 litellm——一個混合雙路徑架構。
+- **實際發生**：plan 階段實測 `inspect.signature(litellm.aresponses)`，發現它的參數已涵蓋
+  完整 Responses 介面（`include`/`reasoning`/`store`/`previous_response_id`/`extra_headers`…）。
+  「litellm 會閹割進階欄位」純屬臆測。混合雙路徑會憑空多一條 raw code path（正中「同一概念
+  兩份必 drift」），且與既有 litellm 架構不一致。
+- **解決方式**：統一走 `litellm.aresponses`——OpenAI/Azure 原生高保真、其他家自動橋接。
+  把 raw pass-through 降為「真機驗證若發現失真才啟用」的 fallback，而非預設。spec 的
+  Assumptions 與 plan R1 明文記錄此抉擇。
+- **教訓**：呼應「build vs adopt 評估要在 specify 之前做」——但更進一步：決策前先用 5 分鐘
+  `inspect.signature` / 讀 SDK 源碼**驗證**能力邊界，別用「抽象層大概會失真」的臆測去論證
+  自寫。臆測導向的「保險」往往是 YAGNI 違反。真正的不確定（litellm 對 Codex 串流是否
+  逐欄保真）用真機驗證收尾，不用預先自寫整條替代路徑。
+- **來源**：`src/ai_api/proxy/{responses,upstream,preflight}.py`、`specs/021-responses-api/research.md` R1；階段 11
+
+### proxy 存取政策要求「該 provider 有 active ProviderCredential」，env fallback 不算
+
+- **理論說**：Azure 有 env key fallback（`AZURE_OPENAI_API_KEY`），所以 proxy 對 Azure 模型
+  一定走得通；測試只要 seed catalog + allocation 即可打 `/v1/responses`。
+- **實際發生**：`/v1/responses` 測試一直回 `model_forbidden`。追下去發現
+  `ModelAccessService.is_accessible` 第一關是 `get_providers_with_active_credentials()`，
+  它只查 `provider_credentials` 表、**不認 env fallback**。env key 能讓「upstream 呼叫」成功，
+  卻不能讓「存取政策」放行。既有 `/chat/completions` 測試沒踩到，只因它們不 seed catalog
+  → `model_row is None` → 整個存取檢查被跳過。
+- **解決方式**：凡是需要 catalog row 的 proxy 測試（responses 因 capability gate 必須 seed
+  catalog），一律也 seed 一筆該 provider 的 ProviderCredential（經 `/admin/providers`）。
+- **教訓**：「能呼叫上游」≠「通過存取政策」——兩者的 credential 來源不同（env fallback vs
+  DB ProviderCredential）。新增任何「先查 catalog 再做存取判斷」的端點時，測試的前置資料要
+  同時備齊 catalog **與** provider credential，否則會被 `model_forbidden` 誤導去查錯方向。
+- **來源**：`src/ai_api/services/model_access.py` `is_accessible`；`tests/contract/test_responses*.py`；階段 11
+
+### Responses streaming 的 usage 只在終局事件，計費要在 generator 的 finally 收尾
+
+- **理論說**：串流轉發就是把上游 SSE 逐塊 yield 給 client 即可。
+- **實際發生**：Responses 的 token usage 只出現在最後的 `response.completed` 事件；若只顧
+  轉發、不攔截終局事件，就沒有 usage 可計費。且 client 中途斷線時 generator 會被取消，
+  若記帳寫在迴圈正常結束後，斷線就完全漏記（違反 FR-017）。
+- **解決方式**：在轉發迴圈中 tee `response.completed` 的 `response.usage` 與 `id`；把
+  `record_call` 放進 generator 的 `finally`，確保正常結束與斷線兩條路徑都記帳（斷線時
+  usage 可能為 None，仍記一筆）。`get_db_session` 在 StreamingResponse 完成後才 commit，
+  所以 finally 內的 flush 會被正常提交。
+- **教訓**：串流端點的「計費／稽核」是 generator 生命週期的一部分，不是迴圈後的收尾語句。
+  任何「邊串流邊要取末尾 metadata」的場景，attribute 擷取放迴圈、persist 放 `finally`。
+- **來源**：`src/ai_api/proxy/responses.py` `event_gen`；`tests/contract/test_responses_stream.py`；階段 11
