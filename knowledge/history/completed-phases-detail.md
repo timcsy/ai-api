@@ -288,3 +288,19 @@
 **明確排除：**
 - ❌ 跨成員比較／排行（admin 才有意義）
 - ❌ 匯出 CSV／JSON、預算告警／超額通知、即時 streaming 用量（YAGNI / 沿用批次聚合）
+
+## 階段 019：憑證暫停 / 恢復（屬階段 10 的新能力）
+
+完成（2026-05-28；後端 383 / 前端 83 全綠；PR #34）。
+動機：admin 想臨時關閉一把（無限額）憑證、之後原樣恢復，而非配額=0；現有 active / revoked（終局換 token）/ quarantined（僅自動）湊不出可逆、保留 token 的暫停。
+
+**成功標準：**
+- [x] `AllocationStatus` 加 `paused`、`CallOutcome` 加 `rejected_paused`、`AuditEventType` 加 `allocation_paused`/`allocation_resumed`（皆 `native_enum=False` → 無 migration）
+- [x] `AllocationService.pause()`/`resume()`：只切 status、**保留 token、不建 reclaim lock**（與 revoke 終局的關鍵差異）；狀態機 pause 僅 active、resume 僅 paused，其餘 `InvalidAllocationState` → 409
+- [x] proxy 對 paused 回 `allocation_paused`(403)、計 `rejected_paused`，可與 revoked/quarantined/quota 區分（沿用既有「先 lookup 後檢查」執法點，即時生效）
+- [x] `POST /admin/allocations/{id}/pause`｜`/resume`（比照 unquarantine）
+- [x] admin UI：分配列 + 成員詳情暫停/恢復鈕，文案與「撤回（終局）」區分
+
+**明確排除：**
+- ❌ 排程自動暫停 / 恢復（首版手動）
+- ❌ 成員自助暫停自己的憑證（首版只 admin）

@@ -40,7 +40,8 @@
 分配詳情皆顯示現價；階段 8 起首位管理員可經 CLI / helm Job 自動佈建，bootstrap
 token 退為 break-glass，正式環境帶預設/空 token 即拒絕啟動；階段 9 起成員在
 儀表板看到自己的整體用量總覽（token / 估算花費 / 次數 + model 拆分 + 區間 +
-分配配額），嚴格只看自己。ProviderCredential Fernet 加密落 DB，K8s Secret 提供
+分配配額），嚴格只看自己；admin 另可**暫停/恢復**一把憑證（可逆、保留 token，非配額=0；
+階段 019 / PR #34）。ProviderCredential Fernet 加密落 DB，K8s Secret 提供
 金鑰，pod 啟動時即驗證。3b.7 Playwright E2E 仍未開。
 
 下一步：階段 10（使用體驗打磨）、3b.7（Playwright E2E）。
@@ -162,12 +163,7 @@ token 退為 break-glass，正式環境帶預設/空 token 即拒絕啟動；階
 - [ ] token 提示文案補上自助情境（`dashboard.tsx` 現文案偏 admin 視角）
 
 **新能力：憑證暫停 / 恢復（管理員）：**
-> **動機**：admin 對無限額（或任何）憑證想「臨時關閉、過陣子再開」，而非用配額=0。
-> 現有狀態只有 active / revoked（終局，且 rotate 會換新 token）/ quarantined（僅異常偵測器自動設），都湊不出「可逆、保留同一 token」的暫停。
-- [ ] `AllocationStatus` 加 `paused`；proxy 將 `paused` 納入拒絕（回明確 `allocation_paused`，比照 revoked）
-- [ ] `AllocationService` 加 `pause()` / `resume()`：**只切 status，不動 token、不建 reclaim lock**（與 revoke 的關鍵差異 = 可逆、保留憑證）
-- [ ] admin UI（分配列 / 詳情）加「暫停 / 恢復」鈕；稽核 `allocation_paused` / `allocation_resumed`
-- [ ] ⚠ 開工先確認 `status` 欄位儲存型別：Postgres native enum 需小 migration（`ALTER TYPE ... ADD VALUE`）；存字串則免
+- [x] ✅ 已於**階段 019**（PR #34）完成 — `paused` 狀態 + `pause()`/`resume()`（只切 status、保留 token、不建 reclaim lock；可逆，與 revoke 終局有別）、proxy 回 `allocation_paused`、admin UI 暫停/恢復鈕。三 enum 皆 `native_enum=False`，無 migration。細節見 `history/completed-phases-detail.md`。
 
 **明確排除（暫擬）：**
 - ❌ 全面視覺改版 / 換 design system（只在既有 shadcn 內打磨）
