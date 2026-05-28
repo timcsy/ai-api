@@ -52,7 +52,7 @@ describe("<AdminPricesPage />", () => {
   it("converts per-1M input to per-1K and surfaces duplicate_version error", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     fetchMock.mockResolvedValueOnce(jsonResponse(200, ROWS)); // list
-    let posted: any = null;
+    let posted: Record<string, unknown> = {};
     fetchMock.mockImplementationOnce(async (_url, init) => {
       posted = JSON.parse((init?.body as string) ?? "{}");
       return jsonResponse(409, { detail: { error: { code: "duplicate_version", message: "該生效時間已有版本" } } });
