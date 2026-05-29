@@ -240,8 +240,13 @@ export function DashboardPage() {
                       {a.status}
                     </Badge>
                   </div>
-                  <CardDescription className="font-mono text-xs">
-                    {a.resource_model} · {a.token_prefix}…
+                  <CardDescription className="space-y-0.5 text-xs">
+                    <span className="block">
+                      呼叫用 model：<span className="font-mono text-foreground">{a.resource_model}</span>
+                    </span>
+                    <span className="block">
+                      憑證：<span className="font-mono">{a.token_prefix}…</span>
+                    </span>
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2 text-xs text-muted-foreground">

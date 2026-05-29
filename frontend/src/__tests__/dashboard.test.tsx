@@ -77,12 +77,12 @@ describe("<DashboardPage />", () => {
         },
       ],
     );
-    await waitFor(() => expect(screen.getByText("gpt-4o-mini")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("gpt-4o-mini").length).toBeGreaterThan(0));
     expect(screen.queryByText("dall-e-3")).not.toBeInTheDocument();
 
     // toggle includeRevoked → revoked shows
     await userEvent.click(screen.getByRole("switch", { name: /含已撤回/ }));
-    await waitFor(() => expect(screen.getByText("dall-e-3")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("dall-e-3").length).toBeGreaterThan(0));
   });
 
   it("shows error block with retry on /me/allocations 500", async () => {

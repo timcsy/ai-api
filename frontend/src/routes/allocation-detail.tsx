@@ -34,6 +34,7 @@ import { copyToClipboard } from "@/lib/clipboard";
 interface Allocation {
   id: string;
   resource_model: string;
+  display_name?: string | null;
   status: string;
   token_prefix: string;
   quota_tokens_per_month?: number | null;
@@ -167,15 +168,18 @@ export function AllocationDetailPage() {
         <Link to="/dashboard" className="text-sm text-muted-foreground hover:underline">
           ← 回 Dashboard
         </Link>
-        <h1 className="text-3xl font-bold">{alloc?.resource_model ?? id}</h1>
-        {alloc && (
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
+          <h1 className="text-3xl font-bold">{alloc?.display_name ?? alloc?.resource_model ?? id}</h1>
+          {alloc && (
             <Badge variant={alloc.status === "active" ? "default" : "secondary"}>
               {alloc.status}
             </Badge>
-            <span className="font-mono text-xs text-muted-foreground">
-              {alloc.token_prefix}…
-            </span>
+          )}
+        </div>
+        {alloc && (
+          <div className="space-y-0.5 text-xs text-muted-foreground">
+            <div>呼叫用 model：<span className="font-mono text-foreground">{alloc.resource_model}</span></div>
+            <div>憑證：<span className="font-mono">{alloc.token_prefix}…</span></div>
           </div>
         )}
       </section>

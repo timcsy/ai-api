@@ -60,14 +60,14 @@ function renderDashboard() {
 describe("dashboard allocation quota view (US3)", () => {
   it("shows used / quota for a capped allocation", async () => {
     renderDashboard();
-    const card = await screen.findByText("gpt-4o-mini").then((el) => el.closest("a")!);
+    const card = (await screen.findAllByText("gpt-4o-mini"))[0]!.closest("a")!;
     expect(within(card).getByText(/12,000/)).toBeInTheDocument();
     expect(within(card).getByText(/50,000/)).toBeInTheDocument();
   });
 
   it("shows unlimited for an allocation without a quota", async () => {
     renderDashboard();
-    const card = await screen.findByText("gpt-4o").then((el) => el.closest("a")!);
+    const card = (await screen.findAllByText("gpt-4o"))[0]!.closest("a")!;
     expect(within(card).getByText(/無上限/)).toBeInTheDocument();
   });
 });
