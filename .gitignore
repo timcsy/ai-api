@@ -47,3 +47,6 @@ uv.lock.local
 # Dev SQLite database
 ai_api.db
 *.db
+
+# transient runtime lock
+.claude/scheduled_tasks.lock
