@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { apiBaseUrl } from "@/lib/api-base";
 import { copyToClipboard } from "@/lib/clipboard";
+import { triggerDownload } from "@/lib/download";
 
 /**
  * One consistent "how to call the API" block shared by the allocation-detail
@@ -86,8 +87,7 @@ resp = client.responses.create(
     input="你好",
 )
 print(resp.output_text)`;
-    snippets.codex = `# ~/.codex/config.toml
-model = "${m}"
+    snippets.codex = `model = "${m}"
 model_provider = "ccsh"
 
 [model_providers.ccsh]
@@ -95,9 +95,13 @@ name = "CCSH AI Gateway"
 base_url = "${base}"
 wire_api = "responses"
 env_key = "CCSH_AI_TOKEN"
-
-# then:  export CCSH_AI_TOKEN="$TOKEN"  &&  codex "你的指令"`;
+`;
   }
+
+  const downloadCodexConfig = () => {
+    triggerDownload("config.toml", new Blob([snippets.codex ?? ""], { type: "text/plain" }));
+    toast({ title: "已下載 config.toml", description: "依下方步驟放到 Codex 設定資料夾" });
+  };
 
   const tabKeys = supportsResponses
     ? (["curl", "python", "javascript", "json", "responses", "responses-py", "codex"] as const)
@@ -154,11 +158,78 @@ env_key = "CCSH_AI_TOKEN"
           </TabsList>
           {tabKeys.map((k) => (
             <TabsContent key={k} value={k}>
-              <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">{snippets[k]}</pre>
+              {k === "codex" ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-muted-foreground">下方是 Codex 設定檔內容（<code>config.toml</code>）。</span>
+                    <Button size="sm" variant="outline" className="shrink-0" onClick={downloadCodexConfig}>
+                      下載 config.toml
+                    </Button>
+                  </div>
+                  <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">{snippets.codex}</pre>
+                  <CodexSetupSteps token="$TOKEN" />
+                </div>
+              ) : (
+                <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">{snippets[k]}</pre>
+              )}
             </TabsContent>
           ))}
         </Tabs>
       </CardContent>
     </Card>
+  );
+}
+
+/** Per-OS install + setup steps after downloading config.toml. */
+function CodexSetupSteps({ token }: { token: string }) {
+  const [os, setOs] = React.useState<"mac" | "linux" | "windows">("mac");
+  const homePath =
+    os === "windows" ? "%USERPROFILE%\\.codex\\config.toml" : "~/.codex/config.toml";
+  const mkdir =
+    os === "windows"
+      ? `mkdir %USERPROFILE%\\.codex`
+      : `mkdir -p ~/.codex`;
+  const move =
+    os === "windows"
+      ? `move %USERPROFILE%\\Downloads\\config.toml %USERPROFILE%\\.codex\\config.toml`
+      : `mv ~/Downloads/config.toml ~/.codex/config.toml`;
+  const setToken =
+    os === "windows"
+      ? `setx CCSH_AI_TOKEN "${token}"   # 重開終端機後生效`
+      : `export CCSH_AI_TOKEN="${token}"   # 可寫進 ~/.zshrc 或 ~/.bashrc`;
+
+  return (
+    <div className="rounded-md border p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium">安裝與使用步驟</span>
+        <div className="flex gap-1">
+          {(["mac", "linux", "windows"] as const).map((o) => (
+            <Button key={o} size="sm" variant={o === os ? "default" : "outline"}
+              className="h-6 px-2 text-xs" onClick={() => setOs(o)}>
+              {o === "mac" ? "macOS" : o === "linux" ? "Linux" : "Windows"}
+            </Button>
+          ))}
+        </div>
+      </div>
+      <ol className="list-decimal pl-5 text-xs space-y-1.5 text-muted-foreground">
+        <li>
+          安裝 Codex CLI（需先有 Node.js）：
+          <pre className="mt-1 bg-muted rounded p-2 overflow-x-auto">npm install -g @openai/codex</pre>
+          {os === "mac" && <span>（或 <code>brew install codex</code>）</span>}
+        </li>
+        <li>
+          建立設定資料夾並把剛下載的 <code>config.toml</code> 放進去（路徑：<code>{homePath}</code>）：
+          <pre className="mt-1 bg-muted rounded p-2 overflow-x-auto">{`${mkdir}\n${move}`}</pre>
+        </li>
+        <li>
+          設定你的憑證 token（把 <code>{token}</code> 換成你的分配 token）：
+          <pre className="mt-1 bg-muted rounded p-2 overflow-x-auto">{setToken}</pre>
+        </li>
+        <li>
+          開始使用：
+          <pre className="mt-1 bg-muted rounded p-2 overflow-x-auto">codex "在這個資料夾建一個 hello.py 並執行"</pre>
+        </li>
+      </ol>
+    </div>
   );
 }
