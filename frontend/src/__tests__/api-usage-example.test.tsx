@@ -24,7 +24,7 @@ describe("<ApiUsageExample />", () => {
     render(<ApiUsageExample model="azure/gpt-5.4" supportsResponses />);
     await user.click(screen.getByRole("tab", { name: "Codex" }));
     expect(screen.getByText("下載 config.toml")).toBeInTheDocument();
-    expect(screen.getByText("安裝與使用步驟")).toBeInTheDocument();
+    expect(screen.getByText(/第一次安裝步驟/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "macOS" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Linux" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Windows" })).toBeInTheDocument();

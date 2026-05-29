@@ -183,25 +183,30 @@ env_key = "CCSH_AI_TOKEN"
 /** Per-OS install + setup steps after downloading config.toml. */
 function CodexSetupSteps({ token }: { token: string }) {
   const [os, setOs] = React.useState<"mac" | "linux" | "windows">("mac");
-  const homePath =
-    os === "windows" ? "%USERPROFILE%\\.codex\\config.toml" : "~/.codex/config.toml";
-  const mkdir =
+  const folderPlain =
     os === "windows"
-      ? `mkdir %USERPROFILE%\\.codex`
-      : `mkdir -p ~/.codex`;
+      ? "你的使用者資料夾裡的 .codex 資料夾（在檔案總管網址列輸入 %USERPROFILE%\\.codex 就會到）"
+      : "你的個人資料夾裡的 .codex 資料夾（個人資料夾就是 Finder/檔案管理員裡你名字的那個家）";
+  const terminalHint =
+    os === "mac"
+      ? "按 ⌘ + 空白鍵，輸入「終端機」(Terminal) 按 Enter 開啟。"
+      : os === "linux"
+      ? "開啟「終端機 / Terminal」應用程式。"
+      : "點開始選單，輸入「PowerShell」按 Enter 開啟。";
+  const mkdir = os === "windows" ? `mkdir %USERPROFILE%\\.codex` : `mkdir -p ~/.codex`;
   const move =
     os === "windows"
       ? `move %USERPROFILE%\\Downloads\\config.toml %USERPROFILE%\\.codex\\config.toml`
       : `mv ~/Downloads/config.toml ~/.codex/config.toml`;
   const setToken =
     os === "windows"
-      ? `setx CCSH_AI_TOKEN "${token}"   # 重開終端機後生效`
-      : `export CCSH_AI_TOKEN="${token}"   # 可寫進 ~/.zshrc 或 ~/.bashrc`;
+      ? `setx CCSH_AI_TOKEN "${token}"`
+      : `export CCSH_AI_TOKEN="${token}"`;
 
   return (
     <div className="rounded-md border p-3 space-y-2">
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-medium">安裝與使用步驟</span>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium">第一次安裝步驟（只需做一次）</span>
         <div className="flex gap-1">
           {(["mac", "linux", "windows"] as const).map((o) => (
             <Button key={o} size="sm" variant={o === os ? "default" : "outline"}
@@ -211,22 +216,43 @@ function CodexSetupSteps({ token }: { token: string }) {
           ))}
         </div>
       </div>
-      <ol className="list-decimal pl-5 text-xs space-y-1.5 text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
+        Codex 是在「終端機」（黑色的指令視窗）裡使用的 AI 助手。照下面做一次就設定完成；
+        之後每次只要打開終端機輸入 <code>codex</code> 即可。
+      </p>
+      <ol className="list-decimal pl-5 text-xs space-y-2 text-muted-foreground">
         <li>
-          安裝 Codex CLI（需先有 Node.js）：
+          <span className="text-foreground">打開終端機。</span>{terminalHint}
+        </li>
+        <li>
+          <span className="text-foreground">先安裝 Node.js</span>（Codex 需要它）：到{" "}
+          <a href="https://nodejs.org" target="_blank" rel="noreferrer" className="text-primary underline">nodejs.org</a>{" "}
+          下載並安裝「LTS」版本，裝完把終端機關掉再重開一次。
+        </li>
+        <li>
+          <span className="text-foreground">安裝 Codex</span>：在終端機貼上這行按 Enter：
           <pre className="mt-1 bg-muted rounded p-2 overflow-x-auto">npm install -g @openai/codex</pre>
-          {os === "mac" && <span>（或 <code>brew install codex</code>）</span>}
+          {os === "mac" && <span>（若有用 Homebrew，也可改用 <code>brew install codex</code>）</span>}
         </li>
         <li>
-          建立設定資料夾並把剛下載的 <code>config.toml</code> 放進去（路徑：<code>{homePath}</code>）：
-          <pre className="mt-1 bg-muted rounded p-2 overflow-x-auto">{`${mkdir}\n${move}`}</pre>
+          <span className="text-foreground">放入剛剛下載的 <code>config.toml</code>。</span>
+          兩種方式擇一：
+          <div className="mt-1">
+            <span className="text-foreground">方式 A（用滑鼠）：</span>把「下載」資料夾裡的 <code>config.toml</code> 搬到 {folderPlain}。若沒有 <code>.codex</code> 資料夾請自己新建一個。
+          </div>
+          <div className="mt-1">
+            <span className="text-foreground">方式 B（用指令）：</span>在終端機貼上：
+            <pre className="mt-1 bg-muted rounded p-2 overflow-x-auto">{`${mkdir}\n${move}`}</pre>
+          </div>
         </li>
         <li>
-          設定你的憑證 token（把 <code>{token}</code> 換成你的分配 token）：
+          <span className="text-foreground">貼上你的金鑰（token）。</span>
+          把下面的 <code>{token}</code> 換成你領到的憑證 token（那一長串以 <code>aiapi_</code> 開頭的字，建立分配時只會顯示一次，請用當時複製的），在終端機貼上執行：
           <pre className="mt-1 bg-muted rounded p-2 overflow-x-auto">{setToken}</pre>
+          {os === "windows" && <span>（Windows 需要把終端機關掉再重開一次才會生效）</span>}
         </li>
         <li>
-          開始使用：
+          <span className="text-foreground">開始用！</span>進到你的專案資料夾，輸入：
           <pre className="mt-1 bg-muted rounded p-2 overflow-x-auto">codex "在這個資料夾建一個 hello.py 並執行"</pre>
         </li>
       </ol>
