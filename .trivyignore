@@ -22,3 +22,11 @@ CVE-2026-23949
 
 # wheel — pip/uv build-time dep; runtime never installs packages.
 CVE-2026-24049
+
+# ---- Phase 11 follow-up ----
+# krb5 (libgssapi-krb5-2 / libk5crypto3 / libkrb5-3 / libkrb5support0) DoS via
+# integer overflow. Comes from the distroless debian-12 base, NOT our deps.
+# Unreachable: this service uses no Kerberos/GSSAPI (Postgres = password auth,
+# providers = HTTPS). distroless has no apt to patch in place; fixed upstream in
+# 1.20.1-2+deb12u5 — will clear via the next distroless `:nonroot` rebuild.
+CVE-2026-40356
