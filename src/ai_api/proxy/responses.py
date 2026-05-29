@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import get_db_session
 from ai_api.config import get_settings
+from ai_api.db import get_sessionmaker
 from ai_api.models import CallOutcome, ModelCatalog
 from ai_api.observability.logging import redact_string
 from ai_api.observability.request_id import current_request_id
@@ -99,6 +100,59 @@ def _map_usage(usage: Any) -> dict[str, int | None]:
 def _sse(event_type: str | None, data: str) -> bytes:
     prefix = f"event: {event_type}\n" if event_type else ""
     return f"{prefix}data: {data}\n\n".encode()
+
+
+async def _persist_responses_call(
+    session: AsyncSession,
+    *,
+    request_id: str,
+    allocation_id: str,
+    subject: str | None,
+    model: str,
+    model_key: str,
+    provider: str,
+    started_at: datetime,
+    usage: Any,
+    want_store: bool,
+    upstream_response_id: str | None,
+) -> None:
+    """Bill + record one successful Responses call. Caller commits the session.
+
+    Used both inline (non-streaming, request session) and from the streaming
+    generator's finally with a FRESH session — the request-scoped session is
+    already closed by the time a StreamingResponse body runs.
+    """
+    mapped = _map_usage(usage)
+    price = await lookup_price_for_call(
+        session, provider=provider, model=model_key, call_time=started_at
+    )
+    cost: Decimal | None = calculate_cost(
+        price=price,
+        prompt_tokens=mapped["prompt_tokens"],
+        completion_tokens=mapped["completion_tokens"],
+        cached_tokens=mapped["cached_tokens"],
+    )
+    await RecordsService(session).record_call(
+        request_id=request_id,
+        allocation_id=allocation_id,
+        subject=subject,
+        model=model,
+        started_at=started_at,
+        status_code=200,
+        outcome=CallOutcome.success,
+        prompt_tokens=mapped["prompt_tokens"],
+        completion_tokens=mapped["completion_tokens"],
+        total_tokens=mapped["total_tokens"],
+        reasoning_tokens=mapped["reasoning_tokens"],
+        cached_tokens=mapped["cached_tokens"],
+        cost_usd=cost,
+    )
+    if want_store and upstream_response_id is not None:
+        await StoredResponseService(session).store(
+            allocation_id=allocation_id,
+            provider=provider,
+            upstream_response_id=upstream_response_id,
+        )
 
 
 @router.post("/responses")
@@ -192,39 +246,10 @@ async def proxy_responses(
     api_version = (resolved.extra_config or {}).get("api_version")
 
     model_key = requested_model.split("/", 1)[-1]
-
-    async def bill_and_record(usage: Any, *, upstream_response_id: str | None) -> None:
-        mapped = _map_usage(usage)
-        price = await lookup_price_for_call(
-            session, provider=provider, model=model_key, call_time=started_at
-        )
-        cost: Decimal | None = calculate_cost(
-            price=price,
-            prompt_tokens=mapped["prompt_tokens"],
-            completion_tokens=mapped["completion_tokens"],
-            cached_tokens=mapped["cached_tokens"],
-        )
-        await records.record_call(
-            request_id=request_id,
-            allocation_id=allocation.id,
-            subject=allocation.subject_snapshot,
-            model=requested_model,
-            started_at=started_at,
-            status_code=200,
-            outcome=CallOutcome.success,
-            prompt_tokens=mapped["prompt_tokens"],
-            completion_tokens=mapped["completion_tokens"],
-            total_tokens=mapped["total_tokens"],
-            reasoning_tokens=mapped["reasoning_tokens"],
-            cached_tokens=mapped["cached_tokens"],
-            cost_usd=cost,
-        )
-        if want_store and upstream_response_id is not None:
-            await stored_svc.store(
-                allocation_id=allocation.id,
-                provider=provider,
-                upstream_response_id=upstream_response_id,
-            )
+    # Plain values captured for the streaming generator (must not touch the
+    # request-scoped `session`/ORM objects after the handler returns).
+    alloc_id = allocation.id
+    alloc_subject = allocation.subject_snapshot
 
     # 6a. Streaming
     if stream:
@@ -268,8 +293,27 @@ async def proxy_responses(
                         captured_resp_id = resp.get("id")
                     yield _sse(etype, data)
             finally:
-                # Record even on client disconnect (partial usage may be None).
-                await bill_and_record(captured_usage, upstream_response_id=captured_resp_id)
+                # The request-scoped session is already closed once the
+                # StreamingResponse body runs, so record on a FRESH session.
+                # Record even on client disconnect (usage may be None).
+                try:
+                    async with get_sessionmaker()() as rec_session:
+                        await _persist_responses_call(
+                            rec_session,
+                            request_id=request_id,
+                            allocation_id=alloc_id,
+                            subject=alloc_subject,
+                            model=requested_model,
+                            model_key=model_key,
+                            provider=provider,
+                            started_at=started_at,
+                            usage=captured_usage,
+                            want_store=want_store,
+                            upstream_response_id=captured_resp_id,
+                        )
+                        await rec_session.commit()
+                except Exception:
+                    logger.exception("failed to record streamed responses call")
 
         return StreamingResponse(event_gen(), media_type="text/event-stream")
 
@@ -288,8 +332,21 @@ async def proxy_responses(
         return await reject("upstream_error", f"upstream call failed: {e}", 502)
 
     payload = _as_dict(upstream_result) if not isinstance(upstream_result, dict) else upstream_result
-    await bill_and_record(payload.get("usage"), upstream_response_id=payload.get("id"))
-    # If we stored under a platform id, surface it (US4). Provider id passes through.
+    # Non-streaming: handler hasn't returned yet, so the request session is live;
+    # get_db_session commits it on teardown.
+    await _persist_responses_call(
+        session,
+        request_id=request_id,
+        allocation_id=alloc_id,
+        subject=alloc_subject,
+        model=requested_model,
+        model_key=model_key,
+        provider=provider,
+        started_at=started_at,
+        usage=payload.get("usage"),
+        want_store=want_store,
+        upstream_response_id=payload.get("id"),
+    )
     return payload
 
 
