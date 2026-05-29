@@ -49,7 +49,7 @@ token 退為 break-glass，正式環境帶預設/空 token 即拒絕啟動；階
 卡片可點進詳情、新成員三步引導、呼叫端點單一來源、admin 配額改站內對話框）。ProviderCredential
 Fernet 加密落 DB，K8s Secret 提供金鑰，pod 啟動時即驗證。3b.7 Playwright E2E 仍未開（暫緩）。
 
-**2026-05-29：階段 11（Responses API / Agent 工具相容）已上線 ai-ccsh**——Codex 等 agent
+**2026-05-29：階段 11（Responses API / Agent 工具相容）已上線正式叢集**——Codex 等 agent
 可用平台憑證走 `/v1/responses`（串流 + 工具 + reasoning/cached 精確計費 + server-side 對話狀態）。
 下一步：使用者端 Codex CLI 煙霧測試（gateway 已驗）、3b.7（Playwright E2E）。
 

@@ -2,7 +2,7 @@
 # The frontend nginx serves the SPA and proxies API paths to the backend, so a
 # domain manager that maps one host → one service still gets the whole app.
 # ${BACKEND_UPSTREAM} is substituted at container start (nginx envsubst) from the
-# deployment env, e.g. ai-api-ai-api.ai-ccsh.svc.cluster.local — keeps this image
+# deployment env, e.g. ai-api-ai-api.<namespace>.svc.cluster.local — keeps this image
 # generic (no hard-coded release/namespace). Only env vars are substituted, so
 # nginx runtime vars ($host, $uri, …) are preserved.
 server {

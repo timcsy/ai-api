@@ -12,7 +12,7 @@
 
 `- [ ] T### [P?] [Story?] description with file path`
 
-- 路徑均相對 repo root：`/Users/timcsy/Documents/Projects/CCSH/AzureAI/ai-api`
+- 路徑均相對 repo root：`<repo-root>`
 
 ---
 

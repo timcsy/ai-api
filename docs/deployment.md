@@ -148,17 +148,17 @@ curl -N https://<平台>/v1/responses \
 
 ```toml
 model = "azure/gpt-4o"
-model_provider = "ccsh"
+model_provider = "gateway"
 
-[model_providers.ccsh]
-name = "CCSH AI Gateway"
+[model_providers.gateway]
+name = "AI Gateway"
 base_url = "https://<平台>/v1"
 wire_api = "responses"
-env_key = "CCSH_AI_TOKEN"
+env_key = "AIAPI_TOKEN"
 ```
 
 ```bash
-export CCSH_AI_TOKEN="<allocation-token>"
+export AIAPI_TOKEN="<allocation-token>"
 codex "在這個 repo 新增一個 hello world 並跑起來"
 ```
 

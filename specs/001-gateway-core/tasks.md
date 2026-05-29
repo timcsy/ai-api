@@ -12,7 +12,7 @@
 
 - **[P]**：可與同階段其他 [P] 任務並行（不同檔案、無互相依賴）
 - **[Story]**：US1 / US2 / US3 / US4，對應 spec.md User Stories
-- 所有路徑相對於 repo root：`/Users/timcsy/Documents/Projects/CCSH/AzureAI/ai-api`
+- 所有路徑相對於 repo root：`<repo-root>`
 
 ## Path Conventions
 

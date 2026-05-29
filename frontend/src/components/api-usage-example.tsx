@@ -88,13 +88,13 @@ resp = client.responses.create(
 )
 print(resp.output_text)`;
     snippets.codex = `model = "${m}"
-model_provider = "ccsh"
+model_provider = "gateway"
 
-[model_providers.ccsh]
-name = "CCSH AI Gateway"
+[model_providers.gateway]
+name = "AI Gateway"
 base_url = "${base}"
 wire_api = "responses"
-env_key = "CCSH_AI_TOKEN"
+env_key = "AIAPI_TOKEN"
 `;
   }
 
@@ -200,8 +200,8 @@ function CodexSetupSteps({ token }: { token: string }) {
       : `mv ~/Downloads/config.toml ~/.codex/config.toml`;
   const setToken =
     os === "windows"
-      ? `setx CCSH_AI_TOKEN "${token}"`
-      : `export CCSH_AI_TOKEN="${token}"`;
+      ? `setx AIAPI_TOKEN "${token}"`
+      : `export AIAPI_TOKEN="${token}"`;
 
   return (
     <div className="rounded-md border p-3 space-y-2">

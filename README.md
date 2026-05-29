@@ -6,6 +6,7 @@
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![React](https://img.shields.io/badge/react-19-61dafb)
 ![runtime](https://img.shields.io/badge/runtime-distroless-0b7285)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
 組織內部 AI API 的**單一分流入口**：用一套 OpenAI 相容的閘道，把多家 AI 供應商
 （Azure OpenAI / OpenAI / Anthropic / Gemini）統一對成員開放，並以**可撤回的分配憑證**
@@ -88,17 +89,17 @@ curl -N -X POST https://<host>/v1/responses \
 ```toml
 # ~/.codex/config.toml
 model = "azure/gpt-5.4"
-model_provider = "ccsh"
+model_provider = "gateway"
 
-[model_providers.ccsh]
-name = "CCSH AI Gateway"
+[model_providers.gateway]
+name = "AI Gateway"
 base_url = "https://<host>/v1"
 wire_api = "responses"
-env_key = "CCSH_AI_TOKEN"
+env_key = "AIAPI_TOKEN"
 ```
 
 ```bash
-export CCSH_AI_TOKEN="$TOKEN"
+export AIAPI_TOKEN="$TOKEN"
 codex "在這個資料夾建一個 hello.py 並執行"
 ```
 
@@ -152,3 +153,7 @@ Kubernetes / Helm 部署、必填機密、首位管理員 bootstrap、Responses/
 
 本專案採 spec-driven 開發（spec → plan → tasks → 失敗測試 → 實作 → 重構 → 審查 → 合併），
 並強制 TDD 與契約優先；規格文件一律繁體中文、程式識別字英文。詳見工程憲章。
+
+## 授權
+
+[MIT License](./LICENSE)。

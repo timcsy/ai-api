@@ -9,7 +9,7 @@
 
 | SC | 結果 | 證據 |
 |---|---|---|
-| **SC-001** Google SSO ≤ 30s | ✅ | 瀏覽器 `localhost:8000/auth/oidc/start` → 同意 → `/me` 回 `張頌宇 / timcsy@ms2.ccsh.tn.edu.tw / provider=google_oidc` |
+| **SC-001** Google SSO ≤ 30s | ✅ | 瀏覽器 `localhost:8000/auth/oidc/start` → 同意 → `/me` 回 `Example User / admin@example.com / provider=google_oidc` |
 | **SC-002** Local 邀請→登入 ≤ 5min | ✅ | quickstart §4 全程 < 10s（CLI 模擬） |
 | **SC-003** 密碼 / secret 不洩漏 | ✅ | 75 tests 中無一筆掃描出 Azure key、cookie、OAuth secret |
 | **SC-004** unknown email vs 密碼錯一致 | ✅ | contract `test_local_login_401_*` 兩情境同樣回 `invalid_credentials` |

@@ -14,17 +14,17 @@
 
 ```toml
 model = "<平台模型 slug>"
-model_provider = "ccsh"
+model_provider = "gateway"
 
-[model_providers.ccsh]
-name = "CCSH AI Gateway"
-base_url = "https://ai-ccsh.tew.tw/v1"
+[model_providers.gateway]
+name = "AI Gateway"
+base_url = "https://your-host.example.com/v1"
 wire_api = "responses"
-env_key = "CCSH_AI_TOKEN"
+env_key = "AIAPI_TOKEN"
 ```
 
 ```bash
-export CCSH_AI_TOKEN="<allocation-token>"
+export AIAPI_TOKEN="<allocation-token>"
 codex "在這個 repo 新增一個 hello world 並跑起來"
 ```
 
@@ -38,14 +38,14 @@ codex "在這個 repo 新增一個 hello world 並跑起來"
 
 ```bash
 # 非串流
-curl -sS https://ai-ccsh.tew.tw/v1/responses \
-  -H "Authorization: Bearer $CCSH_AI_TOKEN" \
+curl -sS https://your-host.example.com/v1/responses \
+  -H "Authorization: Bearer $AIAPI_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"model":"<slug>","input":"say hi"}'
 
 # 串流（應逐步吐 SSE 事件）
-curl -N https://ai-ccsh.tew.tw/v1/responses \
-  -H "Authorization: Bearer $CCSH_AI_TOKEN" \
+curl -N https://your-host.example.com/v1/responses \
+  -H "Authorization: Bearer $AIAPI_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"model":"<slug>","input":"count to 5","stream":true}'
 ```
