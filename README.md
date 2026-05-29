@@ -1,5 +1,12 @@
 # AI API Manager
 
+[![CI](https://github.com/timcsy/ai-api/actions/workflows/ci.yml/badge.svg)](https://github.com/timcsy/ai-api/actions/workflows/ci.yml)
+[![Frontend CI](https://github.com/timcsy/ai-api/actions/workflows/frontend.yml/badge.svg)](https://github.com/timcsy/ai-api/actions/workflows/frontend.yml)
+[![Image build](https://github.com/timcsy/ai-api/actions/workflows/image.yml/badge.svg)](https://github.com/timcsy/ai-api/actions/workflows/image.yml)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![React](https://img.shields.io/badge/react-19-61dafb)
+![runtime](https://img.shields.io/badge/runtime-distroless-0b7285)
+
 組織內部 AI API 的**單一分流入口**：用一套 OpenAI 相容的閘道，把多家 AI 供應商
 （Azure OpenAI / OpenAI / Anthropic / Gemini）統一對成員開放，並以**可撤回的分配憑證**
 管控誰能用、用多少、花多少——用量與成本全部統一歸戶。
@@ -26,6 +33,30 @@
   K8s NetworkPolicy、CI Trivy 掃描 + SBOM、distroless runtime
 
 ## 架構
+
+```mermaid
+flowchart TD
+    Codex["OpenAI Codex CLI"] -->|Bearer token| NG
+    SDK["curl / OpenAI SDK"] -->|Bearer token| NG
+    Admin["管理員 / 成員瀏覽器"] -->|session cookie| NG
+    NG["nginx（單一來源反向代理）"] --> API
+
+    subgraph GW["FastAPI Gateway"]
+        API["API 路由<br/>/v1/responses · /v1/chat/completions<br/>/admin · /me · /catalog"]
+        PF["共用 preflight<br/>憑證 → 分配狀態 → 配額 → model binding → 存取政策"]
+        UP["litellm（library form）"]
+        REC["計費 + 用量記錄"]
+        API --> PF --> UP
+        API --> REC
+    end
+
+    UP --> AZ["Azure OpenAI"]
+    UP --> OA["OpenAI"]
+    UP --> AN["Anthropic"]
+    UP --> GE["Gemini"]
+
+    GW --> DB[("PostgreSQL<br/>members · allocations · credentials<br/>call_records · price_list<br/>stored_responses · model_catalog")]
+```
 
 - **後端**：FastAPI（Python 3.11+）+ SQLAlchemy 2.x async + Alembic；上游經 `litellm` library form
 - **前端**：React 19 + Vite 6 + TypeScript（strict）+ shadcn/ui + TanStack Query
