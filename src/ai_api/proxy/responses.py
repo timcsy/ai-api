@@ -267,9 +267,32 @@ async def proxy_responses(
             logger.exception("upstream responses (stream) failed")
             return await reject("upstream_error", f"upstream call failed: {e}", 502)
 
+        async def _record_fresh(usage: Any, resp_id: str | None) -> None:
+            # Always a FRESH session: the request-scoped one is already closed
+            # once the StreamingResponse body runs.
+            try:
+                async with get_sessionmaker()() as rec_session:
+                    await _persist_responses_call(
+                        rec_session,
+                        request_id=request_id,
+                        allocation_id=alloc_id,
+                        subject=alloc_subject,
+                        model=requested_model,
+                        model_key=model_key,
+                        provider=provider,
+                        started_at=started_at,
+                        usage=usage,
+                        want_store=want_store,
+                        upstream_response_id=resp_id,
+                    )
+                    await rec_session.commit()
+            except BaseException:  # incl. CancelledError; never lose billing silently
+                logger.exception("failed to record streamed responses call")
+
         async def event_gen() -> Any:
             captured_usage: Any = None
             captured_resp_id: str | None = None
+            persisted = False
             try:
                 async for event in stream_iter:
                     data = (
@@ -287,33 +310,22 @@ async def proxy_responses(
                     except (ValueError, TypeError):
                         payload_obj = {}
                     etype = payload_obj.get("type")
-                    if etype == "response.completed":
+                    if etype == "response.completed" and not persisted:
                         resp = _as_dict(payload_obj.get("response"))
                         captured_usage = resp.get("usage")
                         captured_resp_id = resp.get("id")
+                        # Record NOW, while the client is still connected — doing
+                        # it in `finally` loses the row when the client (e.g. Codex)
+                        # disconnects right after `response.completed` and cancels
+                        # the task mid-await.
+                        await _record_fresh(captured_usage, captured_resp_id)
+                        persisted = True
                     yield _sse(etype, data)
             finally:
-                # The request-scoped session is already closed once the
-                # StreamingResponse body runs, so record on a FRESH session.
-                # Record even on client disconnect (usage may be None).
-                try:
-                    async with get_sessionmaker()() as rec_session:
-                        await _persist_responses_call(
-                            rec_session,
-                            request_id=request_id,
-                            allocation_id=alloc_id,
-                            subject=alloc_subject,
-                            model=requested_model,
-                            model_key=model_key,
-                            provider=provider,
-                            started_at=started_at,
-                            usage=captured_usage,
-                            want_store=want_store,
-                            upstream_response_id=captured_resp_id,
-                        )
-                        await rec_session.commit()
-                except Exception:
-                    logger.exception("failed to record streamed responses call")
+                # Fallback: stream ended without a completed event (cut/disconnect)
+                # — still record best-effort so usage isn't silently dropped.
+                if not persisted:
+                    await _record_fresh(captured_usage, captured_resp_id)
 
         return StreamingResponse(event_gen(), media_type="text/event-stream")
 
