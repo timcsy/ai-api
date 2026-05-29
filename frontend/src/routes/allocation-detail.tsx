@@ -178,7 +178,7 @@ export function AllocationDetailPage() {
         </div>
         {alloc && (
           <div className="space-y-0.5 text-xs text-muted-foreground">
-            <div>呼叫用 model：<span className="font-mono text-foreground">{alloc.resource_model}</span></div>
+            <div>呼叫用 model 名稱：<span className="font-mono text-foreground">{alloc.resource_model}</span></div>
             <div>憑證：<span className="font-mono">{alloc.token_prefix}…</span></div>
           </div>
         )}

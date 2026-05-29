@@ -242,7 +242,7 @@ export function DashboardPage() {
                   </div>
                   <CardDescription className="space-y-0.5 text-xs">
                     <span className="block">
-                      呼叫用 model：<span className="font-mono text-foreground">{a.resource_model}</span>
+                      呼叫用 model 名稱：<span className="font-mono text-foreground">{a.resource_model}</span>
                     </span>
                     <span className="block">
                       憑證：<span className="font-mono">{a.token_prefix}…</span>
