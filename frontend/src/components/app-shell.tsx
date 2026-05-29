@@ -1,9 +1,12 @@
+import { Github } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/auth";
 import { cn } from "@/lib/utils";
+
+const GITHUB_URL = "https://github.com/timcsy/ai-api";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -55,6 +58,18 @@ export function AppShell() {
             )}
           </nav>
           <div className="ml-auto flex items-center space-x-3">
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="在 GitHub 給個星星 ⭐"
+              title="喜歡的話到 GitHub 給個星星 ⭐"
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Github className="h-5 w-5" />
+              <span className="hidden sm:inline">Star</span>
+            </a>
+            <Separator orientation="vertical" className="h-6" />
             <span className="text-sm text-muted-foreground" data-testid="member-email">
               {member?.email}
             </span>

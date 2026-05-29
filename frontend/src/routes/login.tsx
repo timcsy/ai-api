@@ -1,3 +1,4 @@
+import { Github } from "lucide-react";
 import * as React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -109,6 +110,16 @@ export function LoginPage() {
           <Button variant="outline" className="w-full" onClick={() => loginGoogle(next)}>
             使用 Google 登入
           </Button>
+
+          <a
+            href="https://github.com/timcsy/ai-api"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-center gap-1.5 pt-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Github className="h-4 w-4" />
+            開源於 GitHub — 給個星星 ⭐
+          </a>
         </CardContent>
       </Card>
     </div>
