@@ -44,6 +44,7 @@ interface AdminAllocation {
   member_id: string;
   subject_snapshot: string;
   resource_model: string;
+  display_name?: string | null;
   status: string;
   quota_tokens_per_month: number | null;
   is_service_allocation: boolean;
@@ -205,7 +206,8 @@ export function AdminAllocationsPage() {
                   {memberById.get(a.member_id)?.email ?? a.subject_snapshot}
                 </TableCell>
                 <TableCell>
-                  <span className="font-mono text-xs">{a.resource_model}</span>
+                  {a.display_name && <div className="text-xs font-medium">{a.display_name}</div>}
+                  <span className="font-mono text-xs text-muted-foreground">{a.resource_model}</span>
                   {catalogSlugs.data && !knownSlugs.has(a.resource_model) && (
                     <Badge variant="outline" className="ml-2 text-amber-700 border-amber-500">
                       ⚠ 已不在 catalog

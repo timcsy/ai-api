@@ -46,6 +46,7 @@ class AllocationOut(BaseModel):
     member_id: str
     subject_snapshot: str
     resource_model: str
+    display_name: str | None = None  # catalog display name of resource_model, if any
     status: AllocationStatus
     created_at: datetime
     revoked_at: datetime | None

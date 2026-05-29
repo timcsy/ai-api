@@ -18,12 +18,13 @@ from ai_api.services.allocations import AllocationService
 router = APIRouter(dependencies=[Depends(require_admin_token)])
 
 
-def _to_out(a: Any) -> AllocationOut:
+def _to_out(a: Any, display_name: str | None = None) -> AllocationOut:
     return AllocationOut(
         id=a.id,
         member_id=a.member_id,
         subject_snapshot=a.subject_snapshot,
         resource_model=a.resource_model,
+        display_name=display_name,
         status=a.status,
         created_at=a.created_at,
         revoked_at=a.revoked_at,
@@ -70,7 +71,14 @@ async def list_allocations(
 ) -> list[AllocationOut]:
     service = AllocationService(session)
     allocations = await service.list(member_id=member_id, status=status_q)
-    return [_to_out(a) for a in allocations]
+    # Catalog slug → display_name so admin tables can show a friendly name.
+    from sqlalchemy import select
+
+    from ai_api.models import ModelCatalog
+
+    name_rows = await session.execute(select(ModelCatalog.slug, ModelCatalog.display_name))
+    name_map: dict[str, str] = {row[0]: row[1] for row in name_rows.all()}
+    return [_to_out(a, name_map.get(a.resource_model)) for a in allocations]
 
 
 @router.delete("/allocations/{allocation_id}", response_model=AllocationOut)

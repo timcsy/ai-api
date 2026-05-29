@@ -59,6 +59,7 @@ interface AdminAllocation {
   id: string;
   member_id: string;
   resource_model: string;
+  display_name?: string | null;
   status: string;
   quota_tokens_per_month: number | null;
   token_prefix: string;
@@ -272,7 +273,10 @@ export function AdminMemberDetailPage() {
               <TableBody>
                 {memberAllocs.map((a) => (
                   <TableRow key={a.id}>
-                    <TableCell className="font-mono text-xs">{a.resource_model}</TableCell>
+                    <TableCell className="text-xs">
+                      {a.display_name && <div className="font-medium">{a.display_name}</div>}
+                      <div className="font-mono text-muted-foreground">{a.resource_model}</div>
+                    </TableCell>
                     <TableCell>
                       <Badge variant={a.status === "active" ? "default" : "secondary"}>{a.status}</Badge>
                     </TableCell>

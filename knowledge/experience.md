@@ -351,3 +351,51 @@
 - **教訓**：串流端點的「計費／稽核」是 generator 生命週期的一部分，不是迴圈後的收尾語句。
   任何「邊串流邊要取末尾 metadata」的場景，attribute 擷取放迴圈、persist 放 `finally`。
 - **來源**：`src/ai_api/proxy/responses.py` `event_gen`；`tests/contract/test_responses_stream.py`；階段 11
+
+### 新增一個資料欄位，要追到「所有讀寫與顯示點」，不是只加 model
+
+- **理論說**：加個 `cached_input_per_1k` 欄位 + 計費公式，功能就完成了。
+- **實際發生**：欄位與 `calculate_cost` 都加了，但使用者「看不到也設不了」——漏接了
+  admin 價目 API（建立/列表/歷史）、`current_price_map`（會員目錄/分配/儀表板的價格來源）、
+  `load_prices` 批次匯入，以及**五個**前端顯示頁（目錄列表/詳情、儀表板卡片、分配詳情、
+  管理員模型詳情）。靠使用者逐頁回報 + 一次完整 grep 盤點才補齊。
+- **解決方式**：新增欄位後立即 `grep` 既有姊妹欄位（如 `input_per_1k`/`output_per_1k`）的
+  **所有**出現點，逐一決定要不要帶上新欄位：序列化（多個端點）、彙總、CLI 匯入、每個前端
+  type + 渲染。把「資料流的端到端清單」當成 DoD。
+- **教訓**：欄位的成本不在 schema，而在「它要在多少地方被讀出來」。加欄位時先列出
+  source（寫入）+ 所有 sink（API 序列化、彙總、匯入、各前端顯示），一次補完，否則會像這次
+  分多輪擠牙膏。**`grep 既有同類欄位` 是找出所有 sink 最快的方法。**
+- **來源**：`services/pricing.py` `current_price_map`、`api/usage.py`、`cli/load_prices.py`、
+  `frontend` 多個 route；階段 11
+
+### 版本化資料的「生效鍵」要用 datetime，不要用 date
+
+- **理論說**：價目版本用「生效日」(date) 當唯一鍵 `(provider, model, effective_from)` 很直覺。
+- **實際發生**：同一個模型同一天只能有一個版本——使用者當天想補一個「快取折扣價」版本就撞
+  `duplicate_version`，得等到隔天才能改價。對「即時改價」是硬傷。
+- **解決方式**：前端生效欄位改 `datetime-local`、預設帶「現在」（本地時區），送出轉 UTC ISO。
+  後端本來就存完整 timestamp、唯一鍵也是 timestamp，無需改 schema——只是前端先前砍到只到日。
+- **教訓**：append-only / 版本化資料若「同一鍵粒度內可能要產生多筆」，鍵就要用足夠細的粒度
+  （datetime 而非 date）。UI 的時間輸入精度會無聲地變成業務限制。
+- **來源**：`frontend/src/routes/admin/prices.tsx`（date → datetime-local）；階段 11
+
+### CSS grid 內要 `truncate`，該格必須 `min-w-0`
+
+- **理論說**：給格子加 `truncate` 就會把過長文字截斷加省略號。
+- **實際發生**：「最近呼叫」表用 `grid-cols-5` 等寬，但一條不可斷行的 request UUID 把該欄
+  撐到比分配寬度還寬，`truncate` 也沒生效——結果「總 tokens」與「請求 ID」視覺上黏成一團。
+- **解決方式**：grid/flex 子項預設 `min-width:auto`（不會縮過內容），要讓 `truncate` 作用必須
+  加 `min-w-0`；並用比例欄寬（`grid-cols-[...fr]`）+ 欄間距，長 ID 加 `title` tooltip。
+- **教訓**：`truncate`（`overflow:hidden`）在 grid/flex 子項裡幾乎都要搭配 `min-w-0` 才有效，
+  這是排版「欄位互相擠爆」最常見的根因。
+- **來源**：`frontend/src/routes/allocation-detail.tsx` 最近呼叫表；階段 11
+
+### 把 admin 操作開放給 member：沿用同一 service + 嚴格擁有者檢查
+
+- **理論說**：要讓使用者自助暫停/恢復憑證，得另寫一套 member 版的邏輯。
+- **實際發生**：直接重用 Phase 019 的 `AllocationService.pause/resume`（admin 用的同一個），
+  member 端點只多做一件事——`allocation.member_id == current_member.id` 的擁有者檢查（沿用
+  既有 `/me/allocations/{id}/rotate-token` 的 404/403 模式），其餘狀態機/稽核全免重寫。
+- **教訓**：把既有 admin 能力下放成 self-service，價值幾乎全在「授權邊界」（擁有者檢查）而非
+  業務邏輯——服務層保持 actor-agnostic，端點層各自把關身分，就能一份邏輯兩種入口、不 drift。
+- **來源**：`api/me.py` `/me/allocations/{id}/pause|resume`；`tests/contract/test_me_allocations.py`；階段 11
