@@ -399,3 +399,20 @@
 - **教訓**：把既有 admin 能力下放成 self-service，價值幾乎全在「授權邊界」（擁有者檢查）而非
   業務邏輯——服務層保持 actor-agnostic，端點層各自把關身分，就能一份邏輯兩種入口、不 drift。
 - **來源**：`api/me.py` `/me/allocations/{id}/pause|resume`；`tests/contract/test_me_allocations.py`；階段 11
+
+### 串流端點的「事後記帳」要在 client 還連著時做，別放 finally（CancelledError 是 BaseException）
+
+- **理論說**：串流回應的計費/稽核放在 generator 的 `finally`，無論正常結束或 client 斷線都會記到。
+- **實際發生**：Codex 收到 `response.completed` 事件後**立刻斷線**——Starlette 取消串流任務，
+  `finally` 是在 `CancelledError` 情境下執行。`CancelledError` 在 Python 3.11 繼承自
+  **`BaseException`**（不是 `Exception`），所以 `except Exception` 接不到；`finally` 內的
+  `await session.commit()` 被取消中斷，那筆用量**默默消失、連 error log 都沒有**。curl 因為會
+  讀到串流結尾才關連線，generator 正常 exhaust，所以「測得到、Codex 卻記不到」，極難察覺。
+  （前一個坑是 request-scoped session 在 StreamingResponse body 執行時已關；那個修好後才浮現這個。）
+- **解決方式**：在解析到 `response.completed`（client 必定還連著、還在收事件）的**當下就立刻**
+  用 fresh session 記帳，不要拖到 `finally`；`finally` 只留作「串流在 completed 前被中斷」的
+  best-effort 後援，且 `except BaseException`（含 CancelledError）並 log，不靜默吞掉。
+- **教訓**：串流端點的副作用（計費/稽核/持久化）要綁在「資料已到且連線仍在」的那個事件點，
+  不要綁在 generator 生命週期結尾——結尾很可能在 client 斷線的 cancellation 下執行，DB await 會被
+  打斷。凡 `try/except` 想涵蓋「被取消也要善後」，記得 catch `BaseException` 而非 `Exception`。
+- **來源**：`src/ai_api/proxy/responses.py` `event_gen` / `_record_fresh`；階段 11（Codex 真機才暴露）
