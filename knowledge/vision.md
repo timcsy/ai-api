@@ -165,7 +165,10 @@
   不該被自動隔離）。**維運可視性**：admin 首頁卡片顯示 quarantined/paused 數，分配列加紅色「已隔離」/
   琥珀色「已暫停」徽章與「解除隔離」操作；首頁加 read-only「系統資訊」卡顯示 request body 上限
   （Helm `requestBodyLimitMB` 同時注入 nginx `client_max_body_size` 與 backend env，
-  「顯示值 = 執法值」single source of truth）。**專案公開化**：MIT License、neutralize 內部命名、
-  Docker image 公開、web header 加 GitHub Star icon。細節見 `history/completed-phases-detail.md`。
+  「顯示值 = 執法值」single source of truth）。`/v1/responses` 串流捕捉 upstream `response.failed`
+  事件並記為 `outcome=upstream_error`，admin log/usage view 直接看得到 upstream 給的失敗原因
+  （DeploymentNotFound / content_filter / rate limit 等），不必猜。**專案公開化**：MIT License、
+  neutralize 內部命名、Docker image 公開、web header 加 GitHub Star icon。
+  細節見 `history/completed-phases-detail.md`。
 
 > **未完成項**：3b.7 Playwright E2E（獨立 test-infra，暫緩）。其餘階段均已完成並真機驗證。
