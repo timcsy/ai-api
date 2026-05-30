@@ -364,19 +364,42 @@ async def proxy_responses(
                             or incomplete.get("description")
                             or "(no error message)"
                         )
-                        # Always log the full response object for failed events
-                        # so we can see what Azure actually puts where; this is
-                        # bounded (one log per failed call) and indispensable for
-                        # diagnosing provider-specific payload shapes.
+                        # Dump only diagnostic fields — skip instructions/input/
+                        # output/tools which are huge user content and crowd out
+                        # the bits we need (status, error, status_details, etc.).
+                        _DIAG_KEYS = (
+                            "object", "status", "error", "incomplete_details",
+                            "status_details", "model", "usage", "id", "created_at",
+                        )
+                        diag = {k: resp.get(k) for k in _DIAG_KEYS if k in resp}
+                        # Also surface any top-level keys we didn't expect; helps
+                        # discover provider-specific extension fields.
+                        extra_keys = sorted(set(resp.keys()) - set(_DIAG_KEYS) - {
+                            "instructions", "input", "output", "tools", "tool_choice",
+                            "metadata", "reasoning", "text", "parallel_tool_calls",
+                            "temperature", "top_p", "max_output_tokens", "previous_response_id",
+                            "store", "truncation", "stream", "user",
+                        })
                         logger.error(
                             "responses stream upstream failure model=%s provider=%s "
-                            "allocation=%s code=%s message=%s full_response=%s",
+                            "allocation=%s code=%s message=%s diag=%s extra_keys=%s",
                             requested_model, provider, alloc_id, err_code, err_msg,
-                            json.dumps(resp, default=str)[:2000],
+                            json.dumps(diag, default=str)[:2000], extra_keys,
                         )
                         await _record_failed_stream(f"{err_code}: {err_msg}")
                         persisted = True
                     yield _sse(etype, data)
+            except Exception as ex:
+                # litellm may raise mid-stream after a synthetic response.failed
+                # event — capture the exception so the underlying upstream reason
+                # surfaces in logs.
+                logger.exception(
+                    "responses stream raised model=%s provider=%s allocation=%s",
+                    requested_model, provider, alloc_id,
+                )
+                if not persisted:
+                    await _record_failed_stream(f"stream_exception: {ex}"[:500])
+                    persisted = True
             finally:
                 # Fallback: stream ended without a completed/failed event
                 # (cut/disconnect) — record best-effort so usage isn't silently dropped.
