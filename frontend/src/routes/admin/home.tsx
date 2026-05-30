@@ -35,6 +35,7 @@ interface CatalogModel {
 }
 interface AdminAllocation {
   id: string;
+  status: string;
 }
 
 export function AdminHomePage() {
@@ -123,9 +124,19 @@ export function AdminHomePage() {
   const doneCount = checklist.filter((x) => x.done).length;
   const allReady = doneCount === checklist.length;
 
+  const quarantinedCount = (allocations.data ?? []).filter((a) => a.status === "quarantined").length;
+  const pausedCount = (allocations.data ?? []).filter((a) => a.status === "paused").length;
+
   // Phase 5.1: switch to dashboard mode when fully onboarded
   if (ready) {
-    return <Dashboard hiddenModels={hiddenModels} audit={audit.data?.rows ?? []} />;
+    return (
+      <Dashboard
+        hiddenModels={hiddenModels}
+        audit={audit.data?.rows ?? []}
+        quarantinedCount={quarantinedCount}
+        pausedCount={pausedCount}
+      />
+    );
   }
 
   return (
@@ -202,13 +213,42 @@ export function AdminHomePage() {
   );
 }
 
-function Dashboard({ hiddenModels, audit }: { hiddenModels: number; audit: AuditRow[] }) {
+function Dashboard({
+  hiddenModels, audit, quarantinedCount, pausedCount,
+}: {
+  hiddenModels: number;
+  audit: AuditRow[];
+  quarantinedCount: number;
+  pausedCount: number;
+}) {
   return (
     <div className="container mx-auto py-8 max-w-4xl space-y-6">
       <div>
         <h1 className="text-3xl font-bold">管理員儀表板</h1>
         <p className="text-muted-foreground mt-1">基礎設定完成。日常維運從這裡開始。</p>
       </div>
+
+      {(quarantinedCount > 0 || pausedCount > 0) && (
+        <Card className={quarantinedCount > 0 ? "border-destructive" : "border-amber-500"}>
+          <CardHeader>
+            <CardTitle className="text-base">
+              {quarantinedCount > 0 && <span className="text-destructive">🚨 {quarantinedCount} 個分配被自動隔離</span>}
+              {quarantinedCount > 0 && pausedCount > 0 && <span className="text-muted-foreground"> · </span>}
+              {pausedCount > 0 && <span className="text-amber-900">⏸ {pausedCount} 個被暫停</span>}
+            </CardTitle>
+            <CardDescription>
+              {quarantinedCount > 0
+                ? "被異常偵測器自動隔離（突發用量）。確認後可解除隔離；若為已知 agent/服務用途，可標為「服務型」永久豁免異常偵測。"
+                : "有分配處於暫停狀態，使用者目前無法呼叫。"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/admin/observability/allocations">去檢視 / 處理</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {hiddenModels > 0 && (
         <Card className="border-amber-500">
