@@ -289,6 +289,26 @@ async def proxy_responses(
             except BaseException:  # incl. CancelledError; never lose billing silently
                 logger.exception("failed to record streamed responses call")
 
+        async def _record_failed_stream(error_message: str) -> None:
+            # Upstream emitted response.failed mid-stream — record an
+            # upstream_error row (no usage/cost) so admin sees the call in
+            # usage views and the log line points at WHY upstream failed.
+            try:
+                async with get_sessionmaker()() as rec_session:
+                    await RecordsService(rec_session).record_call(
+                        request_id=request_id,
+                        allocation_id=alloc_id,
+                        subject=alloc_subject,
+                        model=requested_model,
+                        started_at=started_at,
+                        status_code=200,  # transport was 200; the failure is in-stream
+                        outcome=CallOutcome.upstream_error,
+                        error_message=error_message[:500],
+                    )
+                    await rec_session.commit()
+            except BaseException:
+                logger.exception("failed to record upstream_error responses call")
+
         async def event_gen() -> Any:
             captured_usage: Any = None
             captured_resp_id: str | None = None
@@ -320,10 +340,27 @@ async def proxy_responses(
                         # the task mid-await.
                         await _record_fresh(captured_usage, captured_resp_id)
                         persisted = True
+                    elif etype == "response.failed" and not persisted:
+                        # Upstream protocol-level failure (content filter, model
+                        # not found on deployment, capacity, etc.). Capture the
+                        # error reason — without this log line, admin has no way
+                        # to know WHY the user saw "stream disconnected before
+                        # completion: response.failed event received".
+                        resp = _as_dict(payload_obj.get("response"))
+                        err = _as_dict(resp.get("error"))
+                        err_code = err.get("code") or "unknown"
+                        err_msg = err.get("message") or "(no error message)"
+                        logger.error(
+                            "responses stream upstream failure model=%s provider=%s "
+                            "allocation=%s code=%s message=%s",
+                            requested_model, provider, alloc_id, err_code, err_msg,
+                        )
+                        await _record_failed_stream(f"{err_code}: {err_msg}")
+                        persisted = True
                     yield _sse(etype, data)
             finally:
-                # Fallback: stream ended without a completed event (cut/disconnect)
-                # — still record best-effort so usage isn't silently dropped.
+                # Fallback: stream ended without a completed/failed event
+                # (cut/disconnect) — record best-effort so usage isn't silently dropped.
                 if not persisted:
                     await _record_fresh(captured_usage, captured_resp_id)
 
