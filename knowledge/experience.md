@@ -460,3 +460,31 @@
   DoD 要包含「目標 actor 不需另一個 actor 協助即可完成」，否則就是把工程師當成 production
   dependency。同樣警訊：log 裡常見「admin 來問怎麼 X」，X 就是 UI 缺位的索引。
 - **來源**：`frontend/src/routes/admin/{allocations,home,access}.tsx`；階段 12
+
+### infra 上限類設定：admin UI **顯示**、不要 admin UI **可編輯**
+
+- **理論說**：admin 抱怨「100MB 不夠 / 我想自己調」，就把 nginx `client_max_body_size`、
+  proxy timeout、CORS origins 等通通做成 UI 表單，admin 想改就改。
+- **實際發生**：使用者出現 413，調整完 Helm value 後問「這個能放進 admin UI 管嗎」。仔細推一下
+  做成可編輯 UI 的成本：(1) 這條設定**在 backend 前面**（frontend nginx pod），admin UI 是 backend
+  出的——「被擋住的人想去動擋自己的東西」chicken-and-egg；(2) nginx 改完要 reload／重啟 pod，
+  admin UI 得有 K8s API 權限或一個 reloader sidecar，過大或過度工程；(3) 誤觸後果不對稱——
+  admin 不小心輸 `1k`，下一個 request 包括他自己的下個動作都 413；(4) 一年動一次的東西
+  蓋 CRUD + 驗證 + audit 不划算。但「**完全不出現在 UI**」也不對——使用者上傳前不知道上限是多少，
+  撞到才知道。
+- **解決方式**：把 Helm value（`requestBodyLimitMB`）當 single source of truth，**同時**注入
+  frontend nginx (`CLIENT_MAX_BODY_SIZE` envsubst 進 `client_max_body_size`) 與 backend env
+  (`REQUEST_BODY_LIMIT_MB` → settings → `/admin/system/info`)；admin 首頁加 read-only「系統資訊」
+  卡片顯示這個值並標注「超過會在邊緣回 413」。**顯示而非編輯**：admin 知道機器能吃多大、能對使用者
+  說「目前上限 100MB」、需要調再找維運改 Helm。
+- **教訓**：admin UI 的功能集合不是「所有後端設定」的鏡像——「**可見性**」與「**可編輯性**」要分開
+  判斷。infra 類設定（body size / timeout / replica / resource limit / DB pool / cookie 屬性）
+  通常**可見性高、可編輯性低**：admin 需要知道現值才能與使用者溝通／除錯，但改動成本（reload、
+  誤觸範圍、權限擴張）讓「config-as-code + read-only UI」幾乎總是優於「runtime mutable UI」。
+  反之，業務類設定（access rules、tag、價目、配額）可見可編輯都該高。判準：**改錯的爆炸半徑**
+  與**改動頻率**——半徑大且低頻 → read-only；半徑小或高頻 → 可編。
+  附帶：用同一個 Helm value 同時注 nginx 與 backend env 確保「顯示值 = 執法值」不 drift，
+  避免「UI 寫 100MB 但 nginx 還是 1MB」這種更糟的情況。
+- **來源**：`deploy/helm/ai-api/values.yaml` `requestBodyLimitMB`；
+  `src/ai_api/api/admin_system.py` `/admin/system/info`；
+  `frontend/src/routes/admin/home.tsx` 系統資訊卡片；階段 12
