@@ -407,3 +407,25 @@
 - **來源**：`deploy/helm/ai-api/values.yaml` `requestBodyLimitMB`；
   `src/ai_api/api/admin_system.py` `/admin/system/info`；
   `frontend/src/routes/admin/home.tsx` 系統資訊卡片；階段 12
+
+### proxy 把上游錯誤透明 relay 給 client 之餘，自己也要 log——不然 debug 等於猜謎
+
+- **理論說**：gateway 是 transparent proxy，上游發什麼事件就忠實 relay 給 client；client 自己會
+  解讀 error，gateway 不需要插手。
+- **實際發生**：使用者回報「stream disconnected before completion: `response.failed` event received」。
+  訊息是 Codex 解析 SSE 後自己生的；gateway 沒留任何 log——只看得到 nginx access log 200 OK 與
+  最後一個截斷的 SQL 參數（`'azure', 'gpt-5.4'`）。要回答「為什麼上游失敗」唯一線索就是「呼叫的
+  model 是 gpt-5.4」，到底是 DeploymentNotFound、content filter、rate limit、capacity 全靠猜。
+  admin 看不到 = admin 無法支援使用者。
+- **解決方式**：在 `event_gen` 攔截 `response.failed`，把 `response.error.{code,message}` 提
+  `logger.error` 並帶 model/provider/allocation 上下文；同步寫一筆 `CallRecord(outcome=upstream_error,
+  error_message=...)`，讓使用者用量視圖也看得到這次失敗（而不是「該次呼叫像沒發生過」）。事件本身
+  仍透明 relay，不影響 client 行為。
+- **教訓**：**透明 relay 與本地觀測是兩件事**——前者是對 client 的承諾（協定正確性），後者是對
+  維運的承諾（可診斷性）。proxy 對任何「終局事件」（completed / failed / cancelled / 任何
+  protocol-level error）都該**至少 log 一行帶足夠上下文**並落一筆稽核 row，否則一旦上游出狀況，
+  你只剩 client 的二手錯誤訊息。判準：「使用者問 admin 為什麼，admin 不打 upstream API 也能答嗎？」
+  答不出來 → log 缺位。
+  附帶：把上游錯誤分到既有 `outcome=upstream_error` 而不是新增 enum，沿用既有 usage view 的
+  渲染路徑就能看到——**新事件類型優先映射到既有語意**比加 enum + 改 UI 簡單一輪。
+- **來源**：`src/ai_api/proxy/responses.py` `event_gen` 對 `response.failed` 分支；階段 12
