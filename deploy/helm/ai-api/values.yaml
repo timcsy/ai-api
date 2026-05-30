@@ -22,7 +22,9 @@ ingress:
   enabled: false
   className: "nginx"
   host: "aiapi.example.com"
-  annotations: {}
+  annotations:
+    # Lift ingress-nginx 1MB default — AI payloads (images, long contexts) routinely exceed it.
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
   # Backend path prefixes — order matters (longest-prefix wins via ingress controller).
   # Must match src/ai_api/main.py router prefixes (Phase 3b.0 routing contract).
   backendPaths:

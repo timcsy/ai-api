@@ -11,6 +11,10 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # AI payloads (vision images, long contexts, Codex instructions+input, large PDFs) routinely
+    # exceed nginx's 1MB default; lift to 100MB to cover OpenAI Files 25MB + headroom.
+    client_max_body_size 100m;
+
     # security headers
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "DENY" always;
