@@ -21,7 +21,7 @@ from ai_api.models import (
 from ai_api.services.anomaly import detect_and_quarantine
 
 
-async def _seed_member_and_alloc() -> str:
+async def _seed_member_and_alloc(*, is_service: bool = False) -> str:
     sm = get_sessionmaker()
     async with sm() as s:
         m = Member(
@@ -48,6 +48,7 @@ async def _seed_member_and_alloc() -> str:
             revoked_at=None,
             created_by="test",
             note=None,
+            is_service_allocation=is_service,
         )
         s.add(a)
         s.add(
@@ -139,3 +140,26 @@ async def test_cold_start_over_absolute_triggers(app_client) -> None:
         await s.commit()
     assert len(decisions) == 1
     assert decisions[0].reason == "absolute_cold_start"
+
+
+# Phase 11 follow-up — service allocations (e.g. Codex/agent CLIs) are exempt;
+# their traffic is bursty by design and should not be auto-quarantined.
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_service_allocation_is_exempt_from_quarantine(app_client) -> None:
+    alloc_id = await _seed_member_and_alloc(is_service=True)
+    # Same shape that would normally trigger 'ratio': baseline + spike.
+    for h in range(2, 25):
+        await _add_calls(alloc_id, 100, h)
+    await _add_calls(alloc_id, 1100, 0)
+
+    sm = get_sessionmaker()
+    async with sm() as s:
+        decisions = await detect_and_quarantine(s)
+        await s.commit()
+    assert decisions == []
+    async with sm() as s:
+        alloc = (
+            await s.execute(select(Allocation).where(Allocation.id == alloc_id))
+        ).scalar_one()
+        assert alloc.status == AllocationStatus.active

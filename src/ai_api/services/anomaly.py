@@ -88,8 +88,13 @@ async def evaluate_allocation(
 async def detect_and_quarantine(db: AsyncSession) -> list[QuarantineDecision]:
     """One scan pass. Returns list of allocations that were quarantined."""
     now = datetime.now(UTC)
-    # Only consider active allocations.
-    active_stmt = select(Allocation).where(Allocation.status == AllocationStatus.active)
+    # Only consider active, non-service allocations. Service allocations
+    # (e.g. agent CLIs like Codex, internal bots) are exempt — their traffic
+    # is bursty by design and would otherwise be flagged as anomalous.
+    active_stmt = select(Allocation).where(
+        Allocation.status == AllocationStatus.active,
+        Allocation.is_service_allocation.is_(False),
+    )
     allocations = (await db.execute(active_stmt)).scalars().all()
 
     decisions: list[QuarantineDecision] = []
