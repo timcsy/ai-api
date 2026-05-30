@@ -89,6 +89,12 @@ googleOauth:
 logging:
   level: INFO
 
+# Phase 12: edge request body limit (MB). Single source of truth — applied to
+# both the frontend nginx pod (client_max_body_size) and exposed via backend
+# /admin/system/info so admin UI can show "max accepted payload size".
+# Keep aligned with upstream provider expectations (OpenAI Files: 25 MB).
+requestBodyLimitMB: 100
+
 migrationJob:
   enabled: true
   backoffLimit: 3

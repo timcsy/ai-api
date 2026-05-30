@@ -72,6 +72,12 @@ class Settings(BaseSettings):
     pool_total_tokens_per_month: int = Field(default=0, alias="POOL_TOTAL_TOKENS_PER_MONTH")
     pool_floor_per_allocation: int = Field(default=1000, alias="POOL_FLOOR_PER_ALLOCATION")
 
+    # Phase 12: edge request body limit (informational, mirrors the value baked
+    # into the frontend nginx pod via Helm — admin UI shows it so users know
+    # how big a payload is accepted before they hit 413). Single source of
+    # truth is the Helm value `requestBodyLimitMB`.
+    request_body_limit_mb: int = Field(default=100, alias="REQUEST_BODY_LIMIT_MB")
+
     # Phase 5: provider credential encryption
     # 32-byte url-safe base64 Fernet key (e.g., Fernet.generate_key()).
     # In production this MUST come from a K8s Secret; empty value triggers

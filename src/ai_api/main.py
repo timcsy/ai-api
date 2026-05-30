@@ -17,6 +17,7 @@ from ai_api.api import (
     admin_prices,
     admin_providers,
     admin_self_service,
+    admin_system,
     admin_tag_rules,
     admin_tags,
     allocations,
@@ -81,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_audit.router, prefix="/admin", tags=["admin-audit"])
     app.include_router(admin_diagnose.router, prefix="/admin", tags=["admin-diagnose"])
     app.include_router(admin_access.router, prefix="/admin", tags=["admin-access"])
+    app.include_router(admin_system.router, prefix="/admin", tags=["admin-system"])
     app.include_router(usage.router, prefix="/admin", tags=["admin-usage"])
     app.include_router(quota_pool.router, prefix="/admin", tags=["admin-quota-pool"])
     app.include_router(catalog.router, prefix="/catalog", tags=["catalog"])

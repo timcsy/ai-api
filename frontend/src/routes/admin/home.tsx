@@ -37,6 +37,9 @@ interface AdminAllocation {
   id: string;
   status: string;
 }
+interface SystemInfo {
+  request_body_limit_mb: number;
+}
 
 export function AdminHomePage() {
   const providers = useQuery<ProviderCredential[], ApiError>({
@@ -60,6 +63,11 @@ export function AdminHomePage() {
   const audit = useQuery<{ rows: AuditRow[] }, ApiError>({
     queryKey: ["admin", "audit-recent"],
     queryFn: () => api<{ rows: AuditRow[] }>("/admin/audit?limit=10"),
+  });
+  const systemInfo = useQuery<SystemInfo, ApiError>({
+    queryKey: ["admin", "system-info"],
+    queryFn: () => api<SystemInfo>("/admin/system/info"),
+    staleTime: 5 * 60_000,
   });
 
   const activeProviders = providers.data?.filter((p) => p.status === "active") ?? [];
@@ -135,6 +143,7 @@ export function AdminHomePage() {
         audit={audit.data?.rows ?? []}
         quarantinedCount={quarantinedCount}
         pausedCount={pausedCount}
+        systemInfo={systemInfo.data}
       />
     );
   }
@@ -214,12 +223,13 @@ export function AdminHomePage() {
 }
 
 function Dashboard({
-  hiddenModels, audit, quarantinedCount, pausedCount,
+  hiddenModels, audit, quarantinedCount, pausedCount, systemInfo,
 }: {
   hiddenModels: number;
   audit: AuditRow[];
   quarantinedCount: number;
   pausedCount: number;
+  systemInfo: SystemInfo | undefined;
 }) {
   return (
     <div className="container mx-auto py-8 max-w-4xl space-y-6">
@@ -306,6 +316,26 @@ function Dashboard({
             <Link className="text-primary hover:underline" to="/admin/observability/usage">用量</Link>
             <Link className="text-primary hover:underline" to="/admin/observability/quota">配額池</Link>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">系統資訊</CardTitle>
+          <CardDescription>由部署設定決定，需調整請聯絡維運</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <dl className="text-sm grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2">
+            <dt className="text-muted-foreground">單一請求大小上限</dt>
+            <dd>
+              {systemInfo
+                ? <><span className="font-mono">{systemInfo.request_body_limit_mb} MB</span>
+                    <span className="text-muted-foreground ml-2">
+                      （超過會在邊緣回 413；成員上傳大檔／長 context 受此限制）
+                    </span></>
+                : <span className="text-muted-foreground">載入中…</span>}
+            </dd>
+          </dl>
         </CardContent>
       </Card>
     </div>

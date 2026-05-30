@@ -12,8 +12,9 @@ server {
     index index.html;
 
     # AI payloads (vision images, long contexts, Codex instructions+input, large PDFs) routinely
-    # exceed nginx's 1MB default; lift to 100MB to cover OpenAI Files 25MB + headroom.
-    client_max_body_size 100m;
+    # exceed nginx's 1MB default. Value is templated from Helm (requestBodyLimitMB) so the
+    # admin UI shows the same number via /admin/system/info — single source of truth.
+    client_max_body_size ${CLIENT_MAX_BODY_SIZE};
 
     # security headers
     add_header X-Content-Type-Options "nosniff" always;

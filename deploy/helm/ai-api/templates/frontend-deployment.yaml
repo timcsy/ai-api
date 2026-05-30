@@ -35,6 +35,8 @@ spec:
             # the conf template at start). Single-origin: domain → frontend only.
             - name: BACKEND_UPSTREAM
               value: "{{ include "ai-api.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local"
+            - name: CLIENT_MAX_BODY_SIZE
+              value: "{{ .Values.requestBodyLimitMB }}m"
           ports:
             - name: http
               containerPort: 8080
