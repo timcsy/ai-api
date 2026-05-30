@@ -55,6 +55,22 @@ _PASSTHROUGH_FIELDS = (
     "truncation",
 )
 
+# Diagnostic fields we surface when logging a response.failed event. Skip
+# huge user-content fields (instructions/input/output/tools) so the log line
+# stays readable.
+_FAILED_DIAG_KEYS = (
+    "object", "status", "error", "incomplete_details",
+    "status_details", "model", "usage", "id", "created_at",
+)
+# Known non-diagnostic top-level keys; anything outside this set + diag set
+# gets surfaced as `extra_keys` so we discover provider-specific extensions.
+_FAILED_KNOWN_NOISE_KEYS = frozenset({
+    "instructions", "input", "output", "tools", "tool_choice",
+    "metadata", "reasoning", "text", "parallel_tool_calls",
+    "temperature", "top_p", "max_output_tokens", "previous_response_id",
+    "store", "truncation", "stream", "user",
+})
+
 
 async def model_supports_responses(session: AsyncSession, requested_model: str) -> bool:
     """True if the model is in the catalog AND advertises the `responses` capability."""
@@ -364,22 +380,15 @@ async def proxy_responses(
                             or incomplete.get("description")
                             or "(no error message)"
                         )
-                        # Dump only diagnostic fields — skip instructions/input/
-                        # output/tools which are huge user content and crowd out
-                        # the bits we need (status, error, status_details, etc.).
-                        _DIAG_KEYS = (
-                            "object", "status", "error", "incomplete_details",
-                            "status_details", "model", "usage", "id", "created_at",
+                        # Dump only diagnostic fields (see module-level
+                        # _FAILED_DIAG_KEYS) and list any unexpected top-level
+                        # keys for discovering provider-specific extensions.
+                        diag = {k: resp.get(k) for k in _FAILED_DIAG_KEYS if k in resp}
+                        extra_keys = sorted(
+                            set(resp.keys())
+                            - set(_FAILED_DIAG_KEYS)
+                            - _FAILED_KNOWN_NOISE_KEYS
                         )
-                        diag = {k: resp.get(k) for k in _DIAG_KEYS if k in resp}
-                        # Also surface any top-level keys we didn't expect; helps
-                        # discover provider-specific extension fields.
-                        extra_keys = sorted(set(resp.keys()) - set(_DIAG_KEYS) - {
-                            "instructions", "input", "output", "tools", "tool_choice",
-                            "metadata", "reasoning", "text", "parallel_tool_calls",
-                            "temperature", "top_p", "max_output_tokens", "previous_response_id",
-                            "store", "truncation", "stream", "user",
-                        })
                         logger.error(
                             "responses stream upstream failure model=%s provider=%s "
                             "allocation=%s code=%s message=%s diag=%s extra_keys=%s",
