@@ -55,3 +55,17 @@
   - 分配記錄上有 `can_redelegate` 旗標，預設為 `false`
   - 即使開啟轉分配，二次分配的範圍不得超過原分配；且擁有者仍可見、可撤回
     整條分配鏈
+
+### 5. 集中管理勝於並行管理 (Single Authority for Access)
+
+- **推導自**：根公理 + 可追蹤性（多條路徑同時管同一件事 → 必然 drift →
+  追蹤斷裂 → 違反可追蹤性）
+- **意義**：對「誰能存取什麼」這類治理決策，系統內**只有一條唯一路徑**可改寫；
+  其他機制要嘛 derive 自它、要嘛只在它不存在時生效（bootstrap fallback）。
+  並行管理路徑會逼著管理員兩邊同步、又遲早不同步，使用者被無聲擋下。
+- **如何應用**：
+  - 成員清單是 admin mode 下 access 的單一真理；email 白名單退為
+    bootstrap-only（DB 無 admin 才查）
+  - 一個語意旗標支援多個治理用途（例：分配上的 service flag 同時豁免
+    rebalance 與 anomaly），不為每個治理機制各加專用 exempt 旗標
+  - infra 類設定（body size 等）：唯一真理在 Helm value，UI 可顯示、不可編輯

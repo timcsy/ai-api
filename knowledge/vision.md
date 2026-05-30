@@ -37,19 +37,9 @@
 
 ## 現狀
 
-平台已對組織開放使用。詳細階段成果見下方〈路線圖〉與 `history/completed-phases-detail.md`。
-
-最近的整體形狀：
-- 4 家 provider（Azure / OpenAI / Anthropic / Gemini）統一以 OpenAI 相容介面對外，
-  含 `/v1/chat/completions` 與 `/v1/responses`（後者支援 SSE 串流、工具呼叫、
-  reasoning/cached 精確分項計費、`store`/`previous_response_id` 對話狀態）。
-- 成員自助：可在 web UI 領取 / 暫停 / 恢復自己的憑證、看到自己的整體用量總覽。
-- 管理員端：首位 admin 由 helm Job 自動 bootstrap；之後存取由「成員清單 +
-  自動註冊規則 + 來源限制」管理（白名單退場為 bootstrap-only）；憑證可暫停/
-  恢復、quarantine 可解除；異常偵測器對「服務型分配」豁免（agent 流量本就是
-  by-design 爆量）。
-- 安全：provider key Fernet at-rest、K8s NetworkPolicy、distroless、per-IP 登入鎖、
-  CI Trivy + SBOM、pod 啟動時即驗證加密金鑰與管理員預設值。
+平台已對組織開放使用（k8s 叢集，公開 MIT 倉庫）。詳細階段成果見下方〈路線圖〉與
+`history/completed-phases-detail.md`。本檔〈核心想法〉與〈架構〉段反映平台現行設計；
+本段只記「跑在哪、目前未完成的是什麼」。
 
 未完成：**3b.7 Playwright E2E**（獨立 test-infra，暫緩）。
 
@@ -65,9 +55,10 @@
   查 catalog → 取對應 `ProviderCredential` → 經 litellm 發送
 - **對外 API 介面**：OpenAI 相容端點共用同一條前置 pipeline（憑證 / 分配 /
   狀態 / 配額 / model binding / 存取政策 / 計費記錄）——
-  - `/v1/chat/completions`（既有，非串流）
-  - `/v1/responses`（agent 工具如 Codex 需要；**支援 SSE streaming、tool calls、
-    server-side 對話狀態**）。路由**統一經 litellm `aresponses`**：
+  - `/v1/chat/completions`（非串流）
+  - `/v1/responses`（agent 工具如 Codex 需要；**已上線並真機驗證**，支援 SSE
+    streaming、tool calls、reasoning/cached 精確分項計費、server-side 對話狀態）。
+    路由**統一經 litellm `aresponses`**：
     - **OpenAI / Azure**：litellm 直呼原生 responses，加密 reasoning 跨輪 replay
       等專屬語意高保真
     - **Anthropic / Gemini 等**：litellm 自動橋接（含 streaming）；OpenAI 專屬語意
@@ -84,12 +75,17 @@
   後續 self-hosted（Ollama / vLLM 等）
 - **認證**：彈性身份驗證，預設提供 Google Workspace SSO（最低摩擦），
   同時支援：
-  - 管理員手動加入 email（白名單）
+  - 管理員直接管理成員清單（新增／停用）；email 白名單**僅作為 bootstrap fallback**
+    （DB 無任何 admin 時生效，admin 進來後不再生效）
   - 自動註冊條件（例：email 網域、特定身份屬性），符合條件即可註冊
   - 來源安全性限制（IP/網段、裝置／瀏覽器條件等）
+  - 異常偵測自動隔離可疑分配；service flag 可標示 agent/CLI 等 by-design 爆量者豁免
 
   認證機制應抽象化，未來可新增 OIDC/SAML 等供應商而不需重寫核心邏輯。
-- **管理員介面**：流量／用量觀測、憑證分配、撤回、配額調整
+- **管理員介面**：流量／用量觀測、憑證分配、撤回、配額調整、quarantine 解除、
+  存取規則設定；首頁顯示關鍵維運狀態（被自動隔離 / 暫停的分配數、系統設定
+  上限如 request body）——**可編輯**只開放給業務類設定（access rules、tag、價目、
+  配額）；infra 類（body size、timeout 等）一律 read-only 顯示，由 Helm value 管。
 - **使用情境目錄**：列舉常見任務（文生圖、STT、TTS、摘要、翻譯……）
   並推薦對應 API
 - **不在本專案範圍**：行政輔助服務（聊天介面、文件助理等）由其他專案
@@ -167,7 +163,9 @@
   自動註冊規則 + 來源限制」管理；新增通用 `/admin/access` 頁讓 admin 自己設定（不再 hard-code 任何網域）。
   **anomaly detector 對 `is_service_allocation=True` 豁免**（agent/CLI 流量是 by-design 爆量，
   不該被自動隔離）。**維運可視性**：admin 首頁卡片顯示 quarantined/paused 數，分配列加紅色「已隔離」/
-  琥珀色「已暫停」徽章與「解除隔離」操作。**專案公開化**：MIT License、neutralize 內部命名、
+  琥珀色「已暫停」徽章與「解除隔離」操作；首頁加 read-only「系統資訊」卡顯示 request body 上限
+  （Helm `requestBodyLimitMB` 同時注入 nginx `client_max_body_size` 與 backend env，
+  「顯示值 = 執法值」single source of truth）。**專案公開化**：MIT License、neutralize 內部命名、
   Docker image 公開、web header 加 GitHub Star icon。細節見 `history/completed-phases-detail.md`。
 
 > **未完成項**：3b.7 Playwright E2E（獨立 test-infra，暫緩）。其餘階段均已完成並真機驗證。
