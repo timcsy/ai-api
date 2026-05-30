@@ -342,18 +342,37 @@ async def proxy_responses(
                         persisted = True
                     elif etype == "response.failed" and not persisted:
                         # Upstream protocol-level failure (content filter, model
-                        # not found on deployment, capacity, etc.). Capture the
-                        # error reason — without this log line, admin has no way
-                        # to know WHY the user saw "stream disconnected before
-                        # completion: response.failed event received".
+                        # not found on deployment, capacity, etc.). Try several
+                        # known locations — Azure/OpenAI/litellm don't always put
+                        # the reason in `response.error`; sometimes it's in
+                        # `incomplete_details.reason` or `status_details.error`.
                         resp = _as_dict(payload_obj.get("response"))
                         err = _as_dict(resp.get("error"))
-                        err_code = err.get("code") or "unknown"
-                        err_msg = err.get("message") or "(no error message)"
+                        incomplete = _as_dict(resp.get("incomplete_details"))
+                        status_details = _as_dict(resp.get("status_details"))
+                        sd_err = _as_dict(status_details.get("error"))
+                        err_code = (
+                            err.get("code")
+                            or sd_err.get("code")
+                            or incomplete.get("reason")
+                            or resp.get("status")
+                            or "unknown"
+                        )
+                        err_msg = (
+                            err.get("message")
+                            or sd_err.get("message")
+                            or incomplete.get("description")
+                            or "(no error message)"
+                        )
+                        # Always log the full response object for failed events
+                        # so we can see what Azure actually puts where; this is
+                        # bounded (one log per failed call) and indispensable for
+                        # diagnosing provider-specific payload shapes.
                         logger.error(
                             "responses stream upstream failure model=%s provider=%s "
-                            "allocation=%s code=%s message=%s",
+                            "allocation=%s code=%s message=%s full_response=%s",
                             requested_model, provider, alloc_id, err_code, err_msg,
+                            json.dumps(resp, default=str)[:2000],
                         )
                         await _record_failed_stream(f"{err_code}: {err_msg}")
                         persisted = True
