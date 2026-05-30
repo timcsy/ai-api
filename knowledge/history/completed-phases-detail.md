@@ -323,3 +323,87 @@
 **明確排除：**
 - ❌ 全面視覺改版 / 換 design system
 - ❌ 3b.7 Playwright E2E（獨立 test-infra，暫緩）
+
+## 階段 11：Responses API / Agent 工具（Codex）相容
+
+完成（2026-05-29；Codex CLI 真機驗證）。前置：階段 5（多 provider）、階段 7（價目）、階段 9（用量總覽）。
+
+**動機：** 延伸「單一入口」到主流 agent 開發工具。OpenAI Codex 等 CLI 預設講 Responses API
+（`wire_api = "responses"`），全程依賴 SSE streaming。支援後組織開發者可把 Codex 的 base URL
+指向本平台、填入分配憑證即用，用量／成本仍統一歸戶——不必各自申請 OpenAI 帳號。
+**第一版即交付完整能力，不留半成品。**
+
+**成功標準：**
+- [x] Codex CLI 指向 `https://<平台>/v1` + 平台憑證後，能完成含工具呼叫的多輪 agent 任務
+  （含 reasoning model 的加密 reasoning 跨輪 replay）；該次用量精確歸戶並計費（reasoning /
+  cached token 分項可見）
+- [x] 所有已上架 provider（Azure / OpenAI / Anthropic / Gemini）皆可經 `/v1/responses` 呼叫
+  （OpenAI-family 全保真，其他家 litellm 橋接，進階語意等效降級）
+- [x] 用 `store=true` 的第三方 client 能以 `previous_response_id` 跨輪鏈接
+
+**核心設計（plan R1 精煉後實作）：**
+- **統一 litellm 路由**：所有 provider 走 `litellm.aresponses()`——OpenAI/Azure 原生高保真
+  （等同 pass-through）、其他家自動橋接（含 streaming）。實測 `aresponses` 已涵蓋完整 Responses
+  介面（`include`/`reasoning`/`store`/`previous_response_id`），故不需另寫 raw pass-through（YAGNI）；
+  保留為 fallback 若真機發現失真
+- 與 `/chat/completions` **共用** `proxy/preflight.py` 前置 pipeline，auth／配額／計費不複製
+
+**Checklist 完整版：**
+- [x] 抽出共用 pre-flight pipeline；`/chat/completions` 一併改用
+- [x] `POST /v1/responses` 端點：請求驗證 + 套用共用 pipeline
+- [x] OpenAI/Azure 高保真（litellm 原生 responses，保留 encrypted reasoning / tool calls 透傳）
+- [x] 其他 provider 經 `upstream.aresponses()` litellm 橋接（`stream=True`）
+- [x] catalog `capabilities: ["responses"]` 路由 gate
+- [x] SSE streaming 串流轉發（FastAPI `StreamingResponse`）：完整事件序列
+- [x] 串流時 tee `response.completed` 取 usage；正常結束 / client 斷線都記帳
+- [x] nginx / ingress SSE 不緩衝驗證（`proxy_buffering off`）
+- [x] `CallRecord` 加 `reasoning_tokens`、`cached_tokens`（Alembic migration）
+- [x] 價目表加 cached input 折扣價；`calculate_cost` 納入 reasoning（含於 output）與 cached（折扣）
+- [x] usage 對應：`input_tokens→prompt`、`output_tokens→completion`、details.reasoning_tokens、
+  details.cached_tokens 分項落帳
+- [x] `store=true` 持久化（新表 + TTL + 清理 cronjob）
+- [x] `previous_response_id` 跨輪鏈接 + 嚴格歸屬檢查
+- [x] Gateway 真機驗證（curl 對真實 Azure）
+- [x] Codex CLI 真機煙霧測試（2026-05-29 使用者端 Windows codex-tui 跑通，含 reasoning/cached）
+- [x] 多 provider responses 驗證
+- [x] 測試：契約 + 計費正確性 + SSE mock 上游 + 斷線處理 + store/previous_response_id
+
+**額外 UX 延伸：**
+- 用量總覽顯示 reasoning/cached 分項
+- 「如何呼叫」加 responses/Codex 範例 + **config.toml 下載 + 各 OS 白話步驟**
+- 一般使用者**自助暫停/恢復**自己的憑證（沿用 Phase 019 service，端點層加 ownership check）
+- 分配/管理員表格命名統一（友善名 + 標籤化 model 代號/憑證）
+
+**明確排除：**
+- ❌ 非 OpenAI provider 模擬 OpenAI 專屬語意（加密 reasoning replay）的完全對等
+  ——屬協定物理限制，等效降級可接受（基本對話／工具呼叫仍完整）
+
+## 階段 12：存取設計重組 + 維運可視性
+
+完成（2026-05-30）。前置：階段 2（auth）、階段 5（tag-based access）、階段 11（Codex / agent 工具上線）。
+
+**動機：** Phase 11 上線後幾天浮現的三類非預期狀況：
+1. Codex 流量被 anomaly detector 自動隔離（agent CLI 本就 bursty，不是異常）
+2. 既有設計把白名單同時當「bootstrap」與「日常管理機制」，admin 進來後白名單與成員管理重疊、
+   admin-created member 在 OIDC gate 仍被白名單擋下
+3. quarantined 分配既無首頁可見性也無解除 UI；既有後端 API（`/admin/access/rules` 等）對應的
+   前端頁面缺位，使用者得求助工程師才能管理
+4. 順勢專案公開化（MIT、neutralize 命名、Docker image 公開、GitHub Star 連結）
+
+**成功標準：**
+- [x] anomaly detector 在 `is_service_allocation=True` 時跳過（`services/anomaly.py`）；
+  新增整合測試 `test_us4_anomaly_detector.py::test_service_allocation_is_exempt_from_quarantine`
+- [x] `auth/policy.py::is_email_allowed` 重寫為兩模式：bootstrap（無 admin）= whitelist OR rule；
+  admin mode = rule OR active member by email（whitelist bypassed）
+- [x] `/admin/access` 頁通用化：admin 自己設定自動註冊規則與來源限制（IP/網段），不再 hard-code
+  任何網域；側 nav 新增「存取」入口
+- [x] admin 首頁加 quarantined/paused 數量卡（紅 / 琥珀邊框），點擊跳 `/admin/observability/allocations`
+- [x] 分配列加紅色「🚨 已隔離」/ 琥珀色「⏸ 已暫停」徽章；新增「解除隔離」dropdown 操作呼叫
+  `POST /admin/allocations/{id}/unquarantine`
+- [x] 既有「切換服務型」操作即 anti-anomaly 永久豁免入口（不再需要新 UI）
+- [x] MIT License + README 重寫（badges、Mermaid 架構圖）；scrub 內部命名（CCSH 中性化）；
+  GHCR Docker image 公開；app-shell header 加 GitHub icon + Star tooltip
+
+**明確排除：**
+- ❌ 黑名單設計（封鎖某 email/IP）——當下無需求，保留純白名單心智模型
+- ❌ 異常偵測規則可設定化（首版 service flag 即足夠豁免；門檻值仍寫死）

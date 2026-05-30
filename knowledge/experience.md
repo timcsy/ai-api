@@ -338,20 +338,6 @@
   同時備齊 catalog **與** provider credential，否則會被 `model_forbidden` 誤導去查錯方向。
 - **來源**：`src/ai_api/services/model_access.py` `is_accessible`；`tests/contract/test_responses*.py`；階段 11
 
-### Responses streaming 的 usage 只在終局事件，計費要在 generator 的 finally 收尾
-
-- **理論說**：串流轉發就是把上游 SSE 逐塊 yield 給 client 即可。
-- **實際發生**：Responses 的 token usage 只出現在最後的 `response.completed` 事件；若只顧
-  轉發、不攔截終局事件，就沒有 usage 可計費。且 client 中途斷線時 generator 會被取消，
-  若記帳寫在迴圈正常結束後，斷線就完全漏記（違反 FR-017）。
-- **解決方式**：在轉發迴圈中 tee `response.completed` 的 `response.usage` 與 `id`；把
-  `record_call` 放進 generator 的 `finally`，確保正常結束與斷線兩條路徑都記帳（斷線時
-  usage 可能為 None，仍記一筆）。`get_db_session` 在 StreamingResponse 完成後才 commit，
-  所以 finally 內的 flush 會被正常提交。
-- **教訓**：串流端點的「計費／稽核」是 generator 生命週期的一部分，不是迴圈後的收尾語句。
-  任何「邊串流邊要取末尾 metadata」的場景，attribute 擷取放迴圈、persist 放 `finally`。
-- **來源**：`src/ai_api/proxy/responses.py` `event_gen`；`tests/contract/test_responses_stream.py`；階段 11
-
 ### 新增一個資料欄位，要追到「所有讀寫與顯示點」，不是只加 model
 
 - **理論說**：加個 `cached_input_per_1k` 欄位 + 計費公式，功能就完成了。
@@ -416,3 +402,61 @@
   不要綁在 generator 生命週期結尾——結尾很可能在 client 斷線的 cancellation 下執行，DB await 會被
   打斷。凡 `try/except` 想涵蓋「被取消也要善後」，記得 catch `BaseException` 而非 `Exception`。
 - **來源**：`src/ai_api/proxy/responses.py` `event_gen` / `_record_fresh`；階段 11（Codex 真機才暴露）
+
+### anomaly detector 必須對「by-design 爆量」的服務型分配豁免
+
+- **理論說**：baseline + ratio 偵測能抓出真正異常的用量爆衝，覆蓋所有 active allocation 即可。
+- **實際發生**：Phase 11 上線後，自己（admin）的分配在用 Codex 一個下午後就被自動 quarantine
+  ——Codex 是 agent CLI，連續 tool-call 推進的尖峰流量原本就是 10× baseline 以上，這對 ratio
+  detector 看起來就是異常。模型／規則沒錯，是「被偵測的對象」分布有兩類：給人用的 chat 憑證
+  （爆量是真異常）和給 agent/服務用的（爆量是 by-design）。一視同仁就會誤殺。
+- **解決方式**：`Allocation` 既有 `is_service_allocation` 旗標（Phase 3c 自適應配額池為
+  rebalance 豁免用的），在 `detect_and_quarantine` 的 active query 直接加
+  `is_service_allocation.is_(False)`；admin UI 用既有「切換服務型」操作切換。新增整合測試
+  `test_service_allocation_is_exempt_from_quarantine` 把 baseline+spike 情境跑一遍，確認
+  service 分配不會被隔離。
+- **教訓**：自動化執法（quarantine、rate limit、deactivate）的覆蓋範圍要看「被治理對象的分布」，
+  別假設一條規則適用所有 actor。給 agent/服務憑證一個「by-design 例外」旗標比動門檻好——
+  門檻調寬會放掉真正的 chat 異常，旗標只放掉那一類。同類旗標（service flag）也可重用：
+  Phase 3c 已用它豁免 rebalance，Phase 12 順手豁免 anomaly，**一個語意旗標多個治理用途**比
+  個別新增 `exempt_from_anomaly`、`exempt_from_rebalance` 等專用旗標乾淨。
+- **來源**：`src/ai_api/services/anomaly.py` `detect_and_quarantine`；
+  `tests/integration/test_us4_anomaly_detector.py`；階段 12
+
+### 白名單只在「沒有 admin」時生效，admin 進來後由 admin 管理機制接手
+
+- **理論說**：白名單是穩定的 access control 機制，admin UI 提供新增/刪除頁面持續維護即可。
+- **實際發生**：階段 2 設計時把白名單當「日常管理機制之一」與自動註冊規則、來源限制並列。
+  Phase 11 上線後實測：(1) admin 在 `/admin/members` 新增的成員，OIDC 登入時被白名單擋
+  （白名單漏放）—— admin 自己以為加完成員就 OK；(2) 學校老師回報「this account is not
+  allowed」，根因是白名單機制與成員管理機制重疊、心智模型雙軌、靠 admin 兩邊同步維護不現實。
+- **解決方式**：把白名單退為 **bootstrap-only**：`auth/policy.py::is_email_allowed` 改成
+  「DB 有任何 admin → admin mode」「DB 無 admin → bootstrap mode」。admin mode 下白名單
+  不生效（active member by email 即放行），日常存取改由「成員清單（admin 加的人或自動註冊
+  進來的人）+ 自動註冊規則 + 來源限制」管。bootstrap mode 才查白名單，讓首位 admin 還能用
+  helm Job + bootstrap email 進來。
+- **教訓**：access control 機制若有兩條路徑能管同一件事（白名單 vs 成員清單），admin 必然
+  忘了同步其中一條 → 使用者被無聲擋下。設計時就要回答「**誰是該機制的最終 source of truth**」，
+  並讓其他機制要嘛 derive 自它、要嘛只在它不存在時生效。「bootstrap-only fallback」是把這個
+  原則寫進程式碼的好模式——平時不在路徑上、不會 drift，緊急時還在。
+- **來源**：`src/ai_api/auth/policy.py` `is_email_allowed`；`frontend/src/routes/admin/access.tsx`；階段 12
+
+### backend 有 API 卻沒對應 UI = 隱性債，會被使用者「靠工程師」掩蓋
+
+- **理論說**：backend endpoint 寫好、admin 透過 API/curl 操作即可；UI 慢點補沒關係。
+- **實際發生**：Phase 12 才發現一連串「後端有、前端沒」的隱性債：
+  - `POST /admin/allocations/{id}/unquarantine` 早就存在，但 quarantined 分配在分配列只是
+    一個字串狀態、沒徽章也沒按鈕——admin 不會察覺可以恢復、得求工程師下 SQL
+  - `/admin/access/rules`、`/admin/source-restrictions` CRUD endpoints 全有，但沒有任何
+    admin 頁面操作它們——「不要 hard-code 我的網域」這類請求變成工程師要進 DB 加 row
+  - 「服務型分配」的切換按鈕被當成普通操作放著，但其實是 Phase 12 推出後**就是** anti-anomaly
+    永久豁免的入口——使用者不知道按下去意味著什麼
+- **解決方式**：Phase 12 補上三個 UI 缺口（首頁 quarantine alert + 分配列徽章 + 解除操作；
+  通用 `/admin/access` 頁；「切換服務型」操作加說明文案）。事後盤點：每個 backend endpoint
+  在 PR 中都該回答「使用者怎麼觸發這件事」，如果答案是「靠 admin 打 curl」或「靠 SQL」，
+  就是 UI 缺位、應列為「未完成」而非「後端 done」。
+- **教訓**：admin endpoint 沒對應 UI 不是「待 polish」，是**功能未完成**——使用者實際取得
+  該能力的成本是「找工程師」，等於這條能力對非工程師 admin 等於不存在。Phase boundary 的
+  DoD 要包含「目標 actor 不需另一個 actor 協助即可完成」，否則就是把工程師當成 production
+  dependency。同樣警訊：log 裡常見「admin 來問怎麼 X」，X 就是 UI 缺位的索引。
+- **來源**：`frontend/src/routes/admin/{allocations,home,access}.tsx`；階段 12
