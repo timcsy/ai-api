@@ -34,6 +34,10 @@
   token、估算花費、趨勢、各 model 佔比），自己掌握自己的消耗，不必等 admin 報數
 - 平台額外提供「**使用情境目錄**」，讓不熟悉 LLM API 的人能依需求
   （文生圖、語音轉文字、文件摘要……）找到該用哪個 API、怎麼開始
+- 平台對**突發狀況**（分配被自動隔離、upstream 短時間大量失敗、provider 憑證
+  失效等）主動通知管理員——沿用既有 audit_events 為事件源；通知設定（SMTP
+  / 收件人）admin 可在 web UI 自助設定並按「發測試信」即時驗證，**不需另外
+  架設外部服務**（借既有 Gmail SMTP 或學校 mail 即可）
 
 ## 現狀
 
@@ -171,4 +175,30 @@
   neutralize 內部命名、Docker image 公開、web header 加 GitHub Star icon。
   細節見 `history/completed-phases-detail.md`。
 
-> **未完成項**：3b.7 Playwright E2E（獨立 test-infra，暫緩）。其餘階段均已完成並真機驗證。
+### 階段 13：管理員突發狀況通知 ⏳（規劃中）
+- [ ] 規劃中 — admin 在 web UI 設定 SMTP（Gmail App Password 即可，零外部服務），
+  平台對重要 audit_events 主動寄信通知。第一版只做 Email channel；架構抽象為
+  `Notifier` interface 讓 LINE Bot / Web Push 之後可平行加。
+
+**動機**：目前 admin 只有開著 admin UI 才會看到 quarantined/paused 卡片；分配
+被自動隔離、upstream 短時間大量失敗、憑證失效等事件**離線時無感**，等使用者
+回報才知道。台灣學校環境下 Slack/Discord/Google Chat 都不友善，LINE Bot 設定
+過重，**Email 是「最容易安裝」的選擇**（admin 用既有學校 email，server 端只
+需 SMTP host/port/username/password 4 個 value）。
+
+**成功標準**（待 spec）：
+- admin UI 新 page `/admin/notifications`：SMTP 設定表單 + 收件人清單 + 「發測試信」
+  即時驗證 + 最近 N 條通知歷史
+- SMTP 帳密以 Fernet 加密落 DB（沿用既有 `PROVIDER_KEY_ENC_KEY` pattern）
+- 事件源 = 既有 `audit_events`；用設定檔或預設值定義「值得 page」的事件型別清單
+  + 去重視窗（同事件 N 分鐘內只寄一封，避免轟炸）
+- 未設定 SMTP 時 = 通知停用、不擋部署、不擾現有流程
+- 架構：`Notifier` interface + `EmailNotifier`，第二版 channel 可平行 add
+
+**明確排除（第一版）**：
+- ❌ Web Push / PWA notification（之後可加）
+- ❌ LINE Messaging API（之後可加，但要處理 channel 註冊 + group invite 流程）
+- ❌ Slack/Discord/Google Chat webhook（不符 TW 學校工作流）
+- ❌ 自架 SMTP server（信幾乎進垃圾匣，IP 信譽維運非順手做的事）
+
+> **未完成項**：3b.7 Playwright E2E（獨立 test-infra，暫緩）、**階段 13 通知**（規劃中）。其餘階段均已完成並真機驗證。
