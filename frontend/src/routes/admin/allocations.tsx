@@ -130,6 +130,14 @@ export function AdminAllocationsPage() {
     },
     onError: (e) => toast({ title: "操作失敗", description: e.message, variant: "destructive" }),
   });
+  const unquarantineMut = useMutation<unknown, ApiError, string>({
+    mutationFn: (id) => api(`/admin/allocations/${id}/unquarantine`, { method: "POST" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "allocations"] });
+      toast({ title: "已解除隔離" });
+    },
+    onError: (e) => toast({ title: "解除失敗", description: e.message, variant: "destructive" }),
+  });
 
   const locksQuery = useQuery<ReclaimLock[], ApiError>({
     queryKey: ["admin", "self-service-locks"],
@@ -215,9 +223,17 @@ export function AdminAllocationsPage() {
                   )}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={a.status === "active" ? "default" : "secondary"}>
-                    {a.status}
-                  </Badge>
+                  {a.status === "quarantined" ? (
+                    <Badge variant="destructive" title="被異常偵測自動隔離。可點操作 → 解除隔離">
+                      🚨 已隔離
+                    </Badge>
+                  ) : a.status === "paused" ? (
+                    <Badge variant="outline" className="text-amber-700 border-amber-500">已暫停</Badge>
+                  ) : (
+                    <Badge variant={a.status === "active" ? "default" : "secondary"}>
+                      {a.status}
+                    </Badge>
+                  )}
                 </TableCell>
                 <TableCell>{a.quota_tokens_per_month ?? "無限額"}</TableCell>
                 <TableCell className="space-x-1">
@@ -270,6 +286,13 @@ export function AdminAllocationsPage() {
                           onClick={() => pauseResumeMut.mutate({ id: a.id, action: "resume" })}
                         >
                           恢復
+                        </DropdownMenuItem>
+                      )}
+                      {a.status === "quarantined" && (
+                        <DropdownMenuItem
+                          onClick={() => unquarantineMut.mutate(a.id)}
+                        >
+                          解除隔離（恢復為可用）
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuItem
