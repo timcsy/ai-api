@@ -201,4 +201,44 @@
 - ❌ Slack/Discord/Google Chat webhook（不符 TW 學校工作流）
 - ❌ 自架 SMTP server（信幾乎進垃圾匣，IP 信譽維運非順手做的事）
 
-> **未完成項**：3b.7 Playwright E2E（獨立 test-infra，暫緩）、**階段 13 通知**（規劃中）。其餘階段均已完成並真機驗證。
+### 階段 14：Admin 視覺化強化 ⏳（規劃中）
+- [ ] 規劃中 — 在不破壞既有差異化（quarantine 警示、設定清單、系統資訊）前提下，
+  讓首頁與用量頁的資訊密度與決策力提升一個檔次。沿用既有 `recharts`（可升級到
+  shadcn charts wrapper），不導入新 lib。
+
+**動機**：競品 mockup 的視覺密度顯著高於現況——首頁就有時序圖、model 占比、
+top spenders 等決策圖；對外觀感「像成品」差距明顯。但**圖表多 ≠ 好**：每張圖
+必須回答一個會驅動決策的具體問題，否則只是 chart-junk 把真正重要的警示淹掉。
+
+**第一版範圍**（**首頁最多 3 張新圖**，避免視覺超載）：
+- 首頁 7–14 天 daily spend/usage 條狀圖（可切 token / cost 雙模式，hover 顯示明細）
+  → 答題「最近花錢節奏正常嗎？」
+- 首頁 Spend by Model donut（top 5 + Other，click slice 跳該 model 詳情）
+  → 答題「錢都燒在哪？」
+- 首頁 Top 5 allocations by spend 橫向 bar（display_name + 數字 + click → allocation 詳情）
+  → 答題「誰是重度使用者？」
+- `/admin/usage` 加 Provider 比例 donut（procurement 決策）
+- `/admin/usage` 加 hour-of-day heatmap（24h × 7day；對課堂場景特別有意義）
+- 全頁面統一時段選擇器（本週／本月／本季／自訂，shadcn 現成）
+- 視覺 polish 一輪：卡片陰影、heading scale、空狀態 illustration
+
+**第二版可能**（之後再評估，不在第一版範圍）：
+- Allocation 詳情頁加 30 天 daily token line + token 分項 stacked bar + 配額燃燒投影
+- Member 詳情頁加跨 allocation donut
+- 本月累積支出曲線 + 月底投影（趨勢延伸虛線）
+- PNG export
+
+**明確排除**：
+- ❌ 首頁塞 >3 張圖（quarantine 警示一定要保持顯眼）
+- ❌ 為每個指標都配一張圖（數字 + delta 已足夠就不要硬塞）
+- ❌ 3D pie / radar / treemap 等花俏圖型（漂亮但難讀）
+- ❌ 為了「像成品」犧牲我們的差異化（admin 設定清單、quarantine alert、系統資訊）
+- ❌ 導入新 chart lib（沿用 recharts；最多升級到 shadcn charts wrapper）
+
+**設計原則**：
+- 每張圖回答一個會驅動決策的問題；無此性質的圖一律砍
+- 預設帶「vs 上週／上月」delta 比較
+- 點圖元素能 click-through 到詳情頁，不要孤立圖
+- hourly 重算為最低更新頻率，避免「美但 stale」
+
+> **未完成項**：3b.7 Playwright E2E（獨立 test-infra，暫緩）、**階段 13 通知**、**階段 14 視覺化強化**（皆規劃中）。其餘階段均已完成並真機驗證。
