@@ -30,3 +30,11 @@ CVE-2026-24049
 # providers = HTTPS). distroless has no apt to patch in place; fixed upstream in
 # 1.20.1-2+deb12u5 — will clear via the next distroless `:nonroot` rebuild.
 CVE-2026-40356
+
+# ---- 2026-06-01: frontend image ----
+# libxml2 (2.13.9-r0) DoS via crafted XML in nginx-unprivileged:1.27-alpine base.
+# Unreachable: the frontend nginx serves static SPA + reverse-proxies HTTP only,
+# never parses XML. libxml2 is a transitive Alpine base dep, not invoked at
+# runtime. apk upgrade --no-cache (already in Dockerfile.frontend) will pick up
+# the fix automatically once Alpine publishes 2.13.9-r1.
+CVE-2026-6732
