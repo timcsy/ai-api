@@ -28,6 +28,7 @@ const ADMIN_SUBNAV = [
   { to: "/admin/tag", label: "Tag" },
   { to: "/admin/providers", label: "Provider 憑證" },
   { to: "/admin/access", label: "存取" },
+  { to: "/admin/notifications", label: "通知" },
   { to: "/admin/observability", label: "觀測" },
 ];
 

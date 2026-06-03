@@ -72,6 +72,14 @@ class Settings(BaseSettings):
     pool_total_tokens_per_month: int = Field(default=0, alias="POOL_TOTAL_TOKENS_PER_MONTH")
     pool_floor_per_allocation: int = Field(default=1000, alias="POOL_FLOOR_PER_ALLOCATION")
 
+    # Phase 13: subscription override for which audit event types trigger emails.
+    # Empty list = use built-in default (allocation_quarantined / responses_upstream_error_burst
+    # / provider_credential_auth_failed / allocation_daily_cap_exceeded). Operator can override
+    # at deploy time via NOTIFY_EVENT_TYPES_OVERRIDE="type_a,type_b".
+    notify_event_types_override: list[str] = Field(
+        default=[], alias="NOTIFY_EVENT_TYPES_OVERRIDE"
+    )
+
     # Phase 12: edge request body limit (informational, mirrors the value baked
     # into the frontend nginx pod via Helm — admin UI shows it so users know
     # how big a payload is accepted before they hit 413). Single source of

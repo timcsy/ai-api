@@ -1,0 +1,340 @@
+openapi: 3.0.3
+info:
+  title: Admin Notifications API
+  version: 0.1.0
+  description: |
+    Phase 13 — admin-managed email notifications.
+    Spec: `/specs/022-admin-email-notifications/spec.md`.
+    All endpoints require admin authentication (session cookie OR X-Admin-Token).
+    Error envelope: `{ "error": { "code": "...", "message": "..." } }`
+    (matches existing `_error_payload` helper).
+
+servers:
+  - url: /admin/notifications
+    description: Admin notifications subsystem
+
+components:
+  securitySchemes:
+    AdminSession:
+      type: apiKey
+      in: cookie
+      name: session
+    AdminToken:
+      type: apiKey
+      in: header
+      name: X-Admin-Token
+
+  schemas:
+    NotificationConfig:
+      type: object
+      properties:
+        smtp_host:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: smtp.gmail.com
+        smtp_port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          example: 587
+        smtp_username:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: ai-api-bot@school.edu.tw
+        sender_email:
+          type: string
+          format: email
+          example: ai-api-bot@school.edu.tw
+        sender_name:
+          type: string
+          maxLength: 128
+          default: AI API Manager
+        recipients:
+          type: array
+          items:
+            type: string
+            format: email
+          example: ["admin@school.edu.tw", "ops@school.edu.tw"]
+        enabled:
+          type: boolean
+          default: true
+        # password — see request/response variants below
+      required: [smtp_host, smtp_port, smtp_username, sender_email, recipients]
+
+    NotificationConfigCreate:
+      allOf:
+        - $ref: '#/components/schemas/NotificationConfig'
+        - type: object
+          properties:
+            smtp_password:
+              type: string
+              description: Plaintext SMTP password / app password. Server encrypts at rest.
+              writeOnly: true
+              minLength: 1
+              maxLength: 256
+          required: [smtp_password]
+
+    NotificationConfigResponse:
+      allOf:
+        - $ref: '#/components/schemas/NotificationConfig'
+        - type: object
+          properties:
+            smtp_password_fingerprint:
+              type: string
+              description: First 4 + last 4 chars of encrypted ciphertext, hex; used to confirm "yes a password is stored" without revealing it.
+              readOnly: true
+              example: "a1b2…f9e0"
+            status:
+              type: string
+              enum: [pending_test, verified, credentials_invalid]
+            last_test_at:
+              type: string
+              format: date-time
+              nullable: true
+            last_test_outcome:
+              type: string
+              nullable: true
+            last_test_error:
+              type: string
+              nullable: true
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+            created_by:
+              type: string
+
+    TestSendRequest:
+      type: object
+      properties:
+        test_recipient:
+          type: string
+          format: email
+          description: One-off recipient to send the test email to. The saved recipient list is NOT used.
+          example: tim@school.edu.tw
+      required: [test_recipient]
+
+    TestSendResponse:
+      type: object
+      properties:
+        outcome:
+          type: string
+          enum:
+            - success
+            - send_failed_auth
+            - send_failed_connect
+            - send_failed_sender
+            - send_failed_recipient
+            - send_failed_unknown
+        message:
+          type: string
+          description: Human-readable status (zh-TW). On failure, includes actionable detail.
+          example: 測試信已寄出至 tim@school.edu.tw（30 秒內應該收到）。
+        smtp_response_code:
+          type: integer
+          nullable: true
+          description: SMTP server's final response code (e.g. 535 for auth failure, 250 for success).
+        latency_ms:
+          type: integer
+          description: Total round-trip time in ms.
+      required: [outcome, message, latency_ms]
+
+    NotificationRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 01J5...ULID
+        event_type:
+          type: string
+          example: allocation_quarantined
+        audit_event_id:
+          type: string
+          nullable: true
+        dedup_bucket_id:
+          type: string
+          nullable: true
+        outcome:
+          type: string
+          example: sent
+        recipients:
+          type: array
+          items: { type: string, format: email }
+        per_recipient_status:
+          type: object
+          additionalProperties: { type: string }
+        subject:
+          type: string
+        body_preview:
+          type: string
+        smtp_response_code:
+          type: integer
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        latency_ms:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        # convenience: if this record is the primary of a bucket with N events,
+        # surface the bucket's event_count so UI can show "49 events merged"
+        bucket_event_count:
+          type: integer
+          nullable: true
+          description: If this record is a bucket's primary record, the bucket's total event_count; otherwise null.
+
+    NotificationHistoryResponse:
+      type: object
+      properties:
+        rows:
+          type: array
+          items: { $ref: '#/components/schemas/NotificationRecord' }
+        next_cursor:
+          type: string
+          nullable: true
+          description: Opaque cursor for pagination (next page); null when no more.
+      required: [rows]
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: bad_request
+            message:
+              type: string
+              example: smtp_port must be between 1 and 65535
+          required: [code, message]
+      required: [error]
+
+paths:
+  /config:
+    get:
+      summary: Get current notification configuration
+      operationId: getNotificationConfig
+      security:
+        - AdminSession: []
+        - AdminToken: []
+      responses:
+        '200':
+          description: Current config (password masked); status indicates verified / pending_test / credentials_invalid
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationConfigResponse' }
+        '204':
+          description: No config exists yet (notifications disabled)
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+    put:
+      summary: Create or update notification configuration
+      operationId: saveNotificationConfig
+      security:
+        - AdminSession: []
+        - AdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotificationConfigCreate' }
+      responses:
+        '200':
+          description: Config saved (password encrypted at rest); status reset to pending_test
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationConfigResponse' }
+        '400':
+          description: Validation error (bad port / malformed email / empty host / etc.)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+
+    delete:
+      summary: Remove notification configuration (notifications disabled afterward)
+      operationId: deleteNotificationConfig
+      security:
+        - AdminSession: []
+        - AdminToken: []
+      responses:
+        '204':
+          description: Config removed
+        '401':
+          description: Not authenticated
+
+  /test-send:
+    post:
+      summary: Send a one-off test email to verify the configured channel
+      operationId: testSendNotification
+      security:
+        - AdminSession: []
+        - AdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TestSendRequest' }
+      responses:
+        '200':
+          description: Test attempt completed (success or failure detail in body)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TestSendResponse' }
+        '400':
+          description: No config saved, or invalid test_recipient format
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not authenticated
+        '409':
+          description: Config exists but in credentials_invalid status (password decrypt failed) — re-save first
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /history:
+    get:
+      summary: List recent notification attempts (most recent first)
+      operationId: listNotificationHistory
+      security:
+        - AdminSession: []
+        - AdminToken: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+          description: Opaque pagination cursor returned by previous response
+        - name: event_type
+          in: query
+          schema: { type: string }
+          description: Filter by event type
+        - name: outcome
+          in: query
+          schema: { type: string }
+          description: Filter by outcome (e.g. send_failed_auth)
+      responses:
+        '200':
+          description: Page of records
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NotificationHistoryResponse' }
+        '401':
+          description: Not authenticated
