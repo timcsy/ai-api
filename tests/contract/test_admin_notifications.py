@@ -110,8 +110,8 @@ async def test_blank_password_keeps_existing_on_edit(
     app_client: AsyncClient, admin_headers: dict[str, str]
 ) -> None:
     """Editing other fields with a blank password keeps the stored password
-    (FR: '留白＝沿用已儲存的密碼'). Previously this 400'd — the UI promised it
-    but the backend required a non-empty password every save."""
+    (blank = reuse existing). Previously this 400'd — the UI promised it but
+    the backend required a non-empty password every save."""
     from sqlalchemy import select
 
     from ai_api.db import get_sessionmaker
