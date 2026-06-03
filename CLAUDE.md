@@ -1,6 +1,6 @@
 # ai-api Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-06-03
+Auto-generated from all feature plans. Last updated: 2026-06-04
 
 ## Active Technologies
 - Python 3.11+（同 Phase 1） (002-auth-membership)
@@ -35,6 +35,8 @@ Auto-generated from all feature plans. Last updated: 2026-06-03
 - PostgreSQL / SQLite；**不新增表、不新增 migration**——全部查詢層聚合 (024-admin-visualization)
 - TypeScript strict + React 19 + Vite 6（**僅前端**；Python 後端完全不動） + 既有 Tailwind CSS、shadcn/ui（`Sheet` 將自既有 `@radix-ui/react-dialog` (025-mobile-rwd)
 - N/A（純呈現層，無資料模型／migration） (025-mobile-rwd)
+- Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Pydantic v2（後端，既有）；Tailwind、shadcn/ui、 (026-member-usage-charts)
+- PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表、不新增 migration**——以成員為範圍聚合既有用量 (026-member-usage-charts)
 
 - Python 3.11+ + LiteLLM（proxy core）、FastAPI（admin API）、 (001-gateway-core)
 
@@ -55,9 +57,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 026-member-usage-charts: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Pydantic v2（後端，既有）；Tailwind、shadcn/ui、
 - 025-mobile-rwd: Added TypeScript strict + React 19 + Vite 6（**僅前端**；Python 後端完全不動） + 既有 Tailwind CSS、shadcn/ui（`Sheet` 將自既有 `@radix-ui/react-dialog`
 - 024-admin-visualization: Added TypeScript strict + React 19 + Vite 6（前端為主）/ Python 3.11+（後端少量聚合）
-- 023-tag-group-rollup: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端），皆既有 + FastAPI、SQLAlchemy 2.x async、Pydantic v2、TanStack Query、shadcn/ui（皆既有，**不新增套件**）
 
 
 <!-- MANUAL ADDITIONS START -->

@@ -369,13 +369,16 @@ async def usage_timeseries(
     db: AsyncSession,
     *,
     allocation_id: str | None = None,
+    member_id: str | None = None,
     bucket: Bucket,
     from_: datetime,
     to: datetime,
 ) -> list[TimeseriesPoint]:
     """Time-bucketed usage. `allocation_id=None` aggregates platform-wide (Phase
     14: every allocation summed per bucket); a concrete id scopes to one
-    allocation (existing per-allocation behaviour, unchanged)."""
+    allocation (existing per-allocation behaviour, unchanged). `member_id` (Phase
+    17) scopes to all of one member's allocations — used by the member dashboard,
+    where scope comes from the session, never a client parameter."""
     # dialect-aware truncation
     dialect = db.bind.dialect.name if db.bind else "sqlite"
     if dialect == "postgresql":
@@ -391,18 +394,19 @@ async def usage_timeseries(
     ]
     if allocation_id is not None:
         filters.append(CallRecord.allocation_id == allocation_id)
+    if member_id is not None:
+        filters.append(Allocation.member_id == member_id)
 
-    stmt = (
-        select(
-            ts_expr.label("ts"),
-            func.coalesce(func.sum(CallRecord.total_tokens), 0).label("tokens"),
-            func.coalesce(func.sum(CallRecord.cost_usd), 0).label("cost"),
-            func.count().label("cnt"),
-        )
-        .where(*filters)
-        .group_by(ts_expr)
-        .order_by(ts_expr)
+    stmt = select(
+        ts_expr.label("ts"),
+        func.coalesce(func.sum(CallRecord.total_tokens), 0).label("tokens"),
+        func.coalesce(func.sum(CallRecord.cost_usd), 0).label("cost"),
+        func.count().label("cnt"),
     )
+    if member_id is not None:
+        # member-scope needs Allocation to resolve member ownership
+        stmt = stmt.join(Allocation, Allocation.id == CallRecord.allocation_id)
+    stmt = stmt.where(*filters).group_by(ts_expr).order_by(ts_expr)
     rows = (await db.execute(stmt)).all()
     out: list[TimeseriesPoint] = []
     for r in rows:
