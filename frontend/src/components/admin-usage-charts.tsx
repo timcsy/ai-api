@@ -61,7 +61,7 @@ export function UsageCharts({ fromIso, toIso }: { fromIso: string; toIso: string
   const maxTokens = cells.reduce((m, c) => Math.max(m, c.tokens), 0);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <Card>
         <CardHeader>
           <CardTitle className="text-base">各 Provider 花費占比</CardTitle>

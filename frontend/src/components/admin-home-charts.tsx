@@ -176,7 +176,7 @@ export function DashboardCharts({ range }: { range: TimeRange }) {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">各 Model 花費占比</CardTitle>
