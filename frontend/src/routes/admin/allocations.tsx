@@ -6,6 +6,7 @@ import { MoreHorizontal } from "lucide-react";
 import { z } from "zod";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { QuarantineReasonBadge } from "@/components/quarantine-reason-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -224,11 +225,9 @@ export function AdminAllocationsPage() {
                 </TableCell>
                 <TableCell>
                   {a.status === "quarantined" ? (
-                    <Badge variant="destructive" title="被異常偵測自動隔離。可點操作 → 解除隔離">
-                      🚨 已隔離
-                    </Badge>
+                    <QuarantineReasonBadge allocationId={a.id} status="quarantined" />
                   ) : a.status === "paused" ? (
-                    <Badge variant="outline" className="text-amber-700 border-amber-500">已暫停</Badge>
+                    <QuarantineReasonBadge allocationId={a.id} status="paused" />
                   ) : (
                     <Badge variant={a.status === "active" ? "default" : "secondary"}>
                       {a.status}

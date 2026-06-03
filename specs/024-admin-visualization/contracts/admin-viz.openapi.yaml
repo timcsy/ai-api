@@ -1,0 +1,151 @@
+openapi: 3.0.3
+info:
+  title: Admin Visualization endpoints (Phase 14)
+  version: 0.1.0
+  description: |
+    Backend aggregations powering the admin charts. Spec:
+    specs/024-admin-visualization/spec.md. All endpoints require admin auth.
+    NON-BREAKING: existing /admin/usage group_by values unchanged; provider added.
+
+servers:
+  - url: /admin
+
+components:
+  securitySchemes:
+    AdminSession: { type: apiKey, in: cookie, name: session }
+    AdminToken: { type: apiKey, in: header, name: X-Admin-Token }
+
+  schemas:
+    TimeseriesPoint:
+      type: object
+      properties:
+        ts: { type: string, format: date-time }
+        tokens: { type: integer }
+        cost_usd: { type: string, description: Decimal as string }
+        call_count: { type: integer }
+      required: [ts, tokens, call_count]
+
+    TimeseriesResponse:
+      type: object
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        bucket: { type: string, enum: [hour, day] }
+        points:
+          type: array
+          items: { $ref: '#/components/schemas/TimeseriesPoint' }
+      required: [from, to, bucket, points]
+
+    HeatCell:
+      type: object
+      properties:
+        weekday: { type: integer, minimum: 0, maximum: 6, description: 0=Sunday (UTC+8) }
+        hour: { type: integer, minimum: 0, maximum: 23, description: hour-of-day (UTC+8) }
+        tokens: { type: integer }
+        call_count: { type: integer }
+      required: [weekday, hour, tokens, call_count]
+
+    HeatmapResponse:
+      type: object
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        timezone: { type: string, example: "UTC+8" }
+        cells:
+          type: array
+          items: { $ref: '#/components/schemas/HeatCell' }
+      required: [cells]
+
+    QuarantineReason:
+      type: object
+      properties:
+        allocation_id: { type: string }
+        event_type:
+          type: string
+          enum: [allocation_quarantined, allocation_paused]
+          nullable: true
+        reason: { type: string, nullable: true, example: ratio }
+        last_hour_calls: { type: integer, nullable: true }
+        baseline_per_hour: { type: number, nullable: true }
+        occurred_at: { type: string, format: date-time, nullable: true }
+        message:
+          type: string
+          description: zh-TW human summary; "原因未記錄" when details absent.
+      required: [allocation_id, message]
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+
+paths:
+  /usage:
+    get:
+      summary: Aggregate usage (now incl. provider dimension)
+      operationId: getUsage
+      security: [{ AdminSession: [] }, { AdminToken: [] }]
+      parameters:
+        - name: group_by
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [member, allocation, model, tag, provider]   # provider = new
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: service_only, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          description: Aggregated usage items (group_by=provider one item per provider)
+          content: { application/json: { schema: { type: object } } }
+        '400': { description: Invalid range }
+        '401': { description: Not authenticated }
+
+  /usage/timeseries:
+    get:
+      summary: Platform-wide daily/hourly spend & usage timeseries
+      operationId: getPlatformTimeseries
+      security: [{ AdminSession: [] }, { AdminToken: [] }]
+      parameters:
+        - { name: bucket, in: query, required: true, schema: { type: string, enum: [hour, day] } }
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date-time } }
+      responses:
+        '200':
+          description: Platform-wide timeseries (all allocations aggregated)
+          content: { application/json: { schema: { $ref: '#/components/schemas/TimeseriesResponse' } } }
+        '400': { description: Invalid range / bucket too fine for range }
+        '401': { description: Not authenticated }
+
+  /usage/heatmap:
+    get:
+      summary: Hour-of-day x weekday usage heatmap (UTC+8)
+      operationId: getUsageHeatmap
+      security: [{ AdminSession: [] }, { AdminToken: [] }]
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date-time } }
+      responses:
+        '200':
+          description: Up to 168 cells (7 weekdays x 24 hours)
+          content: { application/json: { schema: { $ref: '#/components/schemas/HeatmapResponse' } } }
+        '400': { description: Invalid range }
+        '401': { description: Not authenticated }
+
+  /allocations/{allocation_id}/quarantine-reason:
+    get:
+      summary: Latest quarantine/pause trigger detail for an allocation
+      operationId: getQuarantineReason
+      security: [{ AdminSession: [] }, { AdminToken: [] }]
+      parameters:
+        - { name: allocation_id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Reason detail from the latest relevant audit event (or "原因未記錄")
+          content: { application/json: { schema: { $ref: '#/components/schemas/QuarantineReason' } } }
+        '401': { description: Not authenticated }
+        '404': { description: Allocation not found }
