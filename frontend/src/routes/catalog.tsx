@@ -205,7 +205,7 @@ export function CatalogPage() {
             </CardContent>
           </Card>
         )}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {modelsQuery.data?.map((m) => (
             <Link key={m.slug} to={`/catalog/${m.slug}`}>
               <Card className="hover:bg-accent transition-colors cursor-pointer h-full">

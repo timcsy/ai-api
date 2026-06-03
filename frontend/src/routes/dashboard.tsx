@@ -149,7 +149,7 @@ export function DashboardPage() {
           <p className="text-sm text-muted-foreground">
             以下 model 已開放自助領取且你被允許使用。按「領取憑證」即可取得一張可呼叫的 token。
           </p>
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {claimableQuery.data?.map((m) => (
               <Link key={m.slug} to={`/catalog/${m.slug}`} className="block">
                 <Card className="hover:bg-accent transition-colors cursor-pointer">
@@ -229,7 +229,7 @@ export function DashboardPage() {
           </Card>
         )}
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {filtered.map((a) => (
             <Link key={a.id} to={`/dashboard/allocations/${a.id}`}>
               <Card className="hover:bg-accent transition-colors cursor-pointer">

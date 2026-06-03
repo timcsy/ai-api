@@ -49,7 +49,9 @@ export function Chart({
     );
   }
   return (
-    <div data-testid="chart" className={className} style={{ height }}>
+    // w-full + min-w-0 so recharts' ResponsiveContainer can shrink inside grid/
+    // flex parents instead of overflowing the viewport on phones (Phase 16 fix).
+    <div data-testid="chart" className={cn("w-full min-w-0", className)} style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         {children}
       </ResponsiveContainer>
