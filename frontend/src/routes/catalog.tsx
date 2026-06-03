@@ -113,7 +113,7 @@ export function CatalogPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[60vh] pr-3">
+            <ScrollArea className="max-h-[60vh] md:h-[60vh] pr-3">
               <div className="space-y-5">
                 <div className="flex items-center space-x-2">
                   <Switch
@@ -216,7 +216,7 @@ export function CatalogPage() {
                       成本：{facetLabel(m.cost_tier)}
                     </Badge>
                   </div>
-                  <CardDescription className="text-xs">
+                  <CardDescription className="text-xs break-words">
                     <Badge variant="secondary" className="mr-1">{m.family}</Badge>
                     {m.modality_input.map(facetLabel).join(" / ")} → {m.modality_output.map(facetLabel).join(" / ")}
                   </CardDescription>

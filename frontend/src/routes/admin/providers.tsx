@@ -204,9 +204,9 @@ export function AdminProvidersPage() {
 
   return (
     <div className="container mx-auto py-8 max-w-6xl space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">Provider 憑證</h1>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <Switch
               id="show-disabled"
@@ -219,7 +219,7 @@ export function AdminProvidersPage() {
         </div>
       </div>
 
-      <Table>
+      <Table className="responsive-table">
         <TableHeader>
           <TableRow>
             <TableHead>供應商</TableHead>
@@ -248,23 +248,23 @@ export function AdminProvidersPage() {
           )}
           {visibleRows.map((c) => (
             <TableRow key={c.id}>
-              <TableCell>{c.provider}</TableCell>
-              <TableCell>{c.label}</TableCell>
-              <TableCell className="font-mono text-xs">{c.fingerprint}</TableCell>
-              <TableCell>
+              <TableCell data-label="供應商">{c.provider}</TableCell>
+              <TableCell data-label="標記">{c.label}</TableCell>
+              <TableCell className="font-mono text-xs" data-label="指紋"><span className="block max-w-[140px] truncate">{c.fingerprint}</span></TableCell>
+              <TableCell data-label="狀態">
                 {c.status === "active" ? (
                   <Badge>active</Badge>
                 ) : (
                   <Badge variant="secondary">disabled</Badge>
                 )}
               </TableCell>
-              <TableCell className="text-xs text-muted-foreground">
+              <TableCell className="text-xs text-muted-foreground" data-label="最後使用">
                 {c.last_used_at ? new Date(c.last_used_at).toLocaleString() : "從未"}
               </TableCell>
-              <TableCell className="text-xs text-muted-foreground">
+              <TableCell className="text-xs text-muted-foreground" data-label="建立時間">
                 {new Date(c.created_at).toLocaleString()}
               </TableCell>
-              <TableCell className="text-right space-x-2">
+              <TableCell className="text-right space-x-2" data-label="動作">
                 {c.status === "active" && (
                   <>
                     <Button

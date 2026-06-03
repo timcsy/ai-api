@@ -296,7 +296,7 @@ function Dashboard({
           ) : (
             <ul className="text-xs space-y-1">
               {audit.map((r) => (
-                <li key={r.id} className="flex items-center gap-2">
+                <li key={r.id} className="flex flex-wrap items-center gap-2">
                   <span className="text-muted-foreground">{new Date(r.created_at).toLocaleString("zh-TW")}</span>
                   <Badge variant="outline" className="font-mono text-xs">{r.event_type}</Badge>
                   <span className="text-muted-foreground">{r.actor_type}{r.actor_id ? ` ${r.actor_id}` : ""}</span>
@@ -332,7 +332,7 @@ function Dashboard({
           <CardDescription>由部署設定決定，需調整請聯絡維運</CardDescription>
         </CardHeader>
         <CardContent>
-          <dl className="text-sm grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2">
+          <dl className="text-sm grid grid-cols-1 sm:grid-cols-[max-content_1fr] gap-x-4 gap-y-2">
             <dt className="text-muted-foreground">單一請求大小上限</dt>
             <dd>
               {systemInfo

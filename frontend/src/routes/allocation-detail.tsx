@@ -169,9 +169,9 @@ export function AllocationDetailPage() {
           ← 回 Dashboard
         </Link>
         <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-bold">{alloc?.display_name ?? alloc?.resource_model ?? id}</h1>
+          <h1 className="text-3xl font-bold min-w-0 truncate">{alloc?.display_name ?? alloc?.resource_model ?? id}</h1>
           {alloc && (
-            <Badge variant={alloc.status === "active" ? "default" : "secondary"}>
+            <Badge variant={alloc.status === "active" ? "default" : "secondary"} className="shrink-0">
               {alloc.status}
             </Badge>
           )}
@@ -186,12 +186,12 @@ export function AllocationDetailPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <CardTitle className="text-lg">你的憑證</CardTitle>
               <CardDescription>token 僅在建立時顯示一次；系統只存雜湊</CardDescription>
             </div>
-            <div className="flex shrink-0 gap-2">
+            <div className="flex flex-wrap gap-2">
               {alloc?.status === "active" && (
                 <Button
                   variant="outline"
@@ -276,8 +276,8 @@ export function AllocationDetailPage() {
             <p className="text-muted-foreground py-6 text-center">尚無呼叫紀錄</p>
           )}
           {items.length > 0 && (
-            <div className="space-y-2">
-              <div className="grid grid-cols-[1.6fr_0.6fr_1fr_0.8fr_1.4fr] gap-3 text-xs font-medium text-muted-foreground border-b pb-2">
+            <div className="space-y-2 overflow-x-auto">
+              <div className="grid min-w-[560px] grid-cols-[1.6fr_0.6fr_1fr_0.8fr_1.4fr] gap-3 text-xs font-medium text-muted-foreground border-b pb-2">
                 <span>時間</span>
                 <span>狀態</span>
                 <span>結果</span>
@@ -285,7 +285,7 @@ export function AllocationDetailPage() {
                 <span className="text-right">請求 ID</span>
               </div>
               {items.map((c) => (
-                <div key={c.id} className="grid grid-cols-[1.6fr_0.6fr_1fr_0.8fr_1.4fr] gap-3 text-sm py-1 border-b border-border/30">
+                <div key={c.id} className="grid min-w-[560px] grid-cols-[1.6fr_0.6fr_1fr_0.8fr_1.4fr] gap-3 text-sm py-1 border-b border-border/30">
                   <span className="truncate">{new Date(c.started_at).toLocaleString("zh-TW")}</span>
                   <span>{c.status_code}</span>
                   <span className="text-xs truncate">{c.outcome}</span>

@@ -58,7 +58,7 @@ export function UsageSummary() {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <CardTitle className="text-base">用量總覽</CardTitle>
             <CardDescription>你跨所有分配的用量（只看自己）</CardDescription>
@@ -81,7 +81,7 @@ export function UsageSummary() {
         {q.isLoading && <p className="text-sm text-muted-foreground">載入中…</p>}
         {s && (
           <>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Stat label="總 tokens" value={s.total_tokens.toLocaleString()} />
               <Stat label="估算花費" value={money(s.total_cost_usd)} />
               <Stat label="呼叫次數" value={s.call_count.toLocaleString()} />

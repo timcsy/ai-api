@@ -180,7 +180,7 @@ export function AdminModelDetailPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
             <div><span className="text-muted-foreground">Provider：</span>{model.provider}</div>
             <div><span className="text-muted-foreground">Cost tier：</span>{model.cost_tier}</div>
             <div><span className="text-muted-foreground">Context window：</span>{model.context_window.toLocaleString()}</div>
@@ -419,7 +419,7 @@ function EditBasicsDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label htmlFor="b-name">顯示名稱</Label>
               <Input id="b-name" className="mt-1" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
@@ -448,7 +448,7 @@ function EditBasicsDialog({
             <Label htmlFor="b-desc">說明</Label>
             <Textarea id="b-desc" className="mt-1" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label htmlFor="b-mi">輸入模態（逗號分隔）</Label>
               <Input id="b-mi" className="mt-1" placeholder="text, image" value={modalityIn} onChange={(e) => setModalityIn(e.target.value)} />

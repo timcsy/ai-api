@@ -97,3 +97,24 @@ backend-only installs do not break.
 - 3b.5 admin: catalog browse
 - 3b.6 admin: RebalanceLog viewer
 - 3b.7 Playwright E2E + final polish
+
+## RWD 規範（階段 16）
+
+桌機優先設計，但手機（最小 360px）也須順手。詳見 `specs/025-mobile-rwd/`。
+
+**斷點策略（沿用 Tailwind 預設）**：
+- 多欄資訊／表單／工具列：base 單欄或可換行，桌機版面掛 `sm:`（640px）——`grid-cols-1 sm:grid-cols-N`、`flex-wrap`。
+- 導覽收合與寬表格卡片化：以 `md:`（768px）為界。
+- 360–414px 手機全部 < sm，所以改動皆為「在更小斷點新增手機行為」，桌機斷點 class 不動 → 桌機零回歸。
+
+**寬表格 → 手機卡片（單一機制，避免 drift）**：
+- `index.css` 的 `.responsive-table`：`< md` 時 `thead` 隱藏、每列變卡片、每格 `data-label` 顯示欄名。
+- 用法：`<Table className="responsive-table">` + 每個 body `<TableCell data-label="欄名">`。
+- CSS 用 **child combinator**（`> tbody > tr > td`）只作用頂層表格，巢狀表（如 tag 下鑽）不受影響。
+- 契約測試：`__tests__/responsive-tables.test.tsx` 斷言每 body 格帶 `data-label`。
+
+**手機導覽**：`app-shell.tsx` 以 `useIsMobile()`（`hooks/use-mobile.ts`，matchMedia）切換——`< md` 顯示漢堡 + `Sheet` 抽屜（含全部目的地），`≥ md` 維持 inline 橫排。`ui/sheet.tsx` 基於既有 `@radix-ui/react-dialog`（零新依賴）。
+
+**CJK 字字斷行防範（核心教訓）**：中文無空格，flex 子項被壓到比內容窄時會逐字換行成直條。凡橫排含中文：`whitespace-nowrap` + 容器 `min-w-0`，或讓父層 `flex-wrap`。長字串（email/slug/URL/指紋）用 `truncate`（配 `min-w-0`）或 `break-all`。
+
+**測試分工**：有 DOM 行為（導覽收合、表格 data-label）走 vitest 先 Red 後 Green；純視覺（溢出/折行）jsdom 無版面引擎，以 `specs/025-mobile-rwd/quickstart.md` 的 360px 手動清單驗收。

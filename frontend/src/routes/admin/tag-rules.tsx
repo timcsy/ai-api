@@ -204,7 +204,7 @@ export function AdminTagRulesPage() {
         <Button onClick={openCreate}>新增規則</Button>
       </div>
 
-      <Table>
+      <Table className="responsive-table">
         <TableHeader>
           <TableRow>
             <TableHead className="w-20">順序</TableHead>
@@ -227,7 +227,7 @@ export function AdminTagRulesPage() {
           )}
           {rules.map((rule, i) => (
             <TableRow key={rule.id} className={rule.enabled ? "" : "opacity-50"}>
-              <TableCell>
+              <TableCell data-label="順序">
                 <div className="flex items-center gap-1">
                   <span className="tabular-nums">{i + 1}</span>
                   <div className="flex flex-col">
@@ -246,20 +246,20 @@ export function AdminTagRulesPage() {
                   </div>
                 </div>
               </TableCell>
-              <TableCell>
+              <TableCell data-label="條件">
                 <div className="text-sm">{MATCHER_LABELS[rule.matcher_type]}</div>
                 {rule.matcher_type !== "always" && (
-                  <code className="text-xs text-muted-foreground">{rule.pattern}</code>
+                  <code className="text-xs text-muted-foreground break-all">{rule.pattern}</code>
                 )}
               </TableCell>
-              <TableCell><Badge variant="secondary">{rule.tag}</Badge></TableCell>
-              <TableCell>
+              <TableCell data-label="貼上 Tag"><Badge variant="secondary">{rule.tag}</Badge></TableCell>
+              <TableCell data-label="啟用">
                 <Switch
                   checked={rule.enabled}
                   onCheckedChange={(v) => updateMut.mutate({ id: rule.id, body: { enabled: v } })}
                 />
               </TableCell>
-              <TableCell className="text-right space-x-2">
+              <TableCell className="text-right space-x-2" data-label="動作">
                 <Button size="sm" variant="outline" onClick={() => openEdit(rule)}>編輯</Button>
                 <Button size="sm" variant="destructive" onClick={() => setDeleteConfirm(rule)}>刪除</Button>
               </TableCell>

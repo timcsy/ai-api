@@ -127,9 +127,9 @@ export function AdminUsagePage() {
 
   return (
     <div className="container mx-auto py-8 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-3xl font-bold">用量統計</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => void download("csv")}>
             下載 CSV
           </Button>
@@ -189,7 +189,7 @@ export function AdminUsagePage() {
       )}
 
       {query.data && (
-        <Table>
+        <Table className="responsive-table">
           <TableHeader>
             <TableRow>
               <TableHead>
@@ -213,14 +213,14 @@ export function AdminUsagePage() {
                 <TagRow key={it.group_key} item={it} fromIso={fromIso} toIso={toIso} />
               ) : (
                 <TableRow key={it.group_key}>
-                  <TableCell className="font-medium">{it.display_name ?? it.group_key}</TableCell>
-                  <TableCell className="text-right">{it.prompt_tokens.toLocaleString()}</TableCell>
-                  <TableCell className="text-right">{it.completion_tokens.toLocaleString()}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">{it.reasoning_tokens.toLocaleString()}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">{it.cached_tokens.toLocaleString()}</TableCell>
-                  <TableCell className="text-right">{it.total_tokens.toLocaleString()}</TableCell>
-                  <TableCell className="text-right">${it.total_cost_usd.toFixed(4)}</TableCell>
-                  <TableCell className="text-right">{it.call_count}</TableCell>
+                  <TableCell className="font-medium" data-label="對象"><span className="block max-w-[160px] truncate">{it.display_name ?? it.group_key}</span></TableCell>
+                  <TableCell className="text-right" data-label="輸入 tokens">{it.prompt_tokens.toLocaleString()}</TableCell>
+                  <TableCell className="text-right" data-label="輸出 tokens">{it.completion_tokens.toLocaleString()}</TableCell>
+                  <TableCell className="text-right text-muted-foreground" data-label="推理 tokens">{it.reasoning_tokens.toLocaleString()}</TableCell>
+                  <TableCell className="text-right text-muted-foreground" data-label="快取 tokens">{it.cached_tokens.toLocaleString()}</TableCell>
+                  <TableCell className="text-right" data-label="總 tokens">{it.total_tokens.toLocaleString()}</TableCell>
+                  <TableCell className="text-right" data-label="費用 (USD)">${it.total_cost_usd.toFixed(4)}</TableCell>
+                  <TableCell className="text-right" data-label="呼叫次數">{it.call_count}</TableCell>
                 </TableRow>
               ),
             )}
@@ -254,17 +254,17 @@ function TagRow({ item, fromIso, toIso }: { item: UsageItem; fromIso: string; to
   return (
     <>
       <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => setOpen((v) => !v)}>
-        <TableCell className="font-medium">
+        <TableCell className="font-medium" data-label="Tag">
           {open ? "▾ " : "▸ "}
           {item.group_key}
         </TableCell>
-        <TableCell className="text-right">{item.prompt_tokens.toLocaleString()}</TableCell>
-        <TableCell className="text-right">{item.completion_tokens.toLocaleString()}</TableCell>
-        <TableCell className="text-right text-muted-foreground">{item.reasoning_tokens.toLocaleString()}</TableCell>
-        <TableCell className="text-right text-muted-foreground">{item.cached_tokens.toLocaleString()}</TableCell>
-        <TableCell className="text-right">{item.total_tokens.toLocaleString()}</TableCell>
-        <TableCell className="text-right">${item.total_cost_usd.toFixed(4)}</TableCell>
-        <TableCell className="text-right">{item.call_count}</TableCell>
+        <TableCell className="text-right" data-label="輸入 tokens">{item.prompt_tokens.toLocaleString()}</TableCell>
+        <TableCell className="text-right" data-label="輸出 tokens">{item.completion_tokens.toLocaleString()}</TableCell>
+        <TableCell className="text-right text-muted-foreground" data-label="推理 tokens">{item.reasoning_tokens.toLocaleString()}</TableCell>
+        <TableCell className="text-right text-muted-foreground" data-label="快取 tokens">{item.cached_tokens.toLocaleString()}</TableCell>
+        <TableCell className="text-right" data-label="總 tokens">{item.total_tokens.toLocaleString()}</TableCell>
+        <TableCell className="text-right" data-label="費用 (USD)">${item.total_cost_usd.toFixed(4)}</TableCell>
+        <TableCell className="text-right" data-label="呼叫次數">{item.call_count}</TableCell>
       </TableRow>
       {open && (
         <TableRow>
@@ -278,7 +278,7 @@ function TagRow({ item, fromIso, toIso }: { item: UsageItem; fromIso: string; to
                 <p className="text-sm text-muted-foreground">此 tag 在區間內無用量。</p>
               )}
               {drill.data && drill.data.members.length > 0 && (
-                <table className="w-full text-sm">
+                <table className="w-full text-sm block overflow-x-auto sm:table">
                   <tbody>
                     {drill.data.members.map((m) => (
                       <tr key={m.group_key} className="border-t border-border/50">

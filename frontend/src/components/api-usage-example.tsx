@@ -124,7 +124,7 @@ env_key = "AIAPI_TOKEN"
           <div>
             <CardTitle className="text-lg">如何呼叫</CardTitle>
             <CardDescription>
-              端點 <code className="text-xs">{base}</code>；把 <code className="text-xs">$TOKEN</code> 換成你的分配 token（放 Authorization: Bearer）。
+              端點 <code className="text-xs break-all">{base}</code>；把 <code className="text-xs">$TOKEN</code> 換成你的分配 token（放 Authorization: Bearer）。
               {supportsResponses && (
                 <>
                   {" "}此模型支援 <code className="text-xs">/responses</code>，可給 OpenAI Codex 等 agent 工具使用（見 Codex 分頁）。
@@ -160,7 +160,7 @@ env_key = "AIAPI_TOKEN"
             <TabsContent key={k} value={k}>
               {k === "codex" ? (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs text-muted-foreground">下方是 Codex 設定檔內容（<code>config.toml</code>）。</span>
                     <Button size="sm" variant="outline" className="shrink-0" onClick={downloadCodexConfig}>
                       下載 config.toml

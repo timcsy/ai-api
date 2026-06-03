@@ -163,9 +163,9 @@ export function AdminAllocationsPage() {
 
   return (
     <div className="container mx-auto py-8 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-3xl font-bold">分配管理</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <Switch
               id="show-revoked"
@@ -196,7 +196,7 @@ export function AdminAllocationsPage() {
       )}
 
       {allocsQuery.data && (
-        <Table>
+        <Table className="responsive-table">
           <TableHeader>
             <TableRow>
               <TableHead>成員</TableHead>
@@ -211,19 +211,21 @@ export function AdminAllocationsPage() {
           <TableBody>
             {filtered.map((a) => (
               <TableRow key={a.id}>
-                <TableCell className="font-medium">
-                  {memberById.get(a.member_id)?.email ?? a.subject_snapshot}
+                <TableCell className="font-medium" data-label="成員">
+                  <span className="block max-w-[180px] truncate">
+                    {memberById.get(a.member_id)?.email ?? a.subject_snapshot}
+                  </span>
                 </TableCell>
-                <TableCell>
+                <TableCell data-label="模型">
                   {a.display_name && <div className="text-xs font-medium">{a.display_name}</div>}
                   <span className="font-mono text-xs text-muted-foreground">{a.resource_model}</span>
                   {catalogSlugs.data && !knownSlugs.has(a.resource_model) && (
-                    <Badge variant="outline" className="ml-2 text-amber-700 border-amber-500">
+                    <Badge variant="outline" className="ml-2 shrink-0 whitespace-nowrap text-amber-700 border-amber-500">
                       ⚠ 已不在 catalog
                     </Badge>
                   )}
                 </TableCell>
-                <TableCell>
+                <TableCell data-label="狀態">
                   {a.status === "quarantined" ? (
                     <QuarantineReasonBadge allocationId={a.id} status="quarantined" />
                   ) : a.status === "paused" ? (
@@ -234,13 +236,13 @@ export function AdminAllocationsPage() {
                     </Badge>
                   )}
                 </TableCell>
-                <TableCell>{a.quota_tokens_per_month ?? "無限額"}</TableCell>
-                <TableCell className="space-x-1">
+                <TableCell data-label="配額">{a.quota_tokens_per_month ?? "無限額"}</TableCell>
+                <TableCell className="space-x-1" data-label="標籤">
                   {a.is_service_allocation && <Badge variant="outline">service</Badge>}
                   {a.quota_locked && <Badge variant="outline">locked</Badge>}
                 </TableCell>
-                <TableCell className="font-mono text-xs">{a.token_prefix}…</TableCell>
-                <TableCell className="text-right">
+                <TableCell className="font-mono text-xs" data-label="Token 前綴">{a.token_prefix}…</TableCell>
+                <TableCell className="text-right" data-label="操作">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" aria-label="操作">

@@ -55,3 +55,40 @@
     @apply bg-background text-foreground;
   }
 }
+
+/*
+ * Phase 16 (RWD): single responsive-table mechanism. Add `responsive-table` to a
+ * <table> and `data-label="欄名"` to each body cell; below the md breakpoint the
+ * table collapses into one stacked card per row (label: value pairs). At >=768px
+ * nothing here applies — the desktop table is untouched (zero regression).
+ */
+@media (max-width: 767px) {
+  /* Child combinators so only the responsive table's OWN rows reflow — a nested
+     table inside an expanded cell (e.g. the tag drill-down) is left untouched. */
+  table.responsive-table > thead {
+    display: none;
+  }
+  table.responsive-table > tbody > tr {
+    display: block;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    margin-bottom: 0.5rem;
+    padding: 0.25rem 0.75rem;
+  }
+  table.responsive-table > tbody > tr > td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.375rem 0;
+    border: none;
+    text-align: right;
+  }
+  table.responsive-table > tbody > tr > td[data-label]::before {
+    content: attr(data-label);
+    font-weight: 500;
+    color: hsl(var(--muted-foreground));
+    text-align: left;
+    flex-shrink: 0;
+  }
+}
