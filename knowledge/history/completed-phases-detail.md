@@ -412,6 +412,7 @@
 
 完成（2026-06-03；spec 022-admin-email-notifications）。前置：階段 2（auth/audit）、
 階段 12（quarantine 可視性）。以 speckit 全流程（spec → plan → tasks → 78 任務 TDD 實作）。
+設計細節（元件圖、決策表、觸發來源對照）見 [`../design/admin-notifications.md`](../design/admin-notifications.md)。
 
 **動機：** Phase 12 把 quarantine/paused 做進 admin 首頁卡片，但 admin 只有「開著 UI 才看得到」。
 分配被自動隔離、upstream 短時間大量失敗、provider 憑證失效等事件**離線時無感**，等使用者回報才知道。

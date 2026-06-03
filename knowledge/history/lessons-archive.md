@@ -88,3 +88,86 @@
   能避開這層責任。
 - **來源**：`deploy/docker/Dockerfile.frontend`，PR #8 Trivy scan
 
+## 從 experience.md 移入（2026-06-03，Phase 13 後分流）
+
+### Helm pre-install Job 需要 Secret，Secret 必須也是 hook
+
+- **理論說**：Helm install 把 manifests 全部建立後才執行 hook。
+- **實際發生**：把 migration Job 標為 `pre-install` hook 後，Job 啟動但
+  `Error: secret "..." not found` — 因為 hook 在 regular manifests **之前**
+  跑，Secret 還沒被建立。
+- **解決方式**：給 Secret 加 `helm.sh/hook: pre-install,pre-upgrade` +
+  `helm.sh/hook-weight: "-10"`，比 Job 的預設 weight 0 更早執行。
+- **教訓**：Helm hook 順序 = (前置 hook 全部跑完) → (regular manifests) →
+  (post hook)。任何被 pre-hook 依賴的東西也必須是 pre-hook。
+- **來源**：`deploy/helm/ai-api/templates/secret.yaml`
+
+### SQLAlchemy delete 後不要再讀屬性
+
+- **理論說**：設定 `expire_on_commit=False` 就能在 commit/flush 後安全存取
+  ORM 物件屬性。
+- **實際發生**：OIDC callback 流程中先 `await session.delete(state_row)` +
+  `await session.flush()`，再讀 `state_row.code_verifier` / `state_row.nonce`
+  傳給 token exchange。authlib 收到的是錯誤值（空 / 過期），整個 SSO 失敗
+  且錯誤訊息只說 `invalid_credentials`，難以定位。
+- **解決方式**：在 `delete()` **之前**就把要用的屬性 cache 成 local
+  variables，再執行 delete。
+- **教訓**：對於「讀後即刪」的短期 token / state 表，永遠先把要用的欄位
+  copy 到 local，再 delete。`expire_on_commit=False` 不等於「物件可永遠
+  被讀」。
+- **來源**：`src/ai_api/api/auth.py` `oidc_callback`，修正於 commit ce3d640
+
+### OIDC id_token 驗證要給 clock-skew leeway
+
+- **理論說**：本機系統時間透過 NTP 同步，與 Google 偏差可忽略。
+- **實際發生**：authlib 預設 `claims.validate()` 不容忍 `iat` 在「未來」。
+  本機時鐘比 Google 慢 ~3 秒，每張 Google id_token 都被拒
+  `InvalidTokenError: The token is not valid as it was issued in the future`。
+  整段 SSO live 驗證在此卡了三輪。
+- **解決方式**：`claims.validate(leeway=60)`，容忍 60 秒時鐘偏移
+  （OAuth 2.0 / OIDC spec §5.3 推薦的合理範圍）。
+- **教訓**：任何接收外部簽發 JWT / id_token 的程式，**預設都要設 leeway**
+  （≥ 30 秒），不要假設本機時鐘準。同時 AuthError 訊息應該帶 JoseError
+  子型別，否則 debug 等於猜謎。
+- **來源**：`src/ai_api/auth/google_oidc.py`，修正於 commit ce3d640
+
+### 快速迭代不要用 mutable tag
+
+- **理論說**：`helm upgrade --set image.tag=main` 配合 push 新版到 ghcr，
+  叢集會拉到最新。
+- **實際發生**：image 推上去了，但 kubelet 仍用先前 `main` 的 layer
+  ——因為 `pullPolicy: IfNotPresent` 且 tag 相同，**不會重新解析 digest**。
+- **解決方式**：驗證迭代時使用 immutable sha tag（`sha-<short>`），或暫時
+  改 `pullPolicy: Always`。生產可以維持 `IfNotPresent` + 不可變 tag。
+- **教訓**：mutable tag (`main` / `latest`) 適合宣告「想要某個流」，不適合
+  「想要這個版本」。任何「為什麼跑舊版？」的除錯都從 image digest 開始查。
+- **來源**：2026-05-21 k3s-tew 部署驗證
+
+### Docker 沒開時 testcontainers 是 error 不是 skip — 新測試優先走 Docker-free
+
+- **理論說**：整合測試一律靠 testcontainers 起真 Postgres；本機沒 Docker 時它會自動 skip。
+- **實際發生**：階段 9 開工跑 `pytest` 出現 **54 個 error**（非 skip）——`conftest` 只在
+  `testcontainers` import 失敗時 `pytest.skip`，但套件裝得好好的、是 **Docker daemon 沒開**，
+  於是 `PostgresContainer()` 在 fixture setup 階段 raise → error。TDD 的 Red/Green 被環境卡住。
+- **解決方式**：新測試優先走 **Docker-free** 路徑——service 層用自帶 temp-file SQLite engine
+  （`create_async_engine` + `Base.metadata.create_all`）；端點層用既有 contract 套件的
+  in-memory SQLite `app_client`（`reset_engine_for_testing("sqlite+aiosqlite:///:memory:")`）
+  搭配登入 helper 或 `dependency_overrides`。Docker 回來後再跑完整 Postgres 整合測試做最終確認
+  （階段 9 最終 375 passed）。
+- **教訓**：TDD 的測試不該被「Docker 有沒有開」綁架。能用 in-memory / temp SQLite + dependency
+  override 表達的行為，就別硬綁 testcontainers——快、可攜、CI 與本機都穩。testcontainers 留給
+  「真的要驗 Postgres 專屬行為」（如 tz-aware datetime、enum、JSON column）。判斷某測試為何
+  error 時，第一個檢查點就是 `docker info` 是否回應。
+- **來源**：`tests/contract/test_me_usage.py`（in-memory）、`tests/integration/test_usage_member_scope.py`
+  （temp-file SQLite）；階段 9 / PR #30
+
+### 版本化資料的「生效鍵」要用 datetime，不要用 date
+
+- **理論說**：價目版本用「生效日」(date) 當唯一鍵 `(provider, model, effective_from)` 很直覺。
+- **實際發生**：同一個模型同一天只能有一個版本——使用者當天想補一個「快取折扣價」版本就撞
+  `duplicate_version`，得等到隔天才能改價。對「即時改價」是硬傷。
+- **解決方式**：前端生效欄位改 `datetime-local`、預設帶「現在」（本地時區），送出轉 UTC ISO。
+  後端本來就存完整 timestamp、唯一鍵也是 timestamp，無需改 schema——只是前端先前砍到只到日。
+- **教訓**：append-only / 版本化資料若「同一鍵粒度內可能要產生多筆」，鍵就要用足夠細的粒度
+  （datetime 而非 date）。UI 的時間輸入精度會無聲地變成業務限制。
+- **來源**：`frontend/src/routes/admin/prices.tsx`（date → datetime-local）；階段 11
