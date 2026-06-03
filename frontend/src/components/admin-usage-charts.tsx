@@ -61,7 +61,7 @@ export function UsageCharts({ fromIso, toIso }: { fromIso: string; toIso: string
   const maxTokens = cells.reduce((m, c) => Math.max(m, c.tokens), 0);
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
       <Card>
         <CardHeader>
           <CardTitle className="text-base">各 Provider 花費占比</CardTitle>
@@ -103,11 +103,16 @@ export function UsageCharts({ fromIso, toIso }: { fromIso: string; toIso: string
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <div className="inline-grid gap-[2px]" style={{ gridTemplateColumns: "auto repeat(24, 12px)" }}>
+              {/* 1fr hour columns so the grid fills the card width on desktop
+                  (bigger cells); min-w keeps it usable + scrollable on phones. */}
+              <div
+                className="grid w-full min-w-[560px] gap-[3px]"
+                style={{ gridTemplateColumns: "auto repeat(24, minmax(0, 1fr))" }}
+              >
                 {/* header row: hour labels (0,3,6,...) */}
                 <div />
                 {Array.from({ length: 24 }, (_, h) => (
-                  <div key={`h-${h}`} className="text-[8px] text-muted-foreground text-center">
+                  <div key={`h-${h}`} className="text-[9px] text-muted-foreground text-center">
                     {h % 3 === 0 ? h : ""}
                   </div>
                 ))}
@@ -137,14 +142,14 @@ function Row({
 }) {
   return (
     <>
-      <div className="pr-1 text-[10px] text-muted-foreground leading-[12px]">週{label}</div>
+      <div className="flex items-center pr-2 text-[11px] text-muted-foreground">週{label}</div>
       {Array.from({ length: 24 }, (_, h) => {
         const c = cellMap.get(`${wd}-${h}`);
         const intensity = c && maxTokens > 0 ? 0.12 + 0.88 * (c.tokens / maxTokens) : 0;
         return (
           <div
             key={h}
-            className="h-[12px] w-[12px] rounded-[2px] border border-border/30"
+            className="h-6 w-full rounded-[3px] border border-border/30"
             style={{ backgroundColor: c ? `rgba(37, 99, 235, ${intensity})` : "transparent" }}
             title={
               c
