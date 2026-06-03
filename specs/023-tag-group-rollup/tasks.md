@@ -119,8 +119,8 @@ description: "Tasks for Phase 15 — tag-based group cost rollup"
 - [X] T033 [P] 更新 `knowledge/vision.md` 階段 15 條目：完成日期填入後改 ✅、列實際交付、連結 history
 - [X] T034 [P] 在 `knowledge/history/completed-phases-detail.md` 追加「## 階段 15：Tag 群組 rollup」詳情（依 Phase 11–13 格式）
 - [X] T035 端到端煙霧（本機）：`/admin/usage` 切「依 Tag」→ 點 tag 展開 → 確認重疊提示 → 匯出 CSV 數字一致
-- [ ] T036 commit + push + 等 CI（**push 前先 `ruff check .` + 前端 lint/build**）；CI 綠後 helm upgrade 至 ai-ccsh；live 跑 quickstart 情境 1 + 4 真機驗證
-- [ ] T037 收尾：vision 階段 15 改 ✅、history 補上、確認 roadmap 狀態一致
+- [X] T036 commit + push + 等 CI（**push 前先 `ruff check .` + 前端 lint/build**）；CI 綠後 helm upgrade 至 ai-ccsh；live 跑 quickstart 情境 1 + 4 真機驗證
+- [X] T037 收尾：vision 階段 15 改 ✅、history 補上、確認 roadmap 狀態一致
 
 ---
 
