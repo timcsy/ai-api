@@ -94,20 +94,20 @@ description: "Tasks for Phase 13 — admin email notifications"
 
 ### Tests First (Red)
 
-- [ ] T029 [US2] 新增 `tests/integration/test_notification_hooks.py::test_allocation_quarantined_event_sends_email`：seed config + recipients、觸發 `audit.record(event_type=allocation_quarantined, target_id=..., details={"reason":"ratio","last_hour_calls":1100,"baseline_per_hour":100,...})`，驗證：a) 30 秒內 `aiosmtpd` 收到 message；b) 每 recipient 都收一封；c) subject 含 `[AI API] 分配自動隔離`；d) body 含完整 FR-014 欄位（分配 ID、display_name、reason 含具體數字、時間 UTC+8、admin 頁連結）
-- [ ] T030 [P] [US2] 同檔加 `test_quarantine_event_when_smtp_unset_skips_silently`：config 不存在時，audit event 仍正常落 DB、`notification_record(outcome=skipped_disabled)` 被建立、無 ERROR log（FR-005、SC-004）
-- [ ] T031 [P] [US2] 同檔加 `test_one_recipient_failure_does_not_block_others`：一位 recipient 故意被 SMTP server reject、另一位成功；驗證 `notification_record.per_recipient_status` 兩位 status 都記、`outcome=sent`（至少一位成功）（FR-021）
-- [ ] T032 [P] [US2] 同檔加 `test_credentials_invalid_status_blocks_send`：config.status=credentials_invalid 時，event 觸發後 record 落 `outcome=skipped_disabled`、無 SMTP 連線嘗試
-- [ ] T033 [P] [US2] 同檔加 `test_email_send_failure_does_not_break_audit`：故意讓 SMTP 連線超時，驗證 audit_events 仍正常寫入、`notification_record(outcome=send_failed_connect)`、`error_message` 含 actionable detail（FR-025）
-- [ ] T034 [US2] 跑 T029–T033 確認 **全 Red**
+- [X] T029 [US2] 新增 `tests/integration/test_notification_hooks.py::test_allocation_quarantined_event_sends_email`：seed config + recipients、觸發 `audit.record(event_type=allocation_quarantined, target_id=..., details={"reason":"ratio","last_hour_calls":1100,"baseline_per_hour":100,...})`，驗證：a) 30 秒內 `aiosmtpd` 收到 message；b) 每 recipient 都收一封；c) subject 含 `[AI API] 分配自動隔離`；d) body 含完整 FR-014 欄位（分配 ID、display_name、reason 含具體數字、時間 UTC+8、admin 頁連結）
+- [X] T030 [P] [US2] 同檔加 `test_quarantine_event_when_smtp_unset_skips_silently`：config 不存在時，audit event 仍正常落 DB、`notification_record(outcome=skipped_disabled)` 被建立、無 ERROR log（FR-005、SC-004）
+- [X] T031 [P] [US2] 同檔加 `test_one_recipient_failure_does_not_block_others`：一位 recipient 故意被 SMTP server reject、另一位成功；驗證 `notification_record.per_recipient_status` 兩位 status 都記、`outcome=sent`（至少一位成功）（FR-021）
+- [X] T032 [P] [US2] 同檔加 `test_credentials_invalid_status_blocks_send`：config.status=credentials_invalid 時，event 觸發後 record 落 `outcome=skipped_disabled`、無 SMTP 連線嘗試
+- [X] T033 [P] [US2] 同檔加 `test_email_send_failure_does_not_break_audit`：故意讓 SMTP 連線超時，驗證 audit_events 仍正常寫入、`notification_record(outcome=send_failed_connect)`、`error_message` 含 actionable detail（FR-025）
+- [X] T034 [US2] 跑 T029–T033 確認 **全 Red**
 
 ### Implementation (Green)
 
-- [ ] T035 [US2] 在 `src/ai_api/services/notifier.py` 實作 `EmailNotifier.notify()` 核心：讀 config（無/disabled/invalid 即落 skipped 並 return）、組 subject/body、寄信、落 record；**此版尚不含 dedup（US4 加）** — 但保留 hook 位置（pass-through）；TLS / timeout / error classification 沿用 T019 內部 helper
-- [ ] T036 [US2] 在 `src/ai_api/services/notifier.py` 加 `_render_quarantine_email(event: NotificationEvent) -> tuple[str, str]`：subject + body template；body 中文範本依 research.md R6
-- [ ] T037 [US2] 在 `src/ai_api/auth/audit.py`（或 `services/audit.py` 視既有結構）`record()` 完成後加 hook：若 `event_type ∈ NOTIFY_EVENT_TYPES`（讀 `settings.notify_event_types_override` 或預設清單），使用 `asyncio.create_task(notifier.notify(...))`；hook 整段包 try/except 不向上 raise（FR-025）
-- [ ] T038 [P] [US2] 在 `src/ai_api/services/notifier.py` 落結構化 JSON log 每筆寄送（含 `event_type`、`audit_event_id`、`recipients_count`、`outcome`、`smtp_response_code`、`latency_ms`、email partial mask）；對應 `contracts/notifier-interface.md` logging 契約
-- [ ] T039 [US2] 跑 T029–T033 確認 **全 Green**
+- [X] T035 [US2] 在 `src/ai_api/services/notifier.py` 實作 `EmailNotifier.notify()` 核心：讀 config（無/disabled/invalid 即落 skipped 並 return）、組 subject/body、寄信、落 record；**此版尚不含 dedup（US4 加）** — 但保留 hook 位置（pass-through）；TLS / timeout / error classification 沿用 T019 內部 helper
+- [X] T036 [US2] 在 `src/ai_api/services/notifier.py` 加 `_render_quarantine_email(event: NotificationEvent) -> tuple[str, str]`：subject + body template；body 中文範本依 research.md R6
+- [X] T037 [US2] 在 `src/ai_api/auth/audit.py`（或 `services/audit.py` 視既有結構）`record()` 完成後加 hook：若 `event_type ∈ NOTIFY_EVENT_TYPES`（讀 `settings.notify_event_types_override` 或預設清單），使用 `asyncio.create_task(notifier.notify(...))`；hook 整段包 try/except 不向上 raise（FR-025）
+- [X] T038 [P] [US2] 在 `src/ai_api/services/notifier.py` 落結構化 JSON log 每筆寄送（含 `event_type`、`audit_event_id`、`recipients_count`、`outcome`、`smtp_response_code`、`latency_ms`、email partial mask）；對應 `contracts/notifier-interface.md` logging 契約
+- [X] T039 [US2] 跑 T029–T033 確認 **全 Green**
 
 ---
 

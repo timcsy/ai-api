@@ -90,7 +90,9 @@ async def _smtp_send(
     aiosmtplib if the server advertises it).
     """
     use_tls = port == 465
-    start_tls: bool | None = None if use_tls else True
+    # start_tls=None lets aiosmtplib auto-detect STARTTLS based on server EHLO.
+    # In production every real SMTP (Gmail / Workspace / school mail) advertises
+    # STARTTLS; in tests aiosmtpd plain-mode does not — auto-detect handles both.
     return await aiosmtplib.send(
         message,
         hostname=hostname,
@@ -98,7 +100,7 @@ async def _smtp_send(
         username=username,
         password=password,
         use_tls=use_tls,
-        start_tls=start_tls,
+        start_tls=None,
         timeout=_COMMAND_TIMEOUT_S,
     )
 
@@ -112,6 +114,82 @@ def _build_message(
     msg["Subject"] = subject
     msg.set_content(body)
     return msg
+
+
+def _fmt_taipei(dt: datetime) -> str:
+    """Format a tz-aware datetime in UTC+8 (Taiwan local) for end-user emails."""
+    from datetime import timedelta, timezone
+    taipei = dt.astimezone(timezone(timedelta(hours=8)))
+    return taipei.strftime("%Y-%m-%d %H:%M (UTC+8)")
+
+
+def _public_base_url() -> str:
+    from ai_api.config import get_settings
+    base = (get_settings().base_url or "").rstrip("/")
+    return base or "https://your-platform"
+
+
+def _render_quarantine_email(event: NotificationEvent) -> tuple[str, str]:
+    """Subject + plain-text body for allocation_quarantined event."""
+    target_id_short = (event.target_id or "unknown")[:8]
+    display = event.target_display_name or f"分配 {target_id_short}"
+    details = event.details or {}
+    last_hour = details.get("last_hour_calls")
+    baseline = details.get("baseline_per_hour")
+    reason = details.get("reason", "unknown")
+    base_url = _public_base_url()
+
+    subject = f"[AI API] 分配自動隔離 — {target_id_short}"
+    why_line = (
+        f"  - 觸發原因：過去 1 小時 {last_hour} calls，baseline {baseline:.1f}/hr"
+        if isinstance(last_hour, int) and isinstance(baseline, (int, float))
+        else f"  - 觸發原因：{reason}"
+    )
+    if isinstance(last_hour, int) and isinstance(baseline, (int, float)) and baseline > 0:
+        ratio = last_hour / baseline
+        why_line += f"（約 {ratio:.0f}× 基準值）"
+
+    body = (
+        "管理員您好，\n\n"
+        "一筆分配剛剛被異常偵測器自動隔離。\n\n"
+        f"  - 分配：{target_id_short}（{display}）\n"
+        f"{why_line}\n"
+        f"  - 時間：{_fmt_taipei(event.occurred_at)}\n\n"
+        "請至以下頁面確認狀況並決定是否解除：\n"
+        f"{base_url}/admin/observability/allocations\n\n"
+        "— AI API Manager\n"
+    )
+    return subject, body
+
+
+def _render_generic_email(event: NotificationEvent) -> tuple[str, str]:
+    """Fallback template for event types without a dedicated renderer."""
+    target_id_short = (event.target_id or "unknown")[:8]
+    base_url = _public_base_url()
+    subject = f"[AI API] {event.event_type} — {target_id_short}"
+    details_dump = (
+        ", ".join(f"{k}={v}" for k, v in (event.details or {}).items()) if event.details else "（無）"
+    )
+    body = (
+        f"管理員您好，\n\n"
+        f"事件 {event.event_type} 已發生。\n\n"
+        f"  - 對象：{event.target_type or '-'} / {target_id_short}\n"
+        f"  - 詳細：{details_dump}\n"
+        f"  - 時間：{_fmt_taipei(event.occurred_at)}\n\n"
+        f"請至管理後台查看：\n{base_url}/admin\n\n"
+        "— AI API Manager\n"
+    )
+    return subject, body
+
+
+_EVENT_RENDERERS = {
+    "allocation_quarantined": _render_quarantine_email,
+}
+
+
+def render_event_email(event: NotificationEvent) -> tuple[str, str]:
+    renderer = _EVENT_RENDERERS.get(event.event_type, _render_generic_email)
+    return renderer(event)
 
 
 def _build_test_message(
@@ -142,8 +220,144 @@ class EmailNotifier(Notifier):
         session: AsyncSession,
         event: NotificationEvent,
     ) -> NotificationResult:
-        # Implemented in US2/US4 — placeholder for now (US1 only delivers test_send).
-        raise NotImplementedError("EmailNotifier.notify is delivered in US2/US4")
+        """Dispatch a real event notification to all configured recipients.
+
+        US2 scope: no dedup yet — every matching event sends a fresh email.
+        Dedup gate added in US4 (T054).
+        """
+        start = time.monotonic()
+        # 1. Load config; absent / disabled / credentials_invalid -> skip.
+        config = (
+            await session.execute(select(NotificationConfig).limit(1))
+        ).scalar_one_or_none()
+        latency_ms_so_far = lambda: int((time.monotonic() - start) * 1000)  # noqa: E731
+
+        if config is None or not config.enabled:
+            return _persist_and_return_result(
+                session=session,
+                event_type=event.event_type,
+                outcome=NotificationOutcome.skipped_disabled,
+                recipients=[],
+                subject="(skipped: notifications disabled)",
+                body_preview="",
+                per_recipient_status={},
+                smtp_response_code=None,
+                error_message=None,
+                latency_ms=latency_ms_so_far(),
+                audit_event_id=event.audit_event_id,
+            )
+        if config.status == NotificationConfigStatus.credentials_invalid:
+            return _persist_and_return_result(
+                session=session,
+                event_type=event.event_type,
+                outcome=NotificationOutcome.skipped_disabled,
+                recipients=[],
+                subject="(skipped: credentials invalid)",
+                body_preview="",
+                per_recipient_status={},
+                smtp_response_code=None,
+                error_message="config.status=credentials_invalid",
+                latency_ms=latency_ms_so_far(),
+                audit_event_id=event.audit_event_id,
+            )
+        if not config.recipients:
+            return _persist_and_return_result(
+                session=session,
+                event_type=event.event_type,
+                outcome=NotificationOutcome.skipped_no_recipients,
+                recipients=[],
+                subject="(skipped: no recipients)",
+                body_preview="",
+                per_recipient_status={},
+                smtp_response_code=None,
+                error_message=None,
+                latency_ms=latency_ms_so_far(),
+                audit_event_id=event.audit_event_id,
+            )
+
+        # 2. Decrypt password; if it fails, mark credentials_invalid and skip.
+        try:
+            password = decrypt_str(config.smtp_password_encrypted)
+        except Exception as exc:
+            config.status = NotificationConfigStatus.credentials_invalid
+            await session.flush()
+            return _persist_and_return_result(
+                session=session,
+                event_type=event.event_type,
+                outcome=NotificationOutcome.skipped_disabled,
+                recipients=[],
+                subject="(skipped: decrypt failed)",
+                body_preview="",
+                per_recipient_status={},
+                smtp_response_code=None,
+                error_message=f"decrypt failed: {exc}",
+                latency_ms=latency_ms_so_far(),
+                audit_event_id=event.audit_event_id,
+            )
+
+        # 3. Render template.
+        subject, body = render_event_email(event)
+        msg = _build_message(
+            sender_email=config.sender_email,
+            sender_name=config.sender_name,
+            recipients=config.recipients,
+            subject=subject,
+            body=body,
+        )
+
+        # 4. Send.
+        outcome: NotificationOutcome
+        smtp_code: int | None = None
+        per_recipient: dict[str, str] = {}
+        error_message: str | None = None
+        try:
+            errors, response = await _smtp_send(
+                message=msg,
+                hostname=config.smtp_host,
+                port=config.smtp_port,
+                username=config.smtp_username,
+                password=password,
+            )
+            # Mark every recipient ok by default; overwrite individual failures.
+            per_recipient = dict.fromkeys(config.recipients, "ok")
+            for addr, (err_code, err_msg) in (errors or {}).items():
+                decoded = err_msg.decode(errors="replace") if isinstance(err_msg, bytes) else str(err_msg)
+                per_recipient[addr] = f"{err_code}: {decoded}"
+            if not errors:
+                outcome = NotificationOutcome.sent
+                smtp_code = 250 if response else None
+            elif len(errors) == len(config.recipients):
+                outcome = NotificationOutcome.send_failed_all_recipients
+                first_code = next(iter(errors.values()))[0]
+                smtp_code = int(first_code) if isinstance(first_code, int) else None
+                error_message = f"all recipients rejected: {per_recipient}"
+            else:
+                # At least one delivered — count as sent per FR-021.
+                outcome = NotificationOutcome.sent
+                smtp_code = 250
+        except BaseException as exc:
+            outcome, smtp_code = classify_smtp_exception(exc, mode="send")
+            per_recipient = dict.fromkeys(config.recipients, f"{outcome.value}: {exc}"[:200])
+            error_message = str(exc)[:5000]
+            logger.exception(
+                "notify failed mode=send outcome=%s event_type=%s recipients_masked=%s",
+                outcome.value, event.event_type,
+                [_mask_email(r) for r in config.recipients],
+            )
+
+        return _persist_and_return_result(
+            session=session,
+            event_type=event.event_type,
+            outcome=outcome,
+            recipients=list(config.recipients),
+            subject=subject,
+            body_preview=body[:500],
+            per_recipient_status=per_recipient,
+            smtp_response_code=smtp_code,
+            error_message=error_message,
+            latency_ms=latency_ms_so_far(),
+            audit_event_id=event.audit_event_id,
+        )
 
     async def test_send(
         self,
@@ -260,11 +474,12 @@ def _persist_and_return_result(
     smtp_response_code: int | None,
     error_message: str | None,
     latency_ms: int,
+    audit_event_id: str | None = None,
 ) -> NotificationResult:
     record = NotificationRecord(
         id=str(ULID()),
         event_type=event_type,
-        audit_event_id=None,
+        audit_event_id=audit_event_id,
         dedup_bucket_id=None,
         outcome=outcome,
         recipients=recipients,
