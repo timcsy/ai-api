@@ -220,7 +220,7 @@ export function AdminCatalogManagePage() {
         若 model 對應的 provider 尚無 credential，model 仍然存在於 catalog 但對 member 隱藏。
       </p>
 
-      <Table>
+      <Table className="responsive-table">
         <TableHeader>
           <TableRow>
             <TableHead>Slug</TableHead>
@@ -251,17 +251,17 @@ export function AdminCatalogManagePage() {
             const hidden = vis && vis.visible_member_count === 0;
             return (
             <TableRow key={m.slug}>
-              <TableCell className="font-mono text-xs">
-                <Link to={`/admin/model/${m.slug}`} className="text-primary hover:underline">
+              <TableCell className="font-mono text-xs" data-label="Slug">
+                <Link to={`/admin/model/${m.slug}`} className="block max-w-[180px] truncate text-primary hover:underline">
                   {m.slug}
                 </Link>
               </TableCell>
-              <TableCell>{m.display_name}</TableCell>
-              <TableCell>{m.provider}</TableCell>
-              <TableCell>
+              <TableCell data-label="顯示名稱">{m.display_name}</TableCell>
+              <TableCell data-label="供應商">{m.provider}</TableCell>
+              <TableCell data-label="成本">
                 <Badge variant="outline">{m.cost_tier}</Badge>
               </TableCell>
-              <TableCell>
+              <TableCell data-label="存取">
                 <Badge variant={m.default_access === "open" ? "default" : "secondary"}>
                   {m.default_access}
                 </Badge>
@@ -271,7 +271,7 @@ export function AdminCatalogManagePage() {
                   </span>
                 )}
               </TableCell>
-              <TableCell>
+              <TableCell data-label="對成員可見">
                 {!vis ? (
                   <span className="text-xs text-muted-foreground">—</span>
                 ) : !vis.provider_has_credential ? (
@@ -288,14 +288,14 @@ export function AdminCatalogManagePage() {
                   </Badge>
                 )}
               </TableCell>
-              <TableCell>
+              <TableCell data-label="狀態">
                 {m.status === "active" ? (
                   <Badge>active</Badge>
                 ) : (
                   <Badge variant="secondary">{m.status}</Badge>
                 )}
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="text-right" data-label="動作">
                 <Button
                   size="sm"
                   variant="destructive"

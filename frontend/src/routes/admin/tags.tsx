@@ -128,7 +128,7 @@ export function AdminTagsPage() {
         Tag 用於控制 model 對成員的可見性。在「Model 存取」頁設定哪些 tag 可使用哪個 model。
       </p>
 
-      <Table>
+      <Table className="responsive-table">
         <TableHeader>
           <TableRow>
             <TableHead>Tag</TableHead>
@@ -151,13 +151,13 @@ export function AdminTagsPage() {
           )}
           {tagsQuery.data?.map((t) => (
             <TableRow key={t.tag}>
-              <TableCell>
+              <TableCell data-label="Tag">
                 <Badge variant="secondary">
                   <Link to={`/admin/tag/${t.tag}`} className="hover:underline">{t.tag}</Link>
                 </Badge>
               </TableCell>
-              <TableCell>{t.member_count}</TableCell>
-              <TableCell className="text-right">
+              <TableCell data-label="使用人數">{t.member_count}</TableCell>
+              <TableCell className="text-right" data-label="動作">
                 <Button size="sm" variant="destructive" onClick={() => setDeleteConfirm(t)}>
                   全域刪除
                 </Button>

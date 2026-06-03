@@ -107,7 +107,7 @@ export function AdminAuditPage() {
         最近 {query.data?.rows.length ?? 0} 筆（從新到舊；最多 100）
       </p>
 
-      <Table>
+      <Table className="responsive-table">
         <TableHeader>
           <TableRow>
             <TableHead>時間</TableHead>
@@ -126,21 +126,25 @@ export function AdminAuditPage() {
           )}
           {query.data?.rows.map((r) => (
             <TableRow key={r.id}>
-              <TableCell className="text-xs whitespace-nowrap">
+              <TableCell className="text-xs whitespace-nowrap" data-label="時間">
                 {new Date(r.created_at).toLocaleString("zh-TW")}
               </TableCell>
-              <TableCell>
+              <TableCell data-label="事件">
                 <Badge variant="outline" className="font-mono text-xs">{r.event_type}</Badge>
               </TableCell>
-              <TableCell className="text-xs">
-                <div>{r.actor_type}</div>
-                {r.actor_id && <div className="text-muted-foreground">{r.actor_id}</div>}
+              <TableCell className="text-xs" data-label="操作者">
+                <div className="min-w-0">
+                  <div>{r.actor_type}</div>
+                  {r.actor_id && <div className="text-muted-foreground break-all">{r.actor_id}</div>}
+                </div>
               </TableCell>
-              <TableCell className="text-xs">
-                {r.target_type && <div>{r.target_type}</div>}
-                {r.target_id && <div className="text-muted-foreground font-mono">{r.target_id}</div>}
+              <TableCell className="text-xs" data-label="對象">
+                <div className="min-w-0">
+                  {r.target_type && <div>{r.target_type}</div>}
+                  {r.target_id && <div className="text-muted-foreground font-mono break-all">{r.target_id}</div>}
+                </div>
               </TableCell>
-              <TableCell className="text-xs">
+              <TableCell className="text-xs" data-label="細節">
                 {r.details && (
                   <details>
                     <summary className="cursor-pointer text-muted-foreground hover:text-foreground">

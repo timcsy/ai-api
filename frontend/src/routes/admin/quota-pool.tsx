@@ -154,7 +154,7 @@ export function AdminQuotaPoolPage() {
       <section>
         <h2 className="text-xl font-semibold mb-3">再分配紀錄</h2>
         {logQuery.data && (
-          <Table>
+          <Table className="responsive-table">
             <TableHeader>
               <TableRow>
                 <TableHead>時間</TableHead>
@@ -178,15 +178,15 @@ export function AdminQuotaPoolPage() {
                     setDetailLog(detail);
                   }}
                 >
-                  <TableCell className="text-xs">
+                  <TableCell className="text-xs" data-label="時間">
                     {new Date(row.finished_at).toLocaleString("zh-TW")}
                   </TableCell>
-                  <TableCell>{row.period_yyyymm}</TableCell>
-                  <TableCell><Badge variant="outline">{row.triggered_by}</Badge></TableCell>
-                  <TableCell className="text-right">{row.scanned}</TableCell>
-                  <TableCell className="text-right">{row.changed}</TableCell>
-                  <TableCell className="text-right">{row.T_after.toLocaleString()}</TableCell>
-                  <TableCell>{row.algorithm_version}</TableCell>
+                  <TableCell data-label="期間">{row.period_yyyymm}</TableCell>
+                  <TableCell data-label="觸發"><Badge variant="outline">{row.triggered_by}</Badge></TableCell>
+                  <TableCell className="text-right" data-label="掃描">{row.scanned}</TableCell>
+                  <TableCell className="text-right" data-label="變更">{row.changed}</TableCell>
+                  <TableCell className="text-right" data-label="T 值">{row.T_after.toLocaleString()}</TableCell>
+                  <TableCell data-label="演算法版本">{row.algorithm_version}</TableCell>
                 </TableRow>
               ))}
               {logQuery.data.length === 0 && (
