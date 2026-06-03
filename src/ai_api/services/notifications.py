@@ -97,18 +97,26 @@ class NotificationConfigService:
             raise NotificationConfigValidationError("smtp_password: must be a string")
         # Normalise: strip whitespace (Gmail App Password paste has spaces).
         smtp_password = _normalize_password(smtp_password)
-        if not smtp_password:
-            raise NotificationConfigValidationError("smtp_password: must be non-empty")
         _validate_email(sender_email, field="sender_email")
         if not isinstance(recipients, list) or not all(isinstance(r, str) for r in recipients):
             raise NotificationConfigValidationError("recipients: must be a list of email strings")
         for r in recipients:
             _validate_email(r, field="recipients")
 
-        encrypted = encrypt_str(smtp_password)
         now = datetime.now(UTC)
-
         existing = await self.get()
+
+        # Blank password = keep the existing stored password (edit-other-fields
+        # flow). On first-time setup a non-blank password is required.
+        if not smtp_password:
+            if existing is None:
+                raise NotificationConfigValidationError(
+                    "smtp_password: required on first-time setup"
+                )
+            encrypted = existing.smtp_password_encrypted
+        else:
+            encrypted = encrypt_str(smtp_password)
+
         if existing is None:
             cfg = NotificationConfig(
                 id=1,
@@ -128,6 +136,15 @@ class NotificationConfigService:
             self._s.add(cfg)
         else:
             cfg = existing
+            # Only connectivity-affecting changes invalidate a prior "verified"
+            # status. Editing recipients / sender / enabled keeps it verified so
+            # admins aren't forced to re-test after a trivial recipient tweak.
+            connectivity_changed = (
+                cfg.smtp_host != smtp_host
+                or cfg.smtp_port != smtp_port
+                or cfg.smtp_username != smtp_username
+                or cfg.smtp_password_encrypted != encrypted
+            )
             cfg.smtp_host = smtp_host
             cfg.smtp_port = smtp_port
             cfg.smtp_username = smtp_username
@@ -136,11 +153,11 @@ class NotificationConfigService:
             cfg.sender_name = sender_name or "AI API Manager"
             cfg.recipients = recipients
             cfg.enabled = enabled
-            # Reset status on any save — admin should re-test after changes
-            cfg.status = NotificationConfigStatus.pending_test
-            cfg.last_test_at = None
-            cfg.last_test_outcome = None
-            cfg.last_test_error = None
+            if connectivity_changed:
+                cfg.status = NotificationConfigStatus.pending_test
+                cfg.last_test_at = None
+                cfg.last_test_outcome = None
+                cfg.last_test_error = None
             cfg.updated_at = now
         await self._s.flush()
         return cfg

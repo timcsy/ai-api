@@ -27,7 +27,9 @@ class NotificationConfigCreate(BaseModel):
     smtp_host: str = Field(..., min_length=1, max_length=255)
     smtp_port: int = Field(..., ge=1, le=65535)
     smtp_username: str = Field(..., min_length=1, max_length=255)
-    smtp_password: str = Field(..., min_length=1, max_length=256)
+    # Blank password = keep the existing stored password (only valid when a
+    # config already exists). On first-time setup a non-blank password is required.
+    smtp_password: str = Field(default="", max_length=256)
     sender_email: EmailStr
     sender_name: str = Field(default="AI API Manager", max_length=128)
     recipients: list[EmailStr] = Field(default_factory=list)

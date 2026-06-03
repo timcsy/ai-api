@@ -106,6 +106,58 @@ async def test_password_whitespace_stripped_and_fingerprint_from_plaintext(
 
 
 @pytest.mark.asyncio
+async def test_blank_password_keeps_existing_on_edit(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    """Editing other fields with a blank password keeps the stored password
+    (FR: '留白＝沿用已儲存的密碼'). Previously this 400'd — the UI promised it
+    but the backend required a non-empty password every save."""
+    from sqlalchemy import select
+
+    from ai_api.db import get_sessionmaker
+    from ai_api.models import NotificationConfig, NotificationConfigStatus
+
+    # First save with a real password
+    r1 = await app_client.put(
+        "/admin/notifications/config", headers=admin_headers, json=_VALID_CONFIG
+    )
+    assert r1.status_code == 200, r1.text
+    fp_before = r1.json()["smtp_password_fingerprint"]
+
+    # Pretend a successful test verified the config
+    sm = get_sessionmaker()
+    async with sm() as s:
+        cfg = (await s.execute(select(NotificationConfig))).scalar_one()
+        cfg.status = NotificationConfigStatus.verified
+        await s.commit()
+
+    # Now change recipients only, leave password blank
+    edit = {**_VALID_CONFIG, "recipients": ["new@example.com"], "smtp_password": ""}
+    r2 = await app_client.put(
+        "/admin/notifications/config", headers=admin_headers, json=edit
+    )
+    assert r2.status_code == 200, r2.text
+    body = r2.json()
+    assert body["recipients"] == ["new@example.com"]
+    # Same password kept → same fingerprint
+    assert body["smtp_password_fingerprint"] == fp_before
+    # Recipient-only change does NOT invalidate verified status
+    assert body["status"] == "verified"
+
+
+@pytest.mark.asyncio
+async def test_blank_password_on_first_setup_is_rejected(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    """No existing config + blank password → must provide one."""
+    payload = {**_VALID_CONFIG, "smtp_password": ""}
+    r = await app_client.put(
+        "/admin/notifications/config", headers=admin_headers, json=payload
+    )
+    assert r.status_code in (400, 422)
+
+
+@pytest.mark.asyncio
 async def test_put_config_rejects_invalid_port(
     app_client: AsyncClient, admin_headers: dict[str, str]
 ) -> None:
