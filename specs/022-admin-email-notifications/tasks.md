@@ -163,19 +163,19 @@ description: "Tasks for Phase 13 — admin email notifications"
 
 ### Tests First (Red)
 
-- [ ] T056 [US5] 在 `tests/contract/test_admin_notifications.py` 加 `test_list_history_returns_paginated_records`：seed 60 筆 records、`GET /admin/notifications/history?limit=20` 回 20 筆 + `next_cursor`，第二次帶 cursor 回下 20 筆
-- [ ] T057 [P] [US5] 同檔加 `test_history_filters_by_event_type`：`?event_type=allocation_quarantined` 只回對應紀錄
-- [ ] T058 [P] [US5] 同檔加 `test_history_filters_by_outcome`：`?outcome=send_failed_auth` 只回失敗紀錄
-- [ ] T059 [P] [US5] 同檔加 `test_primary_record_surfaces_bucket_count`：被 49 筆 suppressed 合併的 primary record 回應含 `bucket_event_count=50`
-- [ ] T060 [US5] 跑 T056–T059 確認 **全 Red**
+- [X] T056 [US5] 在 `tests/contract/test_admin_notifications.py` 加 `test_list_history_returns_paginated_records`：seed 60 筆 records、`GET /admin/notifications/history?limit=20` 回 20 筆 + `next_cursor`，第二次帶 cursor 回下 20 筆
+- [X] T057 [P] [US5] 同檔加 `test_history_filters_by_event_type`：`?event_type=allocation_quarantined` 只回對應紀錄
+- [X] T058 [P] [US5] 同檔加 `test_history_filters_by_outcome`：`?outcome=send_failed_auth` 只回失敗紀錄
+- [X] T059 [P] [US5] 同檔加 `test_primary_record_surfaces_bucket_count`：被 49 筆 suppressed 合併的 primary record 回應含 `bucket_event_count=50`
+- [X] T060 [US5] 跑 T056–T059 確認 **全 Red**
 
 ### Implementation (Green)
 
-- [ ] T061 [US5] 在 `src/ai_api/services/notifications.py` 加 `list_history(limit, cursor, event_type, outcome) -> tuple[list[NotificationRecord], next_cursor]`：cursor 用 `(created_at, id)` 組合 opaque base64；`bucket_event_count` 透過 LEFT JOIN `notification_dedup_bucket` 取得（僅 primary record 上）
-- [ ] T062 [US5] 在 `src/ai_api/api/admin_notifications.py` 加 `GET /history` endpoint，schema 對齊 `contracts/admin-notifications.openapi.yaml::NotificationHistoryResponse`
-- [ ] T063 [P] [US5] 在 `frontend/src/routes/admin/notifications.tsx` 增加歷史區塊：列出最近 50 筆、`bucket_event_count > 1` 的 primary record 顯示「N 筆事件合併入此封」可展開列出 suppressed 子項；篩選器（event_type 下拉、outcome 下拉）；游標分頁
-- [ ] T064 [P] [US5] 在 `frontend/src/routes/admin/notifications.tsx` 為失敗紀錄顯示 actionable 訊息（從 `error_message` + `per_recipient_status` 組合白話文）
-- [ ] T065 [US5] 跑 T056–T059 + frontend lint/build 確認 **全 Green**
+- [X] T061 [US5] 在 `src/ai_api/services/notifications.py` 加 `list_history(limit, cursor, event_type, outcome) -> tuple[list[NotificationRecord], next_cursor]`：cursor 用 `(created_at, id)` 組合 opaque base64；`bucket_event_count` 透過 LEFT JOIN `notification_dedup_bucket` 取得（僅 primary record 上）
+- [X] T062 [US5] 在 `src/ai_api/api/admin_notifications.py` 加 `GET /history` endpoint，schema 對齊 `contracts/admin-notifications.openapi.yaml::NotificationHistoryResponse`
+- [X] T063 [P] [US5] 在 `frontend/src/routes/admin/notifications.tsx` 增加歷史區塊：列出最近 50 筆、`bucket_event_count > 1` 的 primary record 顯示「N 筆事件合併入此封」可展開列出 suppressed 子項；篩選器（event_type 下拉、outcome 下拉）；游標分頁
+- [X] T064 [P] [US5] 在 `frontend/src/routes/admin/notifications.tsx` 為失敗紀錄顯示 actionable 訊息（從 `error_message` + `per_recipient_status` 組合白話文）
+- [X] T065 [US5] 跑 T056–T059 + frontend lint/build 確認 **全 Green**
 
 ---
 

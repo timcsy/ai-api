@@ -7,6 +7,7 @@ admin UI can prompt for re-entry.
 """
 from __future__ import annotations
 
+import base64
 import re
 from datetime import UTC, datetime
 
@@ -14,7 +15,12 @@ from cryptography.fernet import InvalidToken
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai_api.models import NotificationConfig, NotificationConfigStatus
+from ai_api.models import (
+    NotificationConfig,
+    NotificationConfigStatus,
+    NotificationDedupBucket,
+    NotificationRecord,
+)
 from ai_api.services.crypto import encrypt_str
 
 # Conservative email regex; matches FastAPI/email-validator simple form.
@@ -122,6 +128,96 @@ class NotificationConfigService:
         result = await self._s.execute(delete(NotificationConfig))
         await self._s.flush()
         return result.rowcount > 0
+
+    async def list_history(
+        self,
+        *,
+        limit: int = 50,
+        cursor: str | None = None,
+        event_type: str | None = None,
+        outcome: str | None = None,
+    ) -> tuple[list[dict[str, object]], str | None]:
+        """Return a page of notification records (newest first) + next cursor.
+
+        Cursor is an opaque base64 of `<created_at_iso>|<id>` for keyset pagination.
+        Primary records of a dedup bucket surface `bucket_event_count`.
+        """
+        stmt = select(NotificationRecord).order_by(
+            NotificationRecord.created_at.desc(), NotificationRecord.id.desc()
+        )
+        if event_type:
+            stmt = stmt.where(NotificationRecord.event_type == event_type)
+        if outcome:
+            stmt = stmt.where(NotificationRecord.outcome == outcome)
+        if cursor:
+            try:
+                decoded = base64.urlsafe_b64decode(cursor.encode()).decode()
+                cur_ts_iso, cur_id = decoded.split("|", 1)
+                cur_ts = datetime.fromisoformat(cur_ts_iso)
+                stmt = stmt.where(
+                    (NotificationRecord.created_at < cur_ts)
+                    | (
+                        (NotificationRecord.created_at == cur_ts)
+                        & (NotificationRecord.id < cur_id)
+                    )
+                )
+            except (ValueError, TypeError):
+                pass  # invalid cursor -> treat as first page
+
+        rows = list((await self._s.execute(stmt.limit(limit + 1))).scalars().all())
+        has_more = len(rows) > limit
+        page = rows[:limit]
+
+        # Resolve bucket_event_count for primary records.
+        bucket_ids = [r.dedup_bucket_id for r in page if r.dedup_bucket_id]
+        bucket_counts: dict[str, int] = {}
+        primary_ids: dict[str, str] = {}
+        if bucket_ids:
+            buckets = (
+                await self._s.execute(
+                    select(NotificationDedupBucket).where(
+                        NotificationDedupBucket.id.in_(bucket_ids)
+                    )
+                )
+            ).scalars().all()
+            for b in buckets:
+                bucket_counts[b.id] = b.event_count
+                if b.primary_record_id:
+                    primary_ids[b.primary_record_id] = b.id
+
+        out: list[dict[str, object]] = []
+        for r in page:
+            # Only show bucket_event_count on the bucket's primary record.
+            bucket_event_count = (
+                bucket_counts.get(r.dedup_bucket_id)
+                if r.dedup_bucket_id and primary_ids.get(r.id) == r.dedup_bucket_id
+                else None
+            )
+            out.append(
+                {
+                    "id": r.id,
+                    "event_type": r.event_type,
+                    "audit_event_id": r.audit_event_id,
+                    "dedup_bucket_id": r.dedup_bucket_id,
+                    "outcome": r.outcome.value if hasattr(r.outcome, "value") else r.outcome,
+                    "recipients": r.recipients,
+                    "per_recipient_status": r.per_recipient_status,
+                    "subject": r.subject,
+                    "body_preview": r.body_preview,
+                    "smtp_response_code": r.smtp_response_code,
+                    "error_message": r.error_message,
+                    "latency_ms": r.latency_ms,
+                    "created_at": r.created_at.isoformat(),
+                    "bucket_event_count": bucket_event_count,
+                }
+            )
+
+        next_cursor = None
+        if has_more and page:
+            last = page[-1]
+            raw = f"{last.created_at.isoformat()}|{last.id}"
+            next_cursor = base64.urlsafe_b64encode(raw.encode()).decode()
+        return out, next_cursor
 
     @staticmethod
     def to_response(cfg: NotificationConfig) -> dict[str, object]:

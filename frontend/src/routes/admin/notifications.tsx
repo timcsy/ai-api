@@ -32,6 +32,41 @@ interface TestSendResponse {
   latency_ms: number;
 }
 
+interface NotificationRecord {
+  id: string;
+  event_type: string;
+  outcome: string;
+  recipients: string[];
+  per_recipient_status: Record<string, string>;
+  subject: string;
+  error_message: string | null;
+  smtp_response_code: number | null;
+  created_at: string;
+  bucket_event_count: number | null;
+}
+
+interface HistoryResponse {
+  rows: NotificationRecord[];
+  next_cursor: string | null;
+}
+
+const OUTCOME_LABEL: Record<string, string> = {
+  sent: "已寄出",
+  suppressed: "已合併（去重）",
+  skipped_disabled: "略過（停用）",
+  skipped_no_recipients: "略過（無收件人）",
+  send_failed_auth: "失敗（驗證）",
+  send_failed_connect: "失敗（連線）",
+  send_failed_sender: "失敗（寄件者被拒）",
+  send_failed_all_recipients: "失敗（全部收件人被拒）",
+  send_failed_unknown: "失敗（未知）",
+  test_sent: "測試成功",
+};
+
+function outcomeLabel(outcome: string): string {
+  return OUTCOME_LABEL[outcome] ?? outcome;
+}
+
 const STATUS_LABEL: Record<NotificationConfigResponse["status"], { text: string; variant: "default" | "outline" | "destructive" }> = {
   pending_test: { text: "待測試", variant: "outline" },
   verified: { text: "✓ 已驗證", variant: "default" },
@@ -328,6 +363,78 @@ export function AdminNotificationsPage() {
           )}
         </CardContent>
       </Card>
+
+      <NotificationHistory />
     </div>
+  );
+}
+
+function NotificationHistory() {
+  const historyQuery = useQuery<HistoryResponse, ApiError>({
+    queryKey: ["admin", "notifications", "history"],
+    queryFn: () => api<HistoryResponse>("/admin/notifications/history?limit=50"),
+  });
+
+  const rows = historyQuery.data?.rows ?? [];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">通知歷史</CardTitle>
+        <CardDescription>最近的通知寄送紀錄（最新 50 筆）。被去重合併的事件會標示合併數。</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {historyQuery.isLoading ? (
+          <p className="text-sm text-muted-foreground">載入中…</p>
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">目前尚無通知紀錄。</p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {rows.map((r) => {
+              const isFailure = r.outcome.includes("failed");
+              const failedRecipients = Object.entries(r.per_recipient_status).filter(
+                ([, status]) => status !== "ok",
+              );
+              return (
+                <li key={r.id} className="rounded-md border p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={isFailure ? "destructive" : "outline"}>
+                        {outcomeLabel(r.outcome)}
+                      </Badge>
+                      <span className="font-mono text-xs text-muted-foreground">{r.event_type}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(r.created_at).toLocaleString("zh-TW")}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-muted-foreground">{r.subject}</div>
+                  {r.bucket_event_count !== null && r.bucket_event_count > 1 && (
+                    <div className="mt-1 text-xs text-amber-700">
+                      共 {r.bucket_event_count} 筆同類事件合併入此封（5 分鐘去重）
+                    </div>
+                  )}
+                  {isFailure && r.error_message && (
+                    <div className="mt-1 text-xs text-destructive">
+                      原因：{r.error_message}
+                      {r.smtp_response_code ? `（SMTP ${r.smtp_response_code}）` : ""}
+                    </div>
+                  )}
+                  {failedRecipients.length > 0 && (
+                    <ul className="mt-1 text-xs text-destructive">
+                      {failedRecipients.map(([addr, status]) => (
+                        <li key={addr}>
+                          {addr}：{status}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   );
 }

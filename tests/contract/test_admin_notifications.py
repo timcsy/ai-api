@@ -183,3 +183,130 @@ async def test_test_send_returns_actionable_error_on_auth_failure(
     assert body["outcome"] == "send_failed_auth"
     assert body["smtp_response_code"] == 535
     assert "authentication" in body["message"].lower() or "驗證" in body["message"]
+
+
+# ----- GET /admin/notifications/history (US5) -----
+
+async def _seed_records(app_client: AsyncClient, admin_headers: dict[str, str], n: int) -> None:
+    """Seed n notification records directly via the DB session."""
+    from datetime import UTC, datetime, timedelta
+
+    from ulid import ULID
+
+    from ai_api.db import get_sessionmaker
+    from ai_api.models import NotificationOutcome, NotificationRecord
+
+    sm = get_sessionmaker()
+    base = datetime.now(UTC)
+    async with sm() as session:
+        for i in range(n):
+            session.add(
+                NotificationRecord(
+                    id=str(ULID()),
+                    event_type="allocation_quarantined" if i % 2 == 0 else "responses_upstream_error_burst",
+                    audit_event_id=None,
+                    dedup_bucket_id=None,
+                    outcome=NotificationOutcome.sent if i % 3 else NotificationOutcome.send_failed_auth,
+                    recipients=["admin@example.com"],
+                    per_recipient_status={"admin@example.com": "ok"},
+                    subject=f"test {i}",
+                    body_preview="body",
+                    smtp_response_code=250,
+                    error_message=None,
+                    latency_ms=100,
+                    created_at=base - timedelta(seconds=i),
+                )
+            )
+        await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_list_history_returns_paginated_records(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    await _seed_records(app_client, admin_headers, 60)
+    r = await app_client.get("/admin/notifications/history?limit=20", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert len(body["rows"]) == 20
+    assert body["next_cursor"] is not None
+    # second page
+    r2 = await app_client.get(
+        f"/admin/notifications/history?limit=20&cursor={body['next_cursor']}",
+        headers=admin_headers,
+    )
+    assert r2.status_code == 200
+    body2 = r2.json()
+    assert len(body2["rows"]) == 20
+    # no overlap between pages
+    ids1 = {row["id"] for row in body["rows"]}
+    ids2 = {row["id"] for row in body2["rows"]}
+    assert ids1.isdisjoint(ids2)
+
+
+@pytest.mark.asyncio
+async def test_history_filters_by_event_type(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    await _seed_records(app_client, admin_headers, 20)
+    r = await app_client.get(
+        "/admin/notifications/history?event_type=allocation_quarantined", headers=admin_headers
+    )
+    assert r.status_code == 200
+    rows = r.json()["rows"]
+    assert all(row["event_type"] == "allocation_quarantined" for row in rows)
+    assert len(rows) > 0
+
+
+@pytest.mark.asyncio
+async def test_history_filters_by_outcome(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    await _seed_records(app_client, admin_headers, 20)
+    r = await app_client.get(
+        "/admin/notifications/history?outcome=send_failed_auth", headers=admin_headers
+    )
+    assert r.status_code == 200
+    rows = r.json()["rows"]
+    assert all(row["outcome"] == "send_failed_auth" for row in rows)
+
+
+@pytest.mark.asyncio
+async def test_primary_record_surfaces_bucket_count(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from ulid import ULID
+
+    from ai_api.db import get_sessionmaker
+    from ai_api.models import NotificationDedupBucket, NotificationOutcome, NotificationRecord
+
+    sm = get_sessionmaker()
+    now = datetime.now(UTC)
+    async with sm() as session:
+        rec_id = str(ULID())
+        bucket_id = str(ULID())
+        session.add(
+            NotificationRecord(
+                id=rec_id, event_type="allocation_quarantined", audit_event_id=None,
+                dedup_bucket_id=bucket_id, outcome=NotificationOutcome.sent,
+                recipients=["a@b.com"], per_recipient_status={"a@b.com": "ok"},
+                subject="primary", body_preview="b", smtp_response_code=250,
+                error_message=None, latency_ms=10, created_at=now,
+            )
+        )
+        session.add(
+            NotificationDedupBucket(
+                id=bucket_id, event_type="allocation_quarantined",
+                window_start=now, window_end=now + timedelta(minutes=5),
+                event_count=50, primary_record_id=rec_id, last_event_at=now,
+            )
+        )
+        await session.commit()
+
+    r = await app_client.get("/admin/notifications/history", headers=admin_headers)
+    assert r.status_code == 200
+    rows = r.json()["rows"]
+    primary = next(row for row in rows if row["id"] == rec_id)
+    assert primary["bucket_event_count"] == 50

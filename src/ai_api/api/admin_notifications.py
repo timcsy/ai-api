@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -150,6 +150,20 @@ async def test_send(
         "smtp_response_code": result.smtp_response_code,
         "latency_ms": result.latency_ms,
     }
+
+
+@router.get("/history")
+async def list_history(
+    limit: int = Query(default=50, ge=1, le=200),
+    cursor: str | None = Query(default=None),
+    event_type: str | None = Query(default=None),
+    outcome: str | None = Query(default=None),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    rows, next_cursor = await NotificationConfigService(session).list_history(
+        limit=limit, cursor=cursor, event_type=event_type, outcome=outcome
+    )
+    return {"rows": rows, "next_cursor": next_cursor}
 
 
 # ---------- helpers exposed for tests ----------
