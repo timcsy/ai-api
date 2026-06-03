@@ -216,6 +216,19 @@ export function AdminNotificationsPage() {
                 onChange={(e) => setHost(e.target.value)}
                 placeholder="smtp.gmail.com"
               />
+              <p className="text-xs text-muted-foreground">
+                常見範例（點擊填入）：
+                <button
+                  type="button"
+                  className="ml-1 font-mono text-primary hover:underline"
+                  onClick={() => {
+                    setHost("smtp.gmail.com");
+                    setPort("587");
+                  }}
+                >
+                  smtp.gmail.com
+                </button>
+              </p>
             </div>
             <div className="space-y-1">
               <Label htmlFor="smtp-port">SMTP port</Label>
