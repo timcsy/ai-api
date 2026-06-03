@@ -21,6 +21,7 @@ dependencies = [
     "argon2-cffi>=23.1.0",
     "itsdangerous>=2.2.0",
     "email-validator>=2.2.0",
+    "aiosmtplib>=3.0,<4",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +36,7 @@ dev = [
     "pre-commit>=4.0.0",
     "respx>=0.21.0",
     "pyyaml>=6.0.0",
+    "aiosmtpd>=1.4,<2",
 ]
 
 [build-system]
@@ -53,12 +55,15 @@ select = ["E", "F", "W", "I", "B", "UP", "N", "S", "C4", "PIE", "SIM", "RUF"]
 ignore = ["E501", "S101", "B008", "S105", "N818"]  # B008/S105/N818: FastAPI Depends + constants + domain exception names
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S105", "S106", "S603", "S607"]
+"tests/**/*.py" = ["S105", "S106", "S107", "S603", "S607"]
 "src/ai_api/services/quota_pool.py" = ["N803", "N806"]  # T, N, D are math notation
 "src/ai_api/api/quota_pool.py" = ["N806"]
 "tests/unit/test_compute_rebalance.py" = ["N803", "N806", "RUF003"]
 "tests/integration/test_quota_pool_rebalance.py" = ["N803"]
 "tests/contract/test_catalog_api.py" = ["RUF001"]  # Chinese deprecation note contains fullwidth comma
+"src/ai_api/services/notifier_email.py" = ["RUF001"]  # Chinese user-facing email body
+"src/ai_api/services/notifications.py" = ["RUF001"]  # Chinese user-facing messages
+"src/ai_api/api/admin_notifications.py" = ["RUF001"]  # Chinese user-facing messages
 
 [tool.mypy]
 python_version = "3.11"

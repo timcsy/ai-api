@@ -13,6 +13,7 @@ import { AdminCatalogManagePage } from "@/routes/admin/catalog-manage";
 import { AdminHomePage } from "@/routes/admin/home";
 import { AdminMembersPage } from "@/routes/admin/members";
 import { AdminAccessPage } from "@/routes/admin/access";
+import { AdminNotificationsPage } from "@/routes/admin/notifications";
 import { AdminMemberDetailPage } from "@/routes/admin/member-detail";
 import { AdminModelPage } from "@/routes/admin/model";
 import { AdminModelDetailPage } from "@/routes/admin/model-detail";
@@ -77,6 +78,7 @@ export function App() {
                 <Route path="/admin/member/:id" element={<AdminMemberDetailPage />} />
                 <Route path="/admin/providers" element={<AdminProvidersPage />} />
                 <Route path="/admin/access" element={<AdminAccessPage />} />
+                <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
                 <Route path="/admin/tag" element={<AdminTagsPage />} />
                 <Route path="/admin/tag/rules" element={<AdminTagRulesPage />} />
                 <Route path="/admin/tag/:name" element={<AdminTagDetailPage />} />

@@ -135,6 +135,17 @@ storedResponseCleanup:
   enabled: true
   schedule: "0 3 * * *"  # daily 03:00 UTC
 
+# Phase 13: admin email notifications — upstream error-burst detector (cron) +
+# 30-day GC of notification history. SMTP config itself is admin-managed via UI.
+upstreamBurstDetector:
+  enabled: true
+  schedule: "* * * * *"   # every minute
+  thresholdCalls: 10      # N upstream_error within windowMinutes triggers a burst alert
+  windowMinutes: 5
+notificationCleanup:
+  enabled: true
+  schedule: "30 3 * * *"  # daily 03:30 UTC
+
 # Phase 3c quota pool settings
 pool:
   totalTokensPerMonth: 0  # 0 = pool disabled

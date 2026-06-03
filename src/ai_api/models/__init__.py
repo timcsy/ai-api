@@ -15,6 +15,13 @@ from ai_api.models.invitation import InvitationToken
 from ai_api.models.member import Member, MemberProvider, MemberStatus
 from ai_api.models.member_tag import MemberTag, TagSource
 from ai_api.models.model_catalog import DefaultAccess, ModelCatalog
+from ai_api.models.notification import (
+    NotificationConfig,
+    NotificationConfigStatus,
+    NotificationDedupBucket,
+    NotificationOutcome,
+    NotificationRecord,
+)
 from ai_api.models.oidc_state import OidcState
 from ai_api.models.password_attempt import AttemptOutcome, PasswordAttempt
 from ai_api.models.price_list import PriceList
@@ -46,6 +53,11 @@ __all__ = [
     "MemberStatus",
     "MemberTag",
     "ModelCatalog",
+    "NotificationConfig",
+    "NotificationConfigStatus",
+    "NotificationDedupBucket",
+    "NotificationOutcome",
+    "NotificationRecord",
     "OidcState",
     "PasswordAttempt",
     "PriceList",

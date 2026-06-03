@@ -41,6 +41,26 @@ async def record(
     )
     db.add(entry)
     await db.flush()
+
+    # Phase 13: notifier hook — fire-and-forget. MUST NOT impact this write
+    # path (FR-025). See services/notifier_hook.py.
+    try:
+        from ai_api.services.notifier import NotificationEvent
+        from ai_api.services.notifier_hook import fire as _fire_notifier
+
+        _fire_notifier(
+            NotificationEvent(
+                event_type=event_type.value,
+                occurred_at=entry.created_at,
+                audit_event_id=entry.id,
+                target_type=target_type,
+                target_id=target_id,
+                details=details,
+            )
+        )
+    except Exception:
+        import logging
+        logging.getLogger(__name__).debug("notifier hook wiring failed", exc_info=True)
     return entry
 
 
