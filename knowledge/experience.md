@@ -459,3 +459,56 @@
   靠「SMTP 應該回 250」的領域直覺去猜 library 的 Python 介面。一次 `print(repr(...))` 省下一輪
   red-herring 的 debug。
 - **來源**：`src/ai_api/services/notifier_email.py` `_smtp_send`；階段 13
+
+### 新增「需要對外連線」的功能，要同步檢查 NetworkPolicy egress——本機測不出來
+
+- **理論說**：通知功能在本機 + CI 全綠（39 測試 + aiosmtpd 真握手），SMTP 邏輯正確就能上線。
+- **實際發生**：部署到 live cluster，admin 按「發測試信」回 `test_failed_connect`——backend pod
+  連不到 `smtp.gmail.com:587`。根因是 Phase 2.5 安全加固的 K8s NetworkPolicy egress 只放行
+  443(HTTPS給provider) / 5432(PG) / 53(DNS)，**當初沒料到未來會需要 SMTP 587**。本機、CI、
+  單元/整合測試**全都用 loopback 或 in-cluster，碰不到那條 egress 規則**，所以一路綠燈，只有真
+  cluster 的 NetworkPolicy 才會擋。
+- **解決方式**：在 chart 的 NetworkPolicy egress 加 587/465（values 可調 `smtpPorts`）；用
+  `kubectl exec <pod> -- python3 -c "socket.create_connection(('smtp.gmail.com',587))"` 在 pod 內
+  實測連線確認。
+- **教訓**：任何新增「對外連線」的功能（SMTP、webhook、新 provider host、外部 API、新 port）都要
+  問一句「**這條 egress 在 NetworkPolicy 開了嗎？**」——這類問題本機/CI 一定測不出來（測試環境沒有
+  egress 限制），只有真 cluster 才暴露。呼應「加欄位要追到所有 sink」：**加對外功能要追到所有
+  網路層約束**（NetworkPolicy egress、防火牆、proxy allowlist）。把它列進該功能的部署 checklist。
+- **來源**：`deploy/helm/ai-api/templates/networkpolicy.yaml` `smtpPorts`；階段 13
+
+### 遮罩/指紋值要基於「有辨識度的來源」——拿固定前綴的密文當 fingerprint 等於沒 fingerprint
+
+- **理論說**：要在 UI 顯示「密碼已存」又不洩漏明文，取 Fernet 密文的前 4 + 後 4 bytes 當 fingerprint
+  就好——密文看起來夠亂。
+- **實際發生**：admin 存了不同密碼，UI 顯示的 fingerprint 開頭**永遠是 `67414141`**，看起來「跟我存的
+  沒關係、每次都一樣」。根因：**每個 Fernet token 都固定以 `gAAAAA...` 開頭**（version byte 0x80 +
+  timestamp 結構，base64 後固定前綴），所以密文前 4 bytes 對所有 token 都是 `67 41 41 41`（= "gAAA"
+  的 hex）——零辨識度，根本無法用來核對「我存對了嗎」。
+- **解決方式**：fingerprint 改成 `sha256(明文)[:12]`（沿用 `ProviderCredential.fingerprint` 同模式）：
+  不同密碼 → 不同 fingerprint、同密碼 → 同 fingerprint（可核對），且不洩漏明文。singleton config
+  在 `to_response` 時解密一次算，成本可忽略。UI 文案也從「目前儲存」改成「密碼指紋」+ 說明它是雜湊
+  非密碼本身（admin 一開始誤以為會顯示密碼）。
+- **教訓**：任何「遮罩/指紋/摘要」要顯示給人核對，必須**基於有辨識度且因輸入而異的來源**——通常是
+  **明文的 hash**，不是「加密後的密文 bytes」。加密格式常有固定 header（Fernet `gAAAA`、JWT `eyJ`、
+  PEM `-----BEGIN`），取其前綴當指紋會讓所有值看起來一樣。判準：「兩個不同輸入，這個遮罩值會不同嗎？」
+  若否，這個遮罩沒有意義。附帶 UX：遮罩值要明確標示「這是指紋/雜湊，不是原值」，否則使用者會誤判。
+- **來源**：`src/ai_api/services/notifications.py` `_password_fingerprint_from_plain`；階段 13
+
+### 本機 SQLite 寬鬆、CI/prod Postgres 嚴格——互相 FK 循環只在 Postgres 炸
+
+- **理論說**：39 個通知測試（含整合）本機全綠，schema 設計沒問題。
+- **實際發生**：merge 到 main，CI 的 Postgres 整合測試**幾乎全 error**：`CircularDependencyError:
+  Can't sort tables`。根因：`notification_dedup_bucket.primary_record_id` ↔ `notification_record.
+  dedup_bucket_id` 互相 FK 形成循環，`metadata.create_all`/`drop_all` 需要 topological sort 排不出來。
+  本機測試用 SQLite in-memory，**對 FK 排序寬鬆**（甚至預設不強制 FK），所以 create_all 過得去；
+  Postgres 嚴格做 topological sort 才炸。「本機 SQLite 過 ≠ Postgres 過」又一例（前面已有 datetime
+  tz-aware 那條同源）。
+- **解決方式**：互相 FK 的其中一個加 `use_alter=True` + 明確 name，讓 SQLAlchemy 以獨立
+  `ALTER TABLE ADD CONSTRAINT` 發出、打破建表時的循環。本機重現：`Base.metadata.sorted_tables`
+  會噴 `SAWarning: ...unresolvable cycles`（用 `warnings.simplefilter('error')` 可逼成硬錯提早抓）。
+- **教訓**：dev 與 prod 用不同 DB 後端時，**結構性約束（FK 排序、循環、enum、tz、JSON 欄）要用
+  prod 後端驗一次**，別只信 SQLite 綠燈。互相 FK（mutual FK）是經典陷阱——SQLite 容忍、Postgres
+  topological sort 直接拒。設計到「A 指 B、B 也指 A」時，當下就標 `use_alter=True`。本機快速自檢：
+  `python -c "import warnings; warnings.simplefilter('error'); from ai_api.db import Base; import ai_api.models; Base.metadata.sorted_tables"`。
+- **來源**：`src/ai_api/models/notification.py` `primary_record_id` `use_alter=True`；階段 13
