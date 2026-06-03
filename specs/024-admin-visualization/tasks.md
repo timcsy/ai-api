@@ -167,8 +167,8 @@ description: "Tasks for Phase 14 — admin visualization enhancement"
 - [X] T051 [P] 更新 `knowledge/vision.md` 階段 14 條目：完成日期填入後改 ✅、列實際交付、連結 history；roadmap 全部完成的狀態更新
 - [X] T052 [P] 在 `knowledge/history/completed-phases-detail.md` 追加「## 階段 14：Admin 視覺化強化」詳情
 - [X] T053 端到端煙霧（本機）：跑 quickstart 情境 7–13（首頁三圖 + 警示優先 + provider/heatmap + 時段切換 + 隔離原因 + tag 卡 + 空狀態 + bundle）
-- [ ] T054 commit + push + 等 CI（**push 前先 `ruff check .` + 前端 lint/build**）；CI 綠後 helm upgrade 至 ai-ccsh；live 跑 quickstart 情境 7 + 10 真機驗證
-- [ ] T055 收尾：vision 階段 14 改 ✅、history 補上、確認 roadmap **全部承諾階段完成**狀態一致
+- [X] T054 commit + push + 等 CI（**push 前先 `ruff check .` + 前端 lint/build**）；CI 綠後 helm upgrade 至 ai-ccsh；live 跑 quickstart 情境 7 + 10 真機驗證
+- [X] T055 收尾：vision 階段 14 改 ✅、history 補上、確認 roadmap **全部承諾階段完成**狀態一致
 
 ---
 
