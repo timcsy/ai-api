@@ -86,17 +86,18 @@ backend-only installs do not break.
 | Unit | Vitest | api-client, auth-context, ProtectedRoute, login form, sanitizeNext |
 | Component | Vitest + RTL | 5 test files, 21 tests |
 | Integration | manual `npm run dev` | login flow end-to-end |
-| E2E | Playwright | **deferred to Phase 3b.7** |
+| E2E | Playwright | **已 descope**（3b.7；管理介面已被長期實機使用驗證，CP 值低） |
 
-## Future phases
+> 本表為階段 3b.0 當時的測試策略快照。其後各前端能力（成員視圖、admin CRUD、用量
+> dashboard、配額池監控、catalog 瀏覽、RebalanceLog、視覺化、RWD）皆已完成並上線；
+> 既有覆蓋見各路由的 vitest + `specs/*/quickstart.md`。
 
-- 3b.1 member view (allocations, /me detail)
-- 3b.2 admin: members + allocation CRUD
-- 3b.3 admin: usage dashboard + CSV/JSON export
-- 3b.4 admin: quota-pool monitor + manual trigger
-- 3b.5 admin: catalog browse
-- 3b.6 admin: RebalanceLog viewer
-- 3b.7 Playwright E2E + final polish
+## 已完成的前端能力（原 3b.1–3b.6，皆已上線）
+
+- 成員視圖（allocations、/me 詳情）、admin 成員 + 分配 CRUD、用量 dashboard + CSV/JSON 匯出、
+  配額池監控 + 手動觸發、catalog 瀏覽、RebalanceLog viewer。
+- 後續再加：階段 11 Responses/Codex、階段 14 視覺化、階段 16 RWD（見上方〈RWD 規範〉）。
+- **3b.7 Playwright E2E + final polish 已 descope**（見上方測試表說明）。
 
 ## RWD 規範（階段 16）
 
