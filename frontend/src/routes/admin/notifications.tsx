@@ -254,11 +254,19 @@ export function AdminNotificationsPage() {
             <Label htmlFor="smtp-pass">
               SMTP 密碼
               {cfg && (
-                <span className="ml-2 text-xs text-muted-foreground">
-                  目前儲存：<code>{cfg.smtp_password_fingerprint}</code>
+                <span
+                  className="ml-2 text-xs text-muted-foreground"
+                  title="這是密碼的雜湊指紋，不是密碼本身。同一組密碼會得到相同指紋，可用來核對是否存對。"
+                >
+                  密碼指紋：<code>{cfg.smtp_password_fingerprint}</code>
                 </span>
               )}
             </Label>
+            {cfg && (
+              <p className="text-xs text-muted-foreground">
+                「密碼指紋」是密碼的雜湊（<strong>不是密碼本身</strong>），用來核對：同一組密碼永遠是同一個指紋。
+              </p>
+            )}
             <Input
               id="smtp-pass"
               type="password"
