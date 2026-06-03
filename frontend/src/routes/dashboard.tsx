@@ -119,14 +119,14 @@ export function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <code className="text-sm bg-muted px-2 py-1 rounded">
+            <code className="block break-all text-sm bg-muted px-2 py-1 rounded">
               {apiBaseUrl()}
             </code>
             {member?.gateway_base_url &&
               !window.location.origin.startsWith(member.gateway_base_url) && (
               <p className="text-xs text-muted-foreground mt-2">
                 如果你從其他主機呼叫，可改用 admin 設定的 base URL：
-                <code className="ml-1">{member.gateway_base_url}/v1</code>
+                <code className="ml-1 break-all">{member.gateway_base_url}/v1</code>
               </p>
             )}
           </CardContent>
@@ -157,7 +157,7 @@ export function DashboardPage() {
                   <CardTitle className="text-base">{m.display_name}</CardTitle>
                   <CardDescription className="font-mono text-xs">{m.slug}</CardDescription>
                 </CardHeader>
-                <CardContent className="flex items-center justify-between">
+                <CardContent className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs text-muted-foreground">
                     月配額 {m.default_quota?.toLocaleString() ?? "—"}
                   </span>
@@ -178,7 +178,7 @@ export function DashboardPage() {
                     <Badge variant="secondary">已領取</Badge>
                   )}
                   {m.state === "reclaim_locked" && (
-                    <Badge variant="outline" className="text-amber-700 border-amber-500">
+                    <Badge variant="outline" className="shrink-0 whitespace-nowrap text-amber-700 border-amber-500">
                       需 admin 解鎖
                     </Badge>
                   )}
@@ -234,9 +234,9 @@ export function DashboardPage() {
             <Link key={a.id} to={`/dashboard/allocations/${a.id}`}>
               <Card className="hover:bg-accent transition-colors cursor-pointer">
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{a.display_name ?? a.resource_model}</CardTitle>
-                    <Badge variant={a.status === "active" ? "default" : "secondary"}>
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="text-lg min-w-0 truncate">{a.display_name ?? a.resource_model}</CardTitle>
+                    <Badge variant={a.status === "active" ? "default" : "secondary"} className="shrink-0">
                       {a.status}
                     </Badge>
                   </div>
@@ -267,7 +267,7 @@ export function DashboardPage() {
                   <div>
                     現價（每 1M）：
                     {a.price
-                      ? <span className="font-mono">輸入 ${per1kToPer1m(a.price.input_per_1k)} / 輸出 ${per1kToPer1m(a.price.output_per_1k)}{a.price.cached_input_per_1k && ` / 快取 $${per1kToPer1m(a.price.cached_input_per_1k)}`}</span>
+                      ? <span className="font-mono break-words">輸入 ${per1kToPer1m(a.price.input_per_1k)} / 輸出 ${per1kToPer1m(a.price.output_per_1k)}{a.price.cached_input_per_1k && ` / 快取 $${per1kToPer1m(a.price.cached_input_per_1k)}`}</span>
                       : <span>未定價</span>}
                   </div>
                   <div>建立於 {new Date(a.created_at).toLocaleString("zh-TW")}</div>

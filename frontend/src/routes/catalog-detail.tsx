@@ -132,7 +132,7 @@ export function CatalogDetailPage() {
 
       <section className="space-y-2">
         <h1 className="text-3xl font-bold">{m.display_name}</h1>
-        <p className="text-muted-foreground font-mono text-sm">{m.slug}</p>
+        <p className="text-muted-foreground font-mono text-sm break-all">{m.slug}</p>
         <div className="flex flex-wrap gap-2 mt-2">
           <Badge>成本：{facetLabel(m.cost_tier)}</Badge>
           <Badge variant="secondary">{m.family}</Badge>
@@ -146,8 +146,8 @@ export function CatalogDetailPage() {
       {/* A+C: your relationship to this model */}
       {heldAlloc ? (
         <Card className="border-primary/40">
-          <CardContent className="flex items-center justify-between gap-3 py-4">
-            <div className="text-sm">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+            <div className="text-sm min-w-0">
               <span className="font-medium">你已領取此模型</span>
               <Badge variant="default" className="ml-2">{heldAlloc.status}</Badge>
               <p className="text-xs text-muted-foreground mt-1">用 token 呼叫即可；憑證與用量在儀表板管理。</p>
@@ -159,8 +159,8 @@ export function CatalogDetailPage() {
         </Card>
       ) : claimable?.state === "claimable" ? (
         <Card className="border-primary/40">
-          <CardContent className="flex items-center justify-between gap-3 py-4">
-            <div className="text-sm">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+            <div className="text-sm min-w-0">
               <span className="font-medium">此模型開放自助領取</span>
               <p className="text-xs text-muted-foreground mt-1">一鍵領取一張可呼叫的憑證（token 只顯示一次）。</p>
             </div>
@@ -185,7 +185,7 @@ export function CatalogDetailPage() {
         </CardHeader>
         <CardContent>
           {m.price ? (
-            <div className="flex gap-8 text-sm">
+            <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
               <div>
                 <div className="text-xs text-muted-foreground">輸入</div>
                 <div className="font-mono text-lg tabular-nums">${per1kToPer1m(m.price.input_per_1k)}</div>

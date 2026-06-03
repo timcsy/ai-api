@@ -12,7 +12,9 @@ const TABS = [
 
 const tabClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    "px-3 py-2 text-sm font-medium border-b-2 transition-colors",
+    // Phase 16 (RWD): shrink-0 + whitespace-nowrap so this horizontal tab row
+    // scrolls on phones instead of squeezing labels into vertical char columns.
+    "shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 transition-colors",
     isActive
       ? "border-primary text-foreground"
       : "border-transparent text-muted-foreground hover:text-foreground",

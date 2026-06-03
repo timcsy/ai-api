@@ -139,7 +139,7 @@ export function AdminPricesPage() {
 
       <Card className="overflow-hidden">
         <CardContent className="p-0">
-          <Table>
+          <Table className="responsive-table">
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="pl-6">模型</TableHead>
@@ -160,7 +160,7 @@ export function AdminPricesPage() {
               {pricesQuery.data?.map((row) => (
                 <React.Fragment key={row.slug}>
                   <TableRow className="border-0">
-                    <TableCell className="pl-6 py-3">
+                    <TableCell className="pl-6 py-3" data-label="模型">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-sm">{row.slug}</span>
                         {!row.in_catalog && (
@@ -176,19 +176,19 @@ export function AdminPricesPage() {
                     </TableCell>
                     {row.current ? (
                       <>
-                        <TableCell className="text-right font-mono text-sm tabular-nums">${displayPrice(row.current.input_per_1k, displayUnit)}</TableCell>
-                        <TableCell className="text-right font-mono text-sm tabular-nums">${displayPrice(row.current.output_per_1k, displayUnit)}</TableCell>
-                        <TableCell className="text-right font-mono text-sm tabular-nums text-muted-foreground">
+                        <TableCell className="text-right font-mono text-sm tabular-nums" data-label="輸入">${displayPrice(row.current.input_per_1k, displayUnit)}</TableCell>
+                        <TableCell className="text-right font-mono text-sm tabular-nums" data-label="輸出">${displayPrice(row.current.output_per_1k, displayUnit)}</TableCell>
+                        <TableCell className="text-right font-mono text-sm tabular-nums text-muted-foreground" data-label="快取輸入">
                           {row.current.cached_input_per_1k ? `$${displayPrice(row.current.cached_input_per_1k, displayUnit)}` : "—"}
                         </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground tabular-nums">{fmtDate(row.current.effective_from)}</TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground tabular-nums" data-label="生效日">{fmtDate(row.current.effective_from)}</TableCell>
                       </>
                     ) : (
-                      <TableCell colSpan={4} className="text-right">
+                      <TableCell colSpan={4} className="text-right" data-label="價格">
                         <Badge variant="outline" className="text-amber-700 border-amber-500">未定價</Badge>
                       </TableCell>
                     )}
-                    <TableCell className="pr-6 text-right">
+                    <TableCell className="pr-6 text-right" data-label="動作">
                       <Button
                         size="sm"
                         variant="outline"
@@ -355,7 +355,7 @@ function AddPriceDialog({
             <p className="text-xs text-muted-foreground mt-1">範本為預設值，請核對供應商最新價格。</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label htmlFor="p-provider">Provider</Label>
               <Input id="p-provider" className="mt-1" placeholder="azure / openai / anthropic / gemini"
@@ -381,7 +381,7 @@ function AddPriceDialog({
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label htmlFor="p-in">輸入單價 / {unitLabel}（USD）</Label>
               <Input id="p-in" className="mt-1 font-mono" placeholder={unit === "per_1m" ? "0.15" : "0.00015"}

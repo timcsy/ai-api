@@ -7,7 +7,9 @@ const config: Config = {
   theme: {
     container: {
       center: true,
-      padding: "2rem",
+      // Phase 16 (RWD): smaller gutter on phones so 360px screens keep more
+      // usable width; 2rem from `sm` up keeps desktop/tablet unchanged.
+      padding: { DEFAULT: "1rem", sm: "2rem" },
       screens: { "2xl": "1400px" },
     },
     extend: {

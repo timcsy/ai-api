@@ -524,3 +524,35 @@ ruff/mypy/前端 lint+typecheck+build 全綠。
 
 **明確排除（第二版再評估）：** Allocation 詳情 30 天 line + 配額燃燒投影、Member 跨 allocation
 donut、月底支出投影虛線、PNG export、>3 張首頁圖、3D/radar/treemap 花俏圖型、多 charting lib。
+
+## 階段 16：行動裝置（手機）體驗強化（RWD）
+
+**完成：** 2026-06-03（spec 025-mobile-rwd）
+
+**動機：** 後台桌機優先設計，手機上「擠」。真實回饋指出最痛的是**導覽列與資訊密度**——header 塞不下、
+寬表格左右滑、長字串撐破卡片，且**中文被壓窄會字字斷行變直條**。經三路平行 RWD 稽核（殼層／admin／成員端）
+歸納根因與重複反模式。
+
+**交付（零新 npm 依賴、零後端/DB 變更、桌機零回歸）：**
+- **根因①** `tailwind.config.ts` 的 `container.padding` 加手機斷點（`{ DEFAULT: "1rem", sm: "2rem" }`）——
+  360px 手機有效寬從 ~296 增加，放大全站擠壓的根因解除。
+- **US1 手機導覽**（`app-shell.tsx` + `hooks/use-mobile.ts` + `ui/sheet.tsx`）：以 `useIsMobile()`（matchMedia）
+  切換——`< md` 顯示漢堡 + `Sheet` 抽屜（含全部主導覽 + 管理員子導覽 + email + 登出），`≥ md` 維持 inline 橫排。
+  `Sheet` 基於既有 `@radix-ui/react-dialog`。子導覽補 `shrink-0 whitespace-nowrap`。
+- **US2 內容不溢出**：全站機械式套既有 Tailwind 工具——多欄 `grid-cols-1 sm:grid-cols-N`、工具列 `flex-wrap`、
+  長字串 `truncate`（配 `min-w-0`）/`break-all`、CJK `whitespace-nowrap`。涵蓋約 19 個檔。
+- **US3 寬表格卡片化**：`index.css` 新增單一 `.responsive-table` 機制（`< md` 每列變卡片、`data-label` 顯示欄名），
+  以 **child combinator** 限定只作用頂層表（巢狀表如 tag 下鑽不受影響）。套用至 usage/allocations/members/
+  providers/prices/tag-rules/access（兩表）/member-detail 內層表；allocation-detail 五欄呼叫紀錄改 `overflow-x-auto`。
+
+**測試分工（憲章 TDD 之 jsdom 可測邊界）：** 有 DOM 行為（導覽 Sheet 開合並列出全部目的地、表格每格帶
+`data-label`）以 vitest 先 Red 後 Green（`mobile-nav.test.tsx`、`responsive-tables.test.tsx`）；純視覺溢出/折行
+jsdom 無版面引擎，以 `quickstart.md` 的 360px 手動清單驗收。113 前端測試綠（既有 109 零回歸 + 4 新）。
+
+**設計細節：** [`design/frontend.md`](../design/frontend.md) 的「RWD 規範」一節。
+
+**經驗：** CJK 無空格，flex 子項被壓窄會逐字換行成直條；凡橫排含中文需 `whitespace-nowrap` + `min-w-0` 或父層
+`flex-wrap`。寬表格手機策略用「單一 CSS 機制 + data-label」比「每表寫兩套版面」低 drift（呼應「同一概念兩份必 drift」）。
+
+**明確排除：** 不為手機重做獨立 UI、不導入額外 UI lib、不追求像素級精緻；provider 動作欄 DropdownMenu 重構列為
+可選增益（卡片式堆疊已讓 3 按鈕全寬可達，滿足 SC-007）。

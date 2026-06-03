@@ -146,7 +146,7 @@ export function AdminMembersPage() {
       )}
 
       {query.data && (
-        <Table>
+        <Table className="responsive-table">
           <TableHeader>
             <TableRow>
               <TableHead>Email</TableHead>
@@ -161,25 +161,25 @@ export function AdminMembersPage() {
           <TableBody>
             {query.data.map((m) => (
               <TableRow key={m.id}>
-                <TableCell className="font-medium">
-                  <Link to={`/admin/member/${m.id}`} className="text-primary hover:underline">
+                <TableCell className="font-medium" data-label="Email">
+                  <Link to={`/admin/member/${m.id}`} className="block max-w-[180px] truncate text-primary hover:underline">
                     {m.email}
                   </Link>
                 </TableCell>
-                <TableCell>{m.provider}</TableCell>
-                <TableCell>
+                <TableCell data-label="登入方式">{m.provider}</TableCell>
+                <TableCell data-label="狀態">
                   <Badge variant={m.status === "active" ? "default" : "secondary"}>{m.status}</Badge>
                 </TableCell>
-                <TableCell>
+                <TableCell data-label="管理員">
                   {m.is_admin && <Badge>admin</Badge>}
                 </TableCell>
-                <TableCell>
+                <TableCell data-label="Tag">
                   <MemberTagsCell memberId={m.id} />
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
+                <TableCell className="text-xs text-muted-foreground" data-label="建立時間">
                   {new Date(m.created_at).toLocaleDateString("zh-TW")}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right" data-label="操作">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon">

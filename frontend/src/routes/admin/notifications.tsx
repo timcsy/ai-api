@@ -207,7 +207,7 @@ export function AdminNotificationsPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="smtp-host">SMTP host</Label>
               <Input
@@ -281,7 +281,7 @@ export function AdminNotificationsPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label htmlFor="sender-email">寄件者 Email</Label>
               <Input

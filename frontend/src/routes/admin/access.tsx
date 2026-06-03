@@ -95,7 +95,7 @@ function RulesSection() {
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <Table>
+        <Table className="responsive-table">
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="pl-6">類型</TableHead>
@@ -117,16 +117,16 @@ function RulesSection() {
             )}
             {q.data?.map((r) => (
               <TableRow key={r.id}>
-                <TableCell className="pl-6">{r.rule_type === "email_domain" ? "Email 網域" : r.rule_type}</TableCell>
-                <TableCell><code className="font-mono">{r.pattern}</code></TableCell>
-                <TableCell>
+                <TableCell className="pl-6" data-label="類型">{r.rule_type === "email_domain" ? "Email 網域" : r.rule_type}</TableCell>
+                <TableCell data-label="條件"><code className="font-mono break-all">{r.pattern}</code></TableCell>
+                <TableCell data-label="狀態">
                   {r.enabled
                     ? <Badge>啟用</Badge>
                     : <Badge variant="outline" className="text-muted-foreground">停用</Badge>}
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{r.note || "—"}</TableCell>
-                <TableCell className="text-xs text-muted-foreground tabular-nums">{fmtDate(r.created_at)}</TableCell>
-                <TableCell className="pr-6 text-right">
+                <TableCell className="text-sm text-muted-foreground" data-label="備註">{r.note || "—"}</TableCell>
+                <TableCell className="text-xs text-muted-foreground tabular-nums" data-label="建立時間">{fmtDate(r.created_at)}</TableCell>
+                <TableCell className="pr-6 text-right" data-label="動作">
                   <Button
                     size="sm"
                     variant="outline"
@@ -238,7 +238,7 @@ function SourceRestrictionsSection() {
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <Table>
+        <Table className="responsive-table">
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="pl-6">CIDR</TableHead>
@@ -259,15 +259,15 @@ function SourceRestrictionsSection() {
             )}
             {q.data?.map((r) => (
               <TableRow key={r.id}>
-                <TableCell className="pl-6"><code className="font-mono">{r.cidr}</code></TableCell>
-                <TableCell>
+                <TableCell className="pl-6" data-label="CIDR"><code className="font-mono break-all">{r.cidr}</code></TableCell>
+                <TableCell data-label="狀態">
                   {r.enabled
                     ? <Badge>啟用</Badge>
                     : <Badge variant="outline" className="text-muted-foreground">停用</Badge>}
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{r.note || "—"}</TableCell>
-                <TableCell className="text-xs text-muted-foreground tabular-nums">{fmtDate(r.created_at)}</TableCell>
-                <TableCell className="pr-6 text-right">
+                <TableCell className="text-sm text-muted-foreground" data-label="備註">{r.note || "—"}</TableCell>
+                <TableCell className="text-xs text-muted-foreground tabular-nums" data-label="建立時間">{fmtDate(r.created_at)}</TableCell>
+                <TableCell className="pr-6 text-right" data-label="動作">
                   <Button
                     size="sm"
                     variant="outline"

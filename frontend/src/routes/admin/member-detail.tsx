@@ -155,7 +155,7 @@ export function AdminMemberDetailPage() {
           <CardDescription className="font-mono text-xs">{member.id}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
             <div><span className="text-muted-foreground">登入方式：</span>{member.provider}</div>
             <div>
               <span className="text-muted-foreground">狀態：</span>
@@ -260,7 +260,7 @@ export function AdminMemberDetailPage() {
                 : "此成員還沒有任何分配。按「新增分配」發一張綁定該成員的憑證。"}
             </p>
           ) : (
-            <Table>
+            <Table className="responsive-table">
               <TableHeader>
                 <TableRow>
                   <TableHead>模型</TableHead>
@@ -273,16 +273,16 @@ export function AdminMemberDetailPage() {
               <TableBody>
                 {memberAllocs.map((a) => (
                   <TableRow key={a.id}>
-                    <TableCell className="text-xs">
+                    <TableCell className="text-xs" data-label="模型">
                       {a.display_name && <div className="font-medium">{a.display_name}</div>}
                       <div className="font-mono text-muted-foreground">{a.resource_model}</div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-label="狀態">
                       <Badge variant={a.status === "active" ? "default" : "secondary"}>{a.status}</Badge>
                     </TableCell>
-                    <TableCell>{a.quota_tokens_per_month ?? "無限額"}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{a.token_prefix}…</TableCell>
-                    <TableCell className="text-right space-x-2">
+                    <TableCell data-label="配額">{a.quota_tokens_per_month ?? "無限額"}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground" data-label="Token">{a.token_prefix}…</TableCell>
+                    <TableCell className="text-right space-x-2" data-label="動作">
                       {a.status === "active" && (
                         <>
                           <Button
