@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 
 import aiosmtplib
@@ -17,6 +17,7 @@ from ulid import ULID
 from ai_api.models import (
     NotificationConfig,
     NotificationConfigStatus,
+    NotificationDedupBucket,
     NotificationOutcome,
     NotificationRecord,
 )
@@ -33,6 +34,8 @@ logger = logging.getLogger(__name__)
 _CONNECT_TIMEOUT_S = 15
 # Per-command timeout: total send op should finish within FR-017 budget (30s).
 _COMMAND_TIMEOUT_S = 30
+# Dedup window: at most one email per event type per this many minutes (FR-018).
+_DEDUP_WINDOW_MINUTES = 5
 
 
 def classify_smtp_exception(
@@ -358,6 +361,53 @@ class EmailNotifier(Notifier):
                 audit_event_id=event.audit_event_id,
             )
 
+        # 2b. Dedup gate (US4): if an active window already exists for this
+        # event type, suppress this event (no email) and bump the bucket count.
+        now = datetime.now(UTC)
+        active_bucket = (
+            await session.execute(
+                select(NotificationDedupBucket)
+                .where(
+                    NotificationDedupBucket.event_type == event.event_type,
+                    NotificationDedupBucket.window_end > now,
+                )
+                .order_by(NotificationDedupBucket.window_start.desc())
+                .limit(1)
+                .with_for_update()
+            )
+        ).scalar_one_or_none()
+        if active_bucket is not None:
+            active_bucket.event_count += 1
+            active_bucket.last_event_at = now
+            await session.flush()
+            return _persist_and_return_result(
+                session=session,
+                event_type=event.event_type,
+                outcome=NotificationOutcome.suppressed,
+                recipients=[],
+                subject="(suppressed: within dedup window)",
+                body_preview="",
+                per_recipient_status={},
+                smtp_response_code=None,
+                error_message=None,
+                latency_ms=latency_ms_so_far(),
+                audit_event_id=event.audit_event_id,
+                dedup_bucket_id=active_bucket.id,
+            )
+
+        # No active window: open a new bucket. This is the event that sends.
+        bucket = NotificationDedupBucket(
+            id=str(ULID()),
+            event_type=event.event_type,
+            window_start=now,
+            window_end=now + timedelta(minutes=_DEDUP_WINDOW_MINUTES),
+            event_count=1,
+            primary_record_id=None,  # set after the record is created
+            last_event_at=now,
+        )
+        session.add(bucket)
+        await session.flush()
+
         # 3. Render template.
         subject, body = render_event_email(event)
         msg = _build_message(
@@ -408,7 +458,7 @@ class EmailNotifier(Notifier):
                 [_mask_email(r) for r in config.recipients],
             )
 
-        return _persist_and_return_result(
+        result = _persist_and_return_result(
             session=session,
             event_type=event.event_type,
             outcome=outcome,
@@ -420,7 +470,12 @@ class EmailNotifier(Notifier):
             error_message=error_message,
             latency_ms=latency_ms_so_far(),
             audit_event_id=event.audit_event_id,
+            dedup_bucket_id=bucket.id,
         )
+        # Link the bucket to its primary (the record that actually sent).
+        bucket.primary_record_id = result.record_id
+        await session.flush()
+        return result
 
     async def test_send(
         self,
@@ -538,12 +593,14 @@ def _persist_and_return_result(
     error_message: str | None,
     latency_ms: int,
     audit_event_id: str | None = None,
+    dedup_bucket_id: str | None = None,
 ) -> NotificationResult:
+    record_id = str(ULID())
     record = NotificationRecord(
-        id=str(ULID()),
+        id=record_id,
         event_type=event_type,
         audit_event_id=audit_event_id,
-        dedup_bucket_id=None,
+        dedup_bucket_id=dedup_bucket_id,
         outcome=outcome,
         recipients=recipients,
         per_recipient_status=per_recipient_status,
@@ -572,6 +629,7 @@ def _persist_and_return_result(
         per_recipient_status=per_recipient_status,
         error_message=error_message,
         recipients=recipients,
+        record_id=record_id,
     )
 
 

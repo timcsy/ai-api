@@ -142,16 +142,16 @@ description: "Tasks for Phase 13 — admin email notifications"
 
 ### Tests First (Red)
 
-- [ ] T049 [US4] 新增 `tests/integration/test_notification_dedup.py::test_burst_within_5min_window_sends_once`：50 筆同型別事件在 4 分鐘內依序觸發，驗證：a) `aiosmtpd` 只收到 1 封 message；b) `notification_dedup_bucket` 一筆，`event_count=50`；c) 49 筆 `notification_record(outcome=suppressed)` 皆指向同一 `dedup_bucket_id`；d) 1 筆 `notification_record(outcome=sent)` 為 bucket `primary_record_id`
-- [ ] T050 [P] [US4] 同檔加 `test_different_event_types_send_separately`：5 分鐘內 quarantine + upstream burst 兩種型別各 1 筆，驗證寄出 2 封 message（FR-020）
-- [ ] T051 [P] [US4] 同檔加 `test_window_expires_starts_new_bucket`：第 6 分鐘再觸發同型別 1 筆，驗證寄出第 2 封 + `notification_dedup_bucket` 新增第 2 筆
-- [ ] T052 [P] [US4] 同檔加 `test_concurrent_same_type_events_only_send_once`：用 asyncio.gather 並行觸發 5 筆同型別事件（模擬 multi-replica scenario）；驗證 DB row lock 正確、僅 1 封 message 寄出（其餘 4 筆 suppressed）
-- [ ] T053 [US4] 跑 T049–T052 確認 **全 Red**
+- [X] T049 [US4] 新增 `tests/integration/test_notification_dedup.py::test_burst_within_5min_window_sends_once`：50 筆同型別事件在 4 分鐘內依序觸發，驗證：a) `aiosmtpd` 只收到 1 封 message；b) `notification_dedup_bucket` 一筆，`event_count=50`；c) 49 筆 `notification_record(outcome=suppressed)` 皆指向同一 `dedup_bucket_id`；d) 1 筆 `notification_record(outcome=sent)` 為 bucket `primary_record_id`
+- [X] T050 [P] [US4] 同檔加 `test_different_event_types_send_separately`：5 分鐘內 quarantine + upstream burst 兩種型別各 1 筆，驗證寄出 2 封 message（FR-020）
+- [X] T051 [P] [US4] 同檔加 `test_window_expires_starts_new_bucket`：第 6 分鐘再觸發同型別 1 筆，驗證寄出第 2 封 + `notification_dedup_bucket` 新增第 2 筆
+- [X] T052 [P] [US4] 同檔加 `test_concurrent_same_type_events_only_send_once`：用 asyncio.gather 並行觸發 5 筆同型別事件（模擬 multi-replica scenario）；驗證 DB row lock 正確、僅 1 封 message 寄出（其餘 4 筆 suppressed）
+- [X] T053 [US4] 跑 T049–T052 確認 **全 Red**
 
 ### Implementation (Green)
 
-- [ ] T054 [US4] 在 `src/ai_api/services/notifier.py::EmailNotifier.notify()` 加 dedup gate：在寄信前先 query `notification_dedup_bucket WHERE event_type=:t AND window_end > :now FOR UPDATE`；命中即 `event_count += 1`、落 `notification_record(outcome=suppressed, dedup_bucket_id=...)`、return；未命中即 insert bucket（`window_end=now+5min`）、寄信、落 record（`primary_record_id` 反向 update bucket）
-- [ ] T055 [US4] 跑 T049–T052 確認 **全 Green**
+- [X] T054 [US4] 在 `src/ai_api/services/notifier.py::EmailNotifier.notify()` 加 dedup gate：在寄信前先 query `notification_dedup_bucket WHERE event_type=:t AND window_end > :now FOR UPDATE`；命中即 `event_count += 1`、落 `notification_record(outcome=suppressed, dedup_bucket_id=...)`、return；未命中即 insert bucket（`window_end=now+5min`）、寄信、落 record（`primary_record_id` 反向 update bucket）
+- [X] T055 [US4] 跑 T049–T052 確認 **全 Green**
 
 ---
 

@@ -41,6 +41,7 @@ class NotificationResult:
     per_recipient_status: dict[str, str] | None = None
     error_message: str | None = None
     recipients: list[str] | None = None  # actual recipients targeted (may differ from config)
+    record_id: str | None = None  # id of the persisted notification_record row
 
 
 class Notifier(ABC):
