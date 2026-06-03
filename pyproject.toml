@@ -64,6 +64,7 @@ ignore = ["E501", "S101", "B008", "S105", "N818"]  # B008/S105/N818: FastAPI Dep
 "src/ai_api/services/notifier_email.py" = ["RUF001"]  # Chinese user-facing email body
 "src/ai_api/services/notifications.py" = ["RUF001"]  # Chinese user-facing messages
 "src/ai_api/api/admin_notifications.py" = ["RUF001"]  # Chinese user-facing messages
+"src/ai_api/api/usage.py" = ["RUF001"]  # Chinese quarantine-reason message (fullwidth comma)
 
 [tool.mypy]
 python_version = "3.11"

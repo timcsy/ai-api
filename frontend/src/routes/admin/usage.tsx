@@ -4,7 +4,6 @@ import { useSearchParams } from "react-router-dom";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -17,8 +16,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
+import { UsageCharts } from "@/components/admin-usage-charts";
+import { TimeRangeSelect } from "@/components/time-range-select";
 import { ApiError, api } from "@/lib/api-client";
 import { apiBlob, triggerDownload } from "@/lib/download";
+import { type RangePreset, type TimeRange } from "@/lib/time-range";
 
 interface UsageItem {
   group_key: string;
@@ -65,6 +67,24 @@ export function AdminUsagePage() {
 
   const fromIso = `${from}T00:00:00Z`;
   const toIso = `${to}T23:59:59Z`;
+
+  // Phase 14 US3: a shared <TimeRangeSelect> drives from/to (stored in the URL so
+  // the range survives reloads/sharing). Default preset is 自訂 to preserve the
+  // page's historical explicit-date behaviour.
+  const range: TimeRange = {
+    preset: (params.get("preset") as RangePreset | null) ?? "custom",
+    from,
+    to,
+  };
+  const onRangeChange = (next: TimeRange) => {
+    setParams((prev) => {
+      const n = new URLSearchParams(prev);
+      n.set("preset", next.preset);
+      n.set("from", next.from);
+      n.set("to", next.to);
+      return n;
+    });
+  };
 
   const setParam = (key: string, value: string | null) => {
     setParams((prev) => {
@@ -120,24 +140,7 @@ export function AdminUsagePage() {
       </div>
 
       <div className="flex flex-wrap items-end gap-3 p-4 bg-card rounded-lg border">
-        <div>
-          <Label htmlFor="from">起始日期</Label>
-          <Input
-            id="from"
-            type="date"
-            value={from}
-            onChange={(e) => setParam("from", e.target.value)}
-          />
-        </div>
-        <div>
-          <Label htmlFor="to">結束日期</Label>
-          <Input
-            id="to"
-            type="date"
-            value={to}
-            onChange={(e) => setParam("to", e.target.value)}
-          />
-        </div>
+        <TimeRangeSelect value={range} onChange={onRangeChange} />
         <div>
           <Label htmlFor="group_by">分組</Label>
           <Select value={groupBy} onValueChange={(v) => setParam("group_by", v)}>
@@ -161,6 +164,9 @@ export function AdminUsagePage() {
           <Label htmlFor="service_only">只看服務型</Label>
         </div>
       </div>
+
+      {/* Phase 14 US2: provider donut + weekday×hour heatmap, sharing this page's range. */}
+      <UsageCharts fromIso={fromIso} toIso={toIso} />
 
       {groupBy === "tag" && (
         <Alert>

@@ -1,10 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { DashboardCharts } from "@/components/admin-home-charts";
+import { TimeRangeSelect } from "@/components/time-range-select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ApiError, api } from "@/lib/api-client";
+import { presetRange } from "@/lib/time-range";
 
 interface AuditRow {
   id: string;
@@ -231,6 +235,9 @@ function Dashboard({
   pausedCount: number;
   systemInfo: SystemInfo | undefined;
 }) {
+  // Phase 14: one time range drives every chart on this page; the selector lets
+  // admins switch 本週/本月/本季/自訂 and all charts refetch together (US3).
+  const [range, setRange] = useState(() => presetRange("month"));
   return (
     <div className="container mx-auto py-8 max-w-4xl space-y-6">
       <div>
@@ -338,6 +345,19 @@ function Dashboard({
           </dl>
         </CardContent>
       </Card>
+
+      {/* Phase 14: charts live BELOW alerts/info so quarantine warnings always
+          come first (FR-008). At most three charts on this page. */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">用量圖表</CardTitle>
+          <CardDescription>選擇時段，下方圖表一起更新</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TimeRangeSelect value={range} onChange={setRange} />
+        </CardContent>
+      </Card>
+      <DashboardCharts range={range} />
     </div>
   );
 }

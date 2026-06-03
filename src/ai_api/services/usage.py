@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Literal
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import Integer, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.models import (
@@ -15,9 +15,10 @@ from ai_api.models import (
     CallRecord,
     Member,
     MemberTag,
+    ModelCatalog,
 )
 
-GroupBy = Literal["member", "allocation", "model", "tag"]
+GroupBy = Literal["member", "allocation", "model", "tag", "provider"]
 Bucket = Literal["hour", "day"]
 
 
@@ -41,6 +42,14 @@ class TimeseriesPoint:
     ts: datetime
     tokens: int
     cost_usd: Decimal
+    call_count: int
+
+
+@dataclass(frozen=True)
+class HeatCell:
+    weekday: int  # 0=Sunday .. 6=Saturday (UTC+8)
+    hour: int  # 0..23 (UTC+8)
+    tokens: int
     call_count: int
 
 
@@ -188,6 +197,46 @@ async def aggregate_usage(
             for r in tag_rows
         ]
 
+    if group_by == "provider":
+        # Phase 14: aggregate by ModelCatalog.provider. INNER JOIN catalog on
+        # slug == CallRecord.model, so calls to un-catalogued models are excluded
+        # (their provider is unknown). Independent variable names per the
+        # multi-branch-select type lesson.
+        provider_stmt = (
+            select(
+                ModelCatalog.provider,
+                sum_total,
+                sum_prompt,
+                sum_completion,
+                sum_cost,
+                cnt,
+                sum_reasoning,
+                sum_cached,
+            )
+            .join(Allocation, Allocation.id == CallRecord.allocation_id)
+            .join(ModelCatalog, ModelCatalog.slug == CallRecord.model)
+            .where(*base_filters)
+            .group_by(ModelCatalog.provider)
+            .order_by(sum_total.desc())
+        )
+        if service_only:
+            provider_stmt = provider_stmt.where(Allocation.is_service_allocation.is_(True))
+        provider_rows = (await db.execute(provider_stmt)).all()
+        return [
+            UsageItem(
+                group_key=r[0],
+                display_name=r[0],
+                total_tokens=int(r[1] or 0),
+                prompt_tokens=int(r[2] or 0),
+                completion_tokens=int(r[3] or 0),
+                total_cost_usd=Decimal(r[4] or 0),
+                call_count=int(r[5]),
+                reasoning_tokens=int(r[6] or 0),
+                cached_tokens=int(r[7] or 0),
+            )
+            for r in provider_rows
+        ]
+
     # group_by == "model"
     model_stmt = (
         select(
@@ -319,11 +368,14 @@ async def count_unpriced_calls(
 async def usage_timeseries(
     db: AsyncSession,
     *,
-    allocation_id: str,
+    allocation_id: str | None = None,
     bucket: Bucket,
     from_: datetime,
     to: datetime,
 ) -> list[TimeseriesPoint]:
+    """Time-bucketed usage. `allocation_id=None` aggregates platform-wide (Phase
+    14: every allocation summed per bucket); a concrete id scopes to one
+    allocation (existing per-allocation behaviour, unchanged)."""
     # dialect-aware truncation
     dialect = db.bind.dialect.name if db.bind else "sqlite"
     if dialect == "postgresql":
@@ -332,6 +384,14 @@ async def usage_timeseries(
         fmt = "%Y-%m-%d %H:00:00" if bucket == "hour" else "%Y-%m-%d 00:00:00"
         ts_expr = func.strftime(fmt, CallRecord.started_at)
 
+    filters = [
+        CallRecord.outcome == CallOutcome.success,
+        CallRecord.started_at >= from_,
+        CallRecord.started_at < to,
+    ]
+    if allocation_id is not None:
+        filters.append(CallRecord.allocation_id == allocation_id)
+
     stmt = (
         select(
             ts_expr.label("ts"),
@@ -339,12 +399,7 @@ async def usage_timeseries(
             func.coalesce(func.sum(CallRecord.cost_usd), 0).label("cost"),
             func.count().label("cnt"),
         )
-        .where(
-            CallRecord.allocation_id == allocation_id,
-            CallRecord.outcome == CallOutcome.success,
-            CallRecord.started_at >= from_,
-            CallRecord.started_at < to,
-        )
+        .where(*filters)
         .group_by(ts_expr)
         .order_by(ts_expr)
     )
@@ -363,3 +418,51 @@ async def usage_timeseries(
             )
         )
     return out
+
+
+async def usage_heatmap(
+    db: AsyncSession,
+    *,
+    from_: datetime,
+    to: datetime,
+) -> list[HeatCell]:
+    """Phase 14: weekday x hour usage heatmap, bucketed in UTC+8.
+
+    Shifts started_at by +8h before extracting weekday/hour so the grid reflects
+    local (Taiwan) time. weekday: 0=Sunday..6=Saturday (matches both Postgres
+    `dow` and SQLite `%w`). Returns only non-empty cells (≤168)."""
+    dialect = db.bind.dialect.name if db.bind else "sqlite"
+    if dialect == "postgresql":
+        shifted = CallRecord.started_at + timedelta(hours=8)
+        weekday_expr = func.cast(func.extract("dow", shifted), Integer)
+        hour_expr = func.cast(func.extract("hour", shifted), Integer)
+    else:
+        shifted = func.datetime(CallRecord.started_at, "+8 hours")
+        weekday_expr = func.cast(func.strftime("%w", shifted), Integer)
+        hour_expr = func.cast(func.strftime("%H", shifted), Integer)
+
+    stmt = (
+        select(
+            weekday_expr.label("weekday"),
+            hour_expr.label("hour"),
+            func.coalesce(func.sum(CallRecord.total_tokens), 0).label("tokens"),
+            func.count().label("cnt"),
+        )
+        .where(
+            CallRecord.outcome == CallOutcome.success,
+            CallRecord.started_at >= from_,
+            CallRecord.started_at < to,
+        )
+        .group_by(weekday_expr, hour_expr)
+        .order_by(weekday_expr, hour_expr)
+    )
+    rows = (await db.execute(stmt)).all()
+    return [
+        HeatCell(
+            weekday=int(r[0]),
+            hour=int(r[1]),
+            tokens=int(r[2] or 0),
+            call_count=int(r[3]),
+        )
+        for r in rows
+    ]

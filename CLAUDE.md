@@ -31,6 +31,8 @@ Auto-generated from all feature plans. Last updated: 2026-06-03
 - PostgreSQL（生產）/ SQLite（dev、CI）；本功能新增表 `notification_config`、 (022-admin-email-notifications)
 - Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端），皆既有 + FastAPI、SQLAlchemy 2.x async、Pydantic v2、TanStack Query、shadcn/ui（皆既有，**不新增套件**） (023-tag-group-rollup)
 - PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表、不新增 migration**——沿用既有 (023-tag-group-rollup)
+- TypeScript strict + React 19 + Vite 6（前端為主）/ Python 3.11+（後端少量聚合） (024-admin-visualization)
+- PostgreSQL / SQLite；**不新增表、不新增 migration**——全部查詢層聚合 (024-admin-visualization)
 
 - Python 3.11+ + LiteLLM（proxy core）、FastAPI（admin API）、 (001-gateway-core)
 
@@ -51,9 +53,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 024-admin-visualization: Added TypeScript strict + React 19 + Vite 6（前端為主）/ Python 3.11+（後端少量聚合）
 - 023-tag-group-rollup: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端），皆既有 + FastAPI、SQLAlchemy 2.x async、Pydantic v2、TanStack Query、shadcn/ui（皆既有，**不新增套件**）
 - 022-admin-email-notifications: Added Python 3.11+（後端，既有不變）/ TypeScript strict + React 19 + Vite 6（前端，既有不變）
-- 021-responses-api: Added Python 3.11+（後端）/ TypeScript strict（前端僅用量顯示微調） + FastAPI、SQLAlchemy 2.x async、Pydantic v2、`litellm`
 
 
 <!-- MANUAL ADDITIONS START -->

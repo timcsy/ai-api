@@ -490,3 +490,37 @@ ruff/mypy/前端 lint+typecheck+build 全綠。
 
 **已知限制：** 各 tag 加總 > 平台總額（重疊成員多算，by design、UI 標示）；tag 採查詢當下歸屬
 （學期中轉班會讓歷史用量跟著新 tag 走）。
+
+## 階段 14：Admin 視覺化強化
+
+**完成：** 2026-06-03（spec 024-admin-visualization）
+
+**交付：** 導入全平台第一個 charting 依賴 recharts（gzip 增量 ~100KB，< 150KB 預算），
+共用 `<Chart>` wrapper（`components/ui/chart.tsx`，封裝 ResponsiveContainer + 固定高度 +
+統一空狀態/載入 skeleton）+ 單一色盤統一全平台。
+
+- **首頁三圖 + Top 5 tags 卡**（`components/admin-home-charts.tsx`）：daily spend bar（token/花費
+  可切）、Spend by Model donut（top 5 + 其他，click slice 跳 model 詳情）、Top 5 allocations bar
+  （click 跳分配維運頁）、Top 5 tags by spend 卡（卡片非圖表）。圖表區一律放 quarantine/paused
+  警示 + 系統資訊**之下**，首頁最多 3 張圖（FR-008）。
+- **用量頁 provider donut + heatmap**（`components/admin-usage-charts.tsx`）：provider 占比 donut；
+  24×7 用量熱度圖用 **CSS grid（非 recharts）**，UTC+8 分桶。
+- **統一時段選擇器**（`components/time-range-select.tsx` + `lib/time-range.ts`）：本週／本月／本季／
+  自訂；首頁以 state、用量頁以 URL searchParams 持有；切換一起 refetch，載入時顯 skeleton 不空白閃。
+- **隔離原因顯眼化**（`components/quarantine-reason-badge.tsx`）：分配列徽章 click → popover 就地顯示
+  觸發數據（過去 1 小時 N calls、baseline X/hr），lazy fetch；不必點進稽核紀錄。
+
+**後端：** `services/usage.py` 加 `group_by="provider"` 分支（JOIN model_catalog）、`HeatCell` +
+`usage_heatmap`（dialect-aware、UTC+8）、`usage_timeseries` 的 `allocation_id` 改 `str | None`
+（None = 平台級加總）；`api/usage.py` 加 `/usage/timeseries`、`/usage/heatmap`、
+`/allocations/{id}/quarantine-reason`。**無新表、無 migration、僅 recharts 一個新依賴。**
+
+**測試：** `tests/contract/test_usage_viz.py`（平台時序 + provider + 隔離原因 + admin-only）、
+`tests/integration/test_usage_viz_agg.py`（heatmap UTC+8 分桶，Postgres）、
+`frontend/src/__tests__/home-charts.test.tsx`（≤3 圖、警示在圖之前、空狀態）、
+`time-range-select.test.tsx`（preset 換算）。全套 487 後端 + 109 前端測試綠、ruff/mypy 零警告。
+
+**設計細節：** [`design/admin-visualization.md`](../design/admin-visualization.md)。
+
+**明確排除（第二版再評估）：** Allocation 詳情 30 天 line + 配額燃燒投影、Member 跨 allocation
+donut、月底支出投影虛線、PNG export、>3 張首頁圖、3D/radar/treemap 花俏圖型、多 charting lib。
