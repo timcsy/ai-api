@@ -61,7 +61,6 @@ class AuditEventType(enum.StrEnum):
     # Phase 13: admin email notifications — event types that trigger admin emails
     responses_upstream_error_burst = "responses_upstream_error_burst"
     provider_credential_auth_failed = "provider_credential_auth_failed"
-    allocation_daily_cap_exceeded = "allocation_daily_cap_exceeded"
 
 
 class ActorType(enum.StrEnum):

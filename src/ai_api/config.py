@@ -74,8 +74,8 @@ class Settings(BaseSettings):
 
     # Phase 13: subscription override for which audit event types trigger emails.
     # Empty list = use built-in default (allocation_quarantined / responses_upstream_error_burst
-    # / provider_credential_auth_failed / allocation_daily_cap_exceeded). Operator can override
-    # at deploy time via NOTIFY_EVENT_TYPES_OVERRIDE="type_a,type_b".
+    # / provider_credential_auth_failed). Operator can override at deploy time via
+    # NOTIFY_EVENT_TYPES_OVERRIDE="type_a,type_b".
     notify_event_types_override: list[str] = Field(
         default=[], alias="NOTIFY_EVENT_TYPES_OVERRIDE"
     )

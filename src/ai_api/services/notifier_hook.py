@@ -29,7 +29,6 @@ DEFAULT_NOTIFY_EVENT_TYPES: frozenset[str] = frozenset({
     AuditEventType.allocation_quarantined.value,
     AuditEventType.responses_upstream_error_burst.value,
     AuditEventType.provider_credential_auth_failed.value,
-    AuditEventType.allocation_daily_cap_exceeded.value,
 })
 
 

@@ -171,7 +171,7 @@ Codex 預設 `store=false`、自帶 context，不經此路徑。
 
 ## 8. 管理員 Email 通知（階段 13）
 
-平台對重要事件（分配自動隔離、上游連續失敗、provider 憑證失效、每日上限觸發）主動
+平台對重要事件（分配自動隔離、上游連續失敗、provider 憑證失效）主動
 寄信給管理員。**SMTP 由 admin 在 web UI 自助設定，不需 Helm value。**
 
 ### 8.1 申請 Gmail App Password（最容易的選擇）

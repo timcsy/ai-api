@@ -399,40 +399,6 @@ async def test_provider_credential_auth_failed_triggers_notification(
     assert "azure" in body
 
 
-# ----- T042 -----
-
-@pytest.mark.asyncio
-async def test_daily_cap_exceeded_event_template_renders(
-    fresh_db: Any, smtp_server: Any
-) -> None:
-    controller, handler = smtp_server
-    await _save_config(
-        smtp_host=controller.hostname,
-        smtp_port=controller.port,
-        recipients=["admin@example.com"],
-    )
-    sm = get_sessionmaker()
-    async with sm() as session:
-        await audit.record(
-            session,
-            event_type=AuditEventType.allocation_daily_cap_exceeded,
-            actor_type=ActorType.system,
-            target_type="allocation",
-            target_id="alloc_daily99",
-            details={"daily_token_cap": 50000, "today_tokens": 50120},
-        )
-        await session.commit()
-    await drain_notifier_tasks()
-
-    assert len(handler.messages) == 1
-    subject_text = str(make_header(decode_header(handler.messages[0]["Subject"])))
-    assert "每日上限" in subject_text
-    body_part = handler.messages[0].get_payload(decode=True)
-    body = body_part.decode("utf-8") if isinstance(body_part, bytes) else ""
-    assert "50000" in body
-    assert "50120" in body
-
-
 @pytest.fixture(autouse=True)
 def _setup_test_env() -> Any:
     """Make sure timestamps for the rendered email use today's date."""

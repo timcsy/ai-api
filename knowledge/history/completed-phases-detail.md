@@ -432,7 +432,8 @@
 - **US2**：`allocation_quarantined` 觸發 email（含原因具體數字、UTC+8 時間、admin 連結）；per-recipient
   失敗不互相阻斷；未設定/停用/憑證無效皆靜默 skip
 - **US3**：另 3 種事件——`upstream_burst_detector`（cronjob 每分鐘，5 分鐘窗 ≥10 次 upstream_error）、
-  proxy 401/403 → `provider_credential_auth_failed`、`allocation_daily_cap_exceeded`（模板就緒待 Phase 16）
+  proxy 401/403 → `provider_credential_auth_failed`（原預埋的第 4 種 `allocation_daily_cap_exceeded`
+  已於 2026-06-03 隨 daily cap 撤案移除）
 - **US4**：`NotificationDedupBucket` 5 分鐘窗去重；primary record 連結 bucket；per-event-type 獨立
 - **US5**：`/admin/notifications/history` keyset 分頁 + event_type/outcome filter + bucket_event_count；
   前端歷史區含合併標示與逐收件人失敗原因

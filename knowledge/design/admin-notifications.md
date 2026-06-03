@@ -14,7 +14,7 @@ DB 去重，無排程器、無 retry，未設定時零影響。
                             ┌─────────────────────────────┐
   任何業務流程              │  audit.record(event)         │
   （anomaly cronjob /       │   1. 寫 auth_audit_log       │
-   proxy 401 / daily cap /  │   2. if event ∈ NOTIFY_TYPES │
+   proxy 401 /              │   2. if event ∈ NOTIFY_TYPES │
    burst cronjob）          │      → fire(NotificationEvent)│ ── asyncio.create_task ──┐
                             └─────────────────────────────┘                          │
                                                                                      ▼
@@ -62,7 +62,9 @@ DB 去重，無排程器、無 retry，未設定時零影響。
 | `allocation_quarantined` | anomaly detector cronjob（既有） |
 | `responses_upstream_error_burst` | `upstream_burst_detector` cronjob（新，每分鐘） |
 | `provider_credential_auth_failed` | proxy/responses.py 上游 401/403 catch（新） |
-| `allocation_daily_cap_exceeded` | 階段 16 daily cap（模板就緒，事件源待接） |
+
+> 註：原本預埋的第 4 種事件 `allocation_daily_cap_exceeded`（為階段 16 daily cap 準備）已於
+> 2026-06-03 移除——daily cap 評估後不做（見 vision 路線圖末「不做」段）。
 
 ## 已知限制
 

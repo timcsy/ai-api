@@ -225,32 +225,10 @@ def _render_credential_invalid_email(event: NotificationEvent) -> tuple[str, str
     return subject, body
 
 
-def _render_daily_cap_email(event: NotificationEvent) -> tuple[str, str]:
-    target_id_short = (event.target_id or "unknown")[:8]
-    display = event.target_display_name or f"分配 {target_id_short}"
-    details = event.details or {}
-    cap = details.get("daily_token_cap", "?")
-    used = details.get("today_tokens", "?")
-    base_url = _public_base_url()
-    subject = f"[AI API] 每日上限觸發 — {target_id_short}"
-    body = (
-        "管理員您好，\n\n"
-        "一筆分配今天已達到設定的每日 token 上限，後續呼叫會被拒絕直到隔日重置。\n\n"
-        f"  - 分配：{target_id_short}（{display}）\n"
-        f"  - 今日已用 / 上限：{used} / {cap} tokens\n"
-        f"  - 時間：{_fmt_taipei(event.occurred_at)}\n\n"
-        "如需臨時放寬，請至以下頁面調整：\n"
-        f"{base_url}/admin/observability/allocations\n\n"
-        "— AI API Manager\n"
-    )
-    return subject, body
-
-
 _EVENT_RENDERERS = {
     "allocation_quarantined": _render_quarantine_email,
     "responses_upstream_error_burst": _render_upstream_burst_email,
     "provider_credential_auth_failed": _render_credential_invalid_email,
-    "allocation_daily_cap_exceeded": _render_daily_cap_email,
 }
 
 
