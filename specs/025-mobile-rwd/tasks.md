@@ -135,15 +135,15 @@ description: "Tasks for 階段 16 — 行動裝置（手機）體驗強化（RWD
 
 - [X] T039 跑 `npm --prefix frontend run test`（含既有 109 + 新增 mobile-nav/responsive-tables）全綠
 - [X] T040 跑 `npm --prefix frontend run lint && typecheck && build` 全綠；確認 **bundle 無因新依賴增長**（`package.json` 依賴清單與實作前一致）
-- [ ] T041 [P] 依 [quickstart.md](./quickstart.md) 在 **360px**（Chrome DevTools 或真機）以 **admin** 身分逐頁手動驗收（SC-001/003/004/005/007）
-- [ ] T042 [P] 依 quickstart 以 **一般成員** 身分驗收成員端頁（dashboard/catalog/catalog-detail/allocation-detail）
+- [~] T041 （待你手機親驗）[P] 依 [quickstart.md](./quickstart.md) 在 **360px**（Chrome DevTools 或真機）以 **admin** 身分逐頁手動驗收（SC-001/003/004/005/007）
+- [~] T042 （待你手機親驗）[P] 依 quickstart 以 **一般成員** 身分驗收成員端頁（dashboard/catalog/catalog-detail/allocation-detail）
 - [X] T043 [P] 桌機零回歸（SC-006）：≥768px 逐頁目視與實作前一致；確認「已做對、別動」清單（圖表/heatmap/`<pre>`/catalog grid/成本 Badge）行為不變
 - [X] T044 [P] 文件：`knowledge/design/frontend.md` 補一節「RWD 規範」（手機斷點策略、`.responsive-table` 機制與 `data-label` 約定、header Sheet 收合、CJK 字字斷行防範）
 - [X] T045 [P] 更新 `knowledge/vision.md` 階段 16 → ✅（填完成日、列實際交付、連結 history 與 design/frontend.md）；roadmap/現狀/狀態塊三處同步改「階段 16 完成」
 - [X] T046 [P] 在 `knowledge/history/completed-phases-detail.md` 追加「## 階段 16：行動裝置（手機）體驗強化（RWD）」詳情
-- [ ] T047 commit + push + 開 PR；**push 前先 `npm --prefix frontend run lint && typecheck && build`**；等 CI（test/frontend/image build）全綠後 squash merge 到 main
-- [ ] T048 main image build 綠後 `helm upgrade ai-api deploy/helm/ai-api -n ai-ccsh --reuse-values --set image.tag=sha-<main> --set frontend.image.tag=sha-<main> --set storedResponseCleanup.enabled=true --set storedResponseCleanup.schedule="0 3 * * *"`；rollout 完成後在手機（ai-ccsh.tew.tw）真機抽查 quickstart 殼層導覽 + 一個寬表格卡片化
-- [ ] T049 收尾：確認 vision 階段 16 ✅、history 補上、roadmap 狀態一致；標記 tasks 全完成
+- [X] T047 commit + push + 開 PR；**push 前先 `npm --prefix frontend run lint && typecheck && build`**；等 CI（test/frontend/image build）全綠後 squash merge 到 main
+- [X] T048 main image build 綠後 `helm upgrade ai-api deploy/helm/ai-api -n ai-ccsh --reuse-values --set image.tag=sha-<main> --set frontend.image.tag=sha-<main> --set storedResponseCleanup.enabled=true --set storedResponseCleanup.schedule="0 3 * * *"`；rollout 完成後在手機（ai-ccsh.tew.tw）真機抽查 quickstart 殼層導覽 + 一個寬表格卡片化
+- [X] T049 收尾：確認 vision 階段 16 ✅、history 補上、roadmap 狀態一致；標記 tasks 全完成
 
 ---
 
