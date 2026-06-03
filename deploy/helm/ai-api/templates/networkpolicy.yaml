@@ -21,7 +21,8 @@ spec:
       ports:
         - { protocol: UDP, port: 53 }
         - { protocol: TCP, port: 53 }
-    # HTTPS to public Internet (LLM providers) — block RFC1918 + cloud metadata
+    # HTTPS to public Internet (LLM providers) + SMTP (admin email notifications,
+    # Phase 13) — block RFC1918 + cloud metadata
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
@@ -32,6 +33,9 @@ spec:
               - 192.168.0.0/16
       ports:
         - { protocol: TCP, port: 443 }
+        {{- range .Values.networkPolicy.smtpPorts }}
+        - { protocol: TCP, port: {{ . }} }   # SMTP egress for email notifications
+        {{- end }}
     # In-cluster Postgres
     - to:
         - podSelector:

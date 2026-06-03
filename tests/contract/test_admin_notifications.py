@@ -68,6 +68,44 @@ async def test_put_config_persists_and_returns_masked(
 
 
 @pytest.mark.asyncio
+async def test_password_whitespace_stripped_and_fingerprint_from_plaintext(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    """Gmail App Password paste has spaces; they should be stripped on save, and
+    the fingerprint should derive from plaintext (different pw -> different fp)."""
+    from sqlalchemy import select
+
+    from ai_api.db import get_sessionmaker
+    from ai_api.models import NotificationConfig
+    from ai_api.services.crypto import decrypt_str
+
+    # Save with a Gmail-style spaced App Password
+    cfg_spaced = {**_VALID_CONFIG, "smtp_password": "abcd efgh ijkl mnop"}
+    r = await app_client.put(
+        "/admin/notifications/config", headers=admin_headers, json=cfg_spaced
+    )
+    assert r.status_code == 200, r.text
+    fp_1 = r.json()["smtp_password_fingerprint"]
+
+    # Stored plaintext has no spaces
+    sm = get_sessionmaker()
+    async with sm() as s:
+        cfg = (await s.execute(select(NotificationConfig))).scalar_one()
+        assert decrypt_str(cfg.smtp_password_encrypted) == "abcdefghijklmnop"
+
+    # A different password yields a different fingerprint
+    cfg_other = {**_VALID_CONFIG, "smtp_password": "totally-different-pw"}
+    r2 = await app_client.put(
+        "/admin/notifications/config", headers=admin_headers, json=cfg_other
+    )
+    fp_2 = r2.json()["smtp_password_fingerprint"]
+    assert fp_1 != fp_2
+    # Fingerprint is NOT the constant Fernet-ciphertext prefix
+    assert not fp_1.startswith("67414141")
+    assert not fp_2.startswith("67414141")
+
+
+@pytest.mark.asyncio
 async def test_put_config_rejects_invalid_port(
     app_client: AsyncClient, admin_headers: dict[str, str]
 ) -> None:

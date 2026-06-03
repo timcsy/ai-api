@@ -251,8 +251,13 @@ export function AdminNotificationsPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder={cfg ? "（留白表示維持原密碼，本實作會重新儲存）" : "Gmail App Password 等"}
+              placeholder={cfg ? "（留白＝沿用已儲存的密碼）" : "貼上 Gmail App Password（空格會自動移除）"}
             />
+            <p className="text-xs text-muted-foreground">
+              Gmail 顯示的 App Password 有空格（如 <code>abcd efgh ijkl mnop</code>），可直接貼上，
+              系統會自動移除空格。Gmail 需先開啟兩步驟驗證才能產生 App Password。
+              搜尋關鍵字：<span className="font-mono">Gmail App Password 應用程式密碼 兩步驟驗證</span>
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -322,6 +327,12 @@ export function AdminNotificationsPage() {
           <CardDescription>
             測試信會寄到您在下方輸入的「一次性收件人」，<strong>不會</strong>寄給上方的正式 recipients
             清單——避免設定階段誤打擾大家。
+          </CardDescription>
+          <CardDescription className="mt-1 text-xs">
+            常見錯誤排查（可上網搜尋）：
+            <span className="font-mono">「驗證失敗 535」→ Gmail App Password 錯</span>、
+            <span className="font-mono">「連線失敗」→ host/port 或防火牆</span>、
+            <span className="font-mono">「Gmail SMTP 設定 smtp.gmail.com 587」</span>。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">

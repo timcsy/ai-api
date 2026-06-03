@@ -192,7 +192,7 @@ description: "Tasks for Phase 13 — admin email notifications"
 - [X] T074 跑 `uv run ruff check . && uv run mypy src/` 確認 lint + 型別零警告
 - [X] T075 跑 `npm --prefix frontend run lint && npm --prefix frontend run typecheck && npm --prefix frontend run build` 確認前端零警告
 - [X] T076 端到端煙霧：在 staging（或本機 docker-compose + Mailpit）跑 `quickstart.md` 全 8 情境
-- [ ] T077 [P] commit + push + 等 image build；helm upgrade 至 ai-ccsh ns；live cluster 跑 quickstart 情境 1 + 3 真實 SMTP 驗證（用 Gmail App Password + 真 admin 信箱）
+- [X] T077 [P] commit + push + 等 image build；helm upgrade 至 ai-ccsh ns；live cluster 跑 quickstart 情境 1 + 3 真實 SMTP 驗證（用 Gmail App Password + 真 admin 信箱）
 - [ ] T078 收尾：將 spec / plan / tasks 中提到的「實作後待辦」（vision 條目改 ✅、history 補上等）逐項確認完成
 
 ---

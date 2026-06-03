@@ -116,6 +116,11 @@ networkPolicy:
   enabled: true
   postgresPodSelector:
     app: ai-api-pg
+  # Phase 13: SMTP egress ports for admin email notifications (STARTTLS 587 / TLS 465).
+  # Set to [] to disable SMTP egress entirely.
+  smtpPorts:
+    - 587
+    - 465
 
 anomalyDetector:
   enabled: true

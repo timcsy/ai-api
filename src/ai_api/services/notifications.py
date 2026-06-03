@@ -8,6 +8,7 @@ admin UI can prompt for re-entry.
 from __future__ import annotations
 
 import base64
+import hashlib
 import re
 from datetime import UTC, datetime
 
@@ -21,7 +22,7 @@ from ai_api.models import (
     NotificationDedupBucket,
     NotificationRecord,
 )
-from ai_api.services.crypto import encrypt_str
+from ai_api.services.crypto import decrypt_str, encrypt_str
 
 # Conservative email regex; matches FastAPI/email-validator simple form.
 _EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
@@ -36,11 +37,27 @@ def _validate_email(addr: str, *, field: str) -> None:
         raise NotificationConfigValidationError(f"{field}: invalid email format ({addr!r})")
 
 
-def _password_fingerprint(ciphertext: bytes) -> str:
-    """`abcd…wxyz` — first 4 + last 4 bytes of ciphertext as hex (UI-safe mask)."""
-    if not ciphertext or len(ciphertext) < 8:
-        return "***"
-    return ciphertext[:4].hex() + "..." + ciphertext[-4:].hex()
+def _normalize_password(raw: str) -> str:
+    """Strip all whitespace from a pasted SMTP password.
+
+    Gmail App Passwords are displayed as 4 space-separated groups (`abcd efgh
+    ijkl mnop`) but the actual secret is the 16 chars with no spaces — Google's
+    own docs say the spaces are display-only. SMTP passwords with real embedded
+    whitespace are essentially nonexistent, so removing all whitespace lets
+    admins paste straight from Google without manually deleting the spaces.
+    """
+    return "".join(raw.split())
+
+
+def _password_fingerprint_from_plain(plain: str) -> str:
+    """UI-safe identifier derived from the PLAINTEXT password (not the ciphertext).
+
+    Uses sha256(plain)[:12] like ProviderCredential — different passwords yield
+    different fingerprints, but the plaintext is never revealed. (The previous
+    implementation hashed the Fernet ciphertext bytes, whose first 4 bytes are
+    always `67414141` = "gAAA" for every token, giving zero discriminating power.)
+    """
+    return hashlib.sha256(plain.encode("utf-8")).hexdigest()[:12]
 
 
 class NotificationConfigService:
@@ -76,7 +93,11 @@ class NotificationConfigService:
             )
         if not isinstance(smtp_username, str) or not smtp_username.strip():
             raise NotificationConfigValidationError("smtp_username: must be non-empty")
-        if not isinstance(smtp_password, str) or not smtp_password:
+        if not isinstance(smtp_password, str):
+            raise NotificationConfigValidationError("smtp_password: must be a string")
+        # Normalise: strip whitespace (Gmail App Password paste has spaces).
+        smtp_password = _normalize_password(smtp_password)
+        if not smtp_password:
             raise NotificationConfigValidationError("smtp_password: must be non-empty")
         _validate_email(sender_email, field="sender_email")
         if not isinstance(recipients, list) or not all(isinstance(r, str) for r in recipients):
@@ -221,12 +242,23 @@ class NotificationConfigService:
 
     @staticmethod
     def to_response(cfg: NotificationConfig) -> dict[str, object]:
-        """Serialise a NotificationConfig for admin UI (password masked)."""
+        """Serialise a NotificationConfig for admin UI (password masked).
+
+        Fingerprint is derived from the decrypted plaintext (single decrypt for a
+        singleton config — negligible cost). If decryption fails (key rotated),
+        show a clear marker rather than a misleading value.
+        """
+        try:
+            fingerprint = _password_fingerprint_from_plain(
+                decrypt_str(cfg.smtp_password_encrypted)
+            )
+        except Exception:
+            fingerprint = "(無法解密，請重新輸入)"
         return {
             "smtp_host": cfg.smtp_host,
             "smtp_port": cfg.smtp_port,
             "smtp_username": cfg.smtp_username,
-            "smtp_password_fingerprint": _password_fingerprint(cfg.smtp_password_encrypted),
+            "smtp_password_fingerprint": fingerprint,
             "sender_email": cfg.sender_email,
             "sender_name": cfg.sender_name,
             "recipients": cfg.recipients,
