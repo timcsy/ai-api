@@ -105,9 +105,20 @@ class NotificationDedupBucket(Base):
     # Points to the notification_record that triggered this bucket (the one that
     # actually sent the email). Nullable so record deletion cascades to SET NULL
     # without orphaning the bucket.
+    #
+    # use_alter=True breaks the mutual FK cycle with notification_record
+    # (record.dedup_bucket_id -> bucket.id). Without it, metadata.create_all /
+    # drop_all on Postgres raises CircularDependencyError because the tables
+    # can't be topologically sorted; use_alter emits this constraint as a
+    # separate ALTER TABLE after both tables exist.
     primary_record_id: Mapped[str | None] = mapped_column(
         String(26),
-        ForeignKey("notification_record.id", ondelete="SET NULL"),
+        ForeignKey(
+            "notification_record.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_dedup_bucket_primary_record",
+        ),
         nullable=True,
     )
     last_event_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
