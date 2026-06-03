@@ -1,0 +1,67 @@
+openapi: 3.0.3
+info:
+  title: Member usage timeseries (Phase 17)
+  version: 0.1.0
+  description: |
+    Member-scoped daily usage timeseries for the member dashboard charts. Spec:
+    specs/026-member-usage-charts/spec.md. Strictly scoped to the authenticated
+    member — there is NO parameter to view another member's data. The donut chart
+    reuses the existing GET /me/usage?group_by=model (unchanged, not redefined here).
+
+servers:
+  - url: /
+
+components:
+  securitySchemes:
+    MemberSession: { type: apiKey, in: cookie, name: session }
+
+  schemas:
+    TimeseriesPoint:
+      type: object
+      properties:
+        ts: { type: string, format: date-time }
+        tokens: { type: integer }
+        cost_usd: { type: string, description: Decimal as string }
+        call_count: { type: integer }
+      required: [ts, tokens, call_count]
+
+    MyTimeseriesResponse:
+      type: object
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        bucket: { type: string, enum: [day] }
+        points:
+          type: array
+          items: { $ref: '#/components/schemas/TimeseriesPoint' }
+      required: [from, to, bucket, points]
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+
+paths:
+  /me/usage/timeseries:
+    get:
+      summary: This member's own daily usage timeseries (all their allocations summed)
+      operationId: getMyUsageTimeseries
+      description: |
+        Scope comes ENTIRELY from the authenticated session (current_member).
+        There is no member_id / allocation_id parameter — a member cannot view
+        anyone else's data. Each point = sum of THIS member's allocations for
+        that day.
+      security: [{ MemberSession: [] }]
+      parameters:
+        - { name: from, in: query, required: false, schema: { type: string, format: date-time }, description: "default = start of current month (UTC)" }
+        - { name: to, in: query, required: false, schema: { type: string, format: date-time }, description: "default = now (UTC)" }
+      responses:
+        '200':
+          description: This member's own daily timeseries
+          content: { application/json: { schema: { $ref: '#/components/schemas/MyTimeseriesResponse' } } }
+        '400': { description: Invalid range (from >= to or range too wide) }
+        '401': { description: Not authenticated }

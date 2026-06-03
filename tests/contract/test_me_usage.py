@@ -187,3 +187,71 @@ async def test_me_usage_range_filters(app_client: AsyncClient, admin_headers) ->
                 "to": (NOW + timedelta(days=1)).isoformat()},
     )
     assert r2.json()["summary"]["total_tokens"] == 100
+
+
+# ===== Phase 17: GET /me/usage/timeseries (member-scoped daily charts) =====
+
+async def _seed_alloc_with_calls_at(
+    member_id: str, model: str, calls: list[tuple[datetime, int, float]]
+) -> None:
+    """One allocation for member + success CallRecords at given timestamps."""
+    sm = get_sessionmaker()
+    async with sm() as s:
+        alloc_id = str(ULID())
+        s.add(Allocation(
+            id=alloc_id, member_id=member_id, subject_snapshot=model,
+            resource_model=model, status=AllocationStatus.active, created_at=NOW,
+            revoked_at=None, created_by="test", note=None, quota_tokens_per_month=None,
+            is_service_allocation=False, quota_locked=False, origin=AllocationOrigin.admin,
+        ))
+        for when, total, cost in calls:
+            s.add(CallRecord(
+                id=str(ULID()), request_id=str(ULID()), allocation_id=alloc_id,
+                subject=model, model=model, started_at=when, finished_at=when,
+                status_code=200, outcome=CallOutcome.success,
+                prompt_tokens=total // 2, completion_tokens=total - total // 2,
+                total_tokens=total, cost_usd=cost, error_message=None,
+            ))
+        await s.commit()
+
+
+# T002 — daily timeseries sums the member's OWN allocations per day
+@pytest.mark.asyncio
+async def test_my_timeseries_sums_own_allocations(app_client: AsyncClient, admin_headers) -> None:
+    mid = await _login(app_client, admin_headers, "ts1@x.com")
+    day1 = datetime(2026, 5, 10, 9, 0, tzinfo=UTC)
+    day2 = datetime(2026, 5, 11, 9, 0, tzinfo=UTC)
+    # two separate allocations, both contribute to day1
+    await _seed_alloc_with_calls_at(mid, "azure/m1", [(day1, 1000, 0.10)])
+    await _seed_alloc_with_calls_at(mid, "azure/m2", [(day1, 500, 0.05), (day2, 300, 0.03)])
+    r = await app_client.get(
+        "/me/usage/timeseries",
+        params={"from": "2026-05-01T00:00:00+00:00", "to": "2026-05-31T00:00:00+00:00"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["bucket"] == "day"
+    points = {p["ts"][:10]: p for p in body["points"]}
+    assert points["2026-05-10"]["tokens"] == 1500  # both allocations summed
+    assert points["2026-05-10"]["call_count"] == 2
+    assert points["2026-05-11"]["tokens"] == 300
+
+
+# T003 — unauthenticated + invalid range
+@pytest.mark.asyncio
+async def test_my_timeseries_unauthenticated_401(app_client: AsyncClient) -> None:
+    r = await app_client.get(
+        "/me/usage/timeseries",
+        params={"from": "2026-05-01T00:00:00+00:00", "to": "2026-05-31T00:00:00+00:00"},
+    )
+    assert r.status_code in (401, 403)
+
+
+@pytest.mark.asyncio
+async def test_my_timeseries_invalid_range_400(app_client: AsyncClient, admin_headers) -> None:
+    await _login(app_client, admin_headers, "ts-bad@x.com")
+    r = await app_client.get(
+        "/me/usage/timeseries",
+        params={"from": "2026-05-31T00:00:00+00:00", "to": "2026-05-01T00:00:00+00:00"},
+    )
+    assert r.status_code == 400

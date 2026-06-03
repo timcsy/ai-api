@@ -18,8 +18,11 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
+import { MemberUsageCharts } from "@/components/member-usage-charts";
+import { TimeRangeSelect } from "@/components/time-range-select";
 import { UsageSummary } from "@/components/usage-summary";
 import { useAuth } from "@/contexts/auth";
+import { presetRange } from "@/lib/time-range";
 import { apiBaseUrl } from "@/lib/api-base";
 import { ApiError, api } from "@/lib/api-client";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -54,6 +57,8 @@ interface ClaimableModel {
 export function DashboardPage() {
   const { member } = useAuth();
   const [includeRevoked, setIncludeRevoked] = React.useState(false);
+  // Phase 17: one time range drives both of the member's own usage charts.
+  const [usageRange, setUsageRange] = React.useState(() => presetRange("month"));
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -139,8 +144,13 @@ export function DashboardPage() {
         </Alert>
       </section>
 
-      <section>
+      <section className="space-y-4">
         <UsageSummary />
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <h2 className="text-lg font-semibold">用量圖表</h2>
+          <TimeRangeSelect value={usageRange} onChange={setUsageRange} />
+        </div>
+        <MemberUsageCharts range={usageRange} />
       </section>
 
       {(claimableQuery.data?.length ?? 0) > 0 && (

@@ -159,6 +159,46 @@ async def get_my_usage(
     return result
 
 
+@router.get("/me/usage/timeseries")
+async def get_my_usage_timeseries(
+    from_: datetime | None = Query(default=None, alias="from"),
+    to: datetime | None = Query(default=None),
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Phase 17: this member's own daily usage timeseries (all their allocations
+    summed per day), for the member dashboard charts.
+
+    Scope comes ENTIRELY from the session (`member`). There is no member /
+    allocation parameter — a member cannot view anyone else's data (FR-002).
+    """
+    from ai_api.api.usage import _validate_range
+    from ai_api.services.usage import usage_timeseries
+
+    now = datetime.now(UTC)
+    to = to or now
+    from_ = from_ or now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    _validate_range(from_, to)
+
+    points = await usage_timeseries(
+        db, member_id=member.id, bucket="day", from_=from_, to=to
+    )
+    return {
+        "from": from_.isoformat(),
+        "to": to.isoformat(),
+        "bucket": "day",
+        "points": [
+            {
+                "ts": p.ts.isoformat() if hasattr(p.ts, "isoformat") else str(p.ts),
+                "tokens": p.tokens,
+                "cost_usd": float(p.cost_usd),
+                "call_count": p.call_count,
+            }
+            for p in points
+        ],
+    }
+
+
 @router.get("/me/claimable-models")
 async def list_claimable_models(
     member: Member = Depends(current_member),
