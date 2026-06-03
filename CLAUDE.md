@@ -1,6 +1,6 @@
 # ai-api Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-06-02
+Auto-generated from all feature plans. Last updated: 2026-06-03
 
 ## Active Technologies
 - Python 3.11+（同 Phase 1） (002-auth-membership)
@@ -29,6 +29,8 @@ Auto-generated from all feature plans. Last updated: 2026-06-02
 - PostgreSQL（生產）/ SQLite（dev、CI）；migration `0013_responses_api` (021-responses-api)
 - Python 3.11+（後端，既有不變）/ TypeScript strict + React 19 + Vite 6（前端，既有不變） (022-admin-email-notifications)
 - PostgreSQL（生產）/ SQLite（dev、CI）；本功能新增表 `notification_config`、 (022-admin-email-notifications)
+- Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端），皆既有 + FastAPI、SQLAlchemy 2.x async、Pydantic v2、TanStack Query、shadcn/ui（皆既有，**不新增套件**） (023-tag-group-rollup)
+- PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表、不新增 migration**——沿用既有 (023-tag-group-rollup)
 
 - Python 3.11+ + LiteLLM（proxy core）、FastAPI（admin API）、 (001-gateway-core)
 
@@ -49,9 +51,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 023-tag-group-rollup: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端），皆既有 + FastAPI、SQLAlchemy 2.x async、Pydantic v2、TanStack Query、shadcn/ui（皆既有，**不新增套件**）
 - 022-admin-email-notifications: Added Python 3.11+（後端，既有不變）/ TypeScript strict + React 19 + Vite 6（前端，既有不變）
 - 021-responses-api: Added Python 3.11+（後端）/ TypeScript strict（前端僅用量顯示微調） + FastAPI、SQLAlchemy 2.x async、Pydantic v2、`litellm`
-- 020-phase10-ux-polish: Added TypeScript strict + React 19 + Vite 6（前端為主）/ Python 3.11+（後端僅 1 處序列化） + TanStack Query、shadcn/ui、FastAPI、SQLAlchemy 2.x async（皆既有）
 
 
 <!-- MANUAL ADDITIONS START -->

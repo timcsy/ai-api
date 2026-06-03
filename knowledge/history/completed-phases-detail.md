@@ -452,3 +452,41 @@ mypy/ruff 全綠。
 row lock 無法序列化；research R3 接受此限（真同時跨 replica 機率近 0）。
 
 **待真機驗證：** 用真實 Gmail App Password 在 live cluster 跑 quickstart 情境 1 + 3（尚未部署）。
+
+## 階段 15：Tag-based 群組成本 rollup
+
+完成（2026-06-03；spec 023-tag-group-rollup）。前置：階段 5（MemberTag）、階段 3a/9（aggregate_usage）。
+以 speckit 全流程（spec → plan → tasks → 37 任務 TDD）。設計細節見
+[`../design/tag-rollup.md`](../design/tag-rollup.md)。
+
+**動機：** 學校／團隊推廣 AI 時「按班級／群組看用量」比「按個別成員」更接近 admin 真實心智
+（預算按班級給、報告按專案寫）。原本 `/admin/usage` 只能切 member/allocation/model，admin 得自己
+把同一班成員加總出 Excel。外部回饋也一致指向此為剛需。
+
+**核心設計：** 在 `aggregate_usage` 加 `group_by="tag"` 分支，JOIN
+`call_records → allocations → member_tags`、`GROUP BY member_tags.tag`。重疊**自然產生**：
+成員掛 N tag → join 出 N 列 → 其每筆 call 計入 N 個 tag，這正是「tag 總額 = 該 tag 成員各自相加」
+的定義。**無新表、無 migration、無新依賴。**
+
+**交付（依 user story）：**
+- **US1**：`GET /admin/usage?group_by=tag` 回各 tag 聚合（token/cost/call + 區間）；既有
+  `/usage.json`、`/usage.csv` 自動支援；service_only filter 有效
+- **US2**：`GET /admin/usage/tag/{tag}/members` 下鑽（重用 member 分支 + tag 成員過濾）；前端
+  `/admin/usage` 加「依 Tag」視圖——可點列展開成員明細、常駐重疊提示「各 tag 加總可能重複、不等於平台總額」
+- **US3**：CSV/JSON 以 tag 維度匯出（零改動，回傳同 `UsageItem` 形狀）
+- 隔離：admin-only；成員無法透過任何端點取得跨成員 tag 聚合
+
+**關鍵設計抉擇：**
+- tag **不做時間版本化**——採查詢當下歸屬（班級穩定、YAGNI）
+- 重疊**不去重**——刻意語意，UI 標示而非試圖去重
+- 下鑽**重用 member 分支** + tag 過濾，不重寫聚合邏輯
+
+**測試：** 11 個（6 contract + 5 integration，含「tag 聚合 = 成員各自相加」「多 tag 重疊計入每個 tag」
+「service_only」「時間區間」「下鑽」「匯出」「admin-only 隔離」）；既有 251 usage+contract 測試零退化。
+ruff/mypy/前端 lint+typecheck+build 全綠。
+
+**明確排除：** nested tags / tag hierarchy、per-tag quota（quota 仍以 allocation 為單位）、
+首頁 Top 5 tags 卡（依賴階段 14 圖表基建，延後）。
+
+**已知限制：** 各 tag 加總 > 平台總額（重疊成員多算，by design、UI 標示）；tag 採查詢當下歸屬
+（學期中轉班會讓歷史用量跟著新 tag 走）。

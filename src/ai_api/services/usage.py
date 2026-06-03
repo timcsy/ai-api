@@ -14,9 +14,10 @@ from ai_api.models import (
     CallOutcome,
     CallRecord,
     Member,
+    MemberTag,
 )
 
-GroupBy = Literal["member", "allocation", "model"]
+GroupBy = Literal["member", "allocation", "model", "tag"]
 Bucket = Literal["hour", "day"]
 
 
@@ -147,6 +148,46 @@ async def aggregate_usage(
             for r in alloc_rows
         ]
 
+    if group_by == "tag":
+        # Phase 15: aggregate by MemberTag.tag. JOIN member_tags so a member in
+        # N tags contributes to each (intended overlap — a tag total = sum of its
+        # members' usage; a member in two tags counts in both). Independent
+        # variable names per the multi-branch-select type lesson.
+        tag_stmt = (
+            select(
+                MemberTag.tag,
+                sum_total,
+                sum_prompt,
+                sum_completion,
+                sum_cost,
+                cnt,
+                sum_reasoning,
+                sum_cached,
+            )
+            .join(Allocation, Allocation.id == CallRecord.allocation_id)
+            .join(MemberTag, MemberTag.member_id == Allocation.member_id)
+            .where(*base_filters)
+            .group_by(MemberTag.tag)
+            .order_by(sum_total.desc())
+        )
+        if service_only:
+            tag_stmt = tag_stmt.where(Allocation.is_service_allocation.is_(True))
+        tag_rows = (await db.execute(tag_stmt)).all()
+        return [
+            UsageItem(
+                group_key=r[0],
+                display_name=r[0],
+                total_tokens=int(r[1] or 0),
+                prompt_tokens=int(r[2] or 0),
+                completion_tokens=int(r[3] or 0),
+                total_cost_usd=Decimal(r[4] or 0),
+                call_count=int(r[5]),
+                reasoning_tokens=int(r[6] or 0),
+                cached_tokens=int(r[7] or 0),
+            )
+            for r in tag_rows
+        ]
+
     # group_by == "model"
     model_stmt = (
         select(
@@ -180,6 +221,72 @@ async def aggregate_usage(
             cached_tokens=int(r[7] or 0),
         )
         for r in model_rows
+    ]
+
+
+async def aggregate_usage_for_tag_members(
+    db: AsyncSession,
+    *,
+    tag: str,
+    from_: datetime,
+    to: datetime,
+    service_only: bool = False,
+) -> list[UsageItem]:
+    """Phase 15 drill-down: per-member usage for members belonging to `tag`.
+
+    Reuses the member-dimension aggregation, scoped to members that carry the
+    given tag. Returns the same UsageItem shape as group_by=member.
+    """
+    sum_total = func.coalesce(func.sum(CallRecord.total_tokens), 0).label("total")
+    sum_prompt = func.coalesce(func.sum(CallRecord.prompt_tokens), 0).label("prompt")
+    sum_completion = func.coalesce(func.sum(CallRecord.completion_tokens), 0).label("completion")
+    sum_cost = func.coalesce(func.sum(CallRecord.cost_usd), 0).label("cost")
+    sum_reasoning = func.coalesce(func.sum(CallRecord.reasoning_tokens), 0).label("reasoning")
+    sum_cached = func.coalesce(func.sum(CallRecord.cached_tokens), 0).label("cached")
+    cnt = func.count().label("cnt")
+
+    tag_member_ids = select(MemberTag.member_id).where(MemberTag.tag == tag)
+
+    stmt = (
+        select(
+            Member.id,
+            Member.email,
+            Member.display_name,
+            sum_total,
+            sum_prompt,
+            sum_completion,
+            sum_cost,
+            cnt,
+            sum_reasoning,
+            sum_cached,
+        )
+        .join(Allocation, Allocation.id == CallRecord.allocation_id)
+        .join(Member, Member.id == Allocation.member_id)
+        .where(
+            CallRecord.outcome == CallOutcome.success,
+            CallRecord.started_at >= from_,
+            CallRecord.started_at < to,
+            Allocation.member_id.in_(tag_member_ids),
+        )
+        .group_by(Member.id, Member.email, Member.display_name)
+        .order_by(sum_total.desc())
+    )
+    if service_only:
+        stmt = stmt.where(Allocation.is_service_allocation.is_(True))
+    rows = (await db.execute(stmt)).all()
+    return [
+        UsageItem(
+            group_key=r[0],
+            display_name=r[2] or r[1],
+            total_tokens=int(r[3] or 0),
+            prompt_tokens=int(r[4] or 0),
+            completion_tokens=int(r[5] or 0),
+            total_cost_usd=Decimal(r[6] or 0),
+            call_count=int(r[7]),
+            reasoning_tokens=int(r[8] or 0),
+            cached_tokens=int(r[9] or 0),
+        )
+        for r in rows
     ]
 
 

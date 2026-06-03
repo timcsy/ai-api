@@ -1,0 +1,149 @@
+openapi: 3.0.3
+info:
+  title: Admin Usage — Tag dimension (Phase 15)
+  version: 0.1.0
+  description: |
+    Extends the existing /admin/usage endpoints with a `tag` group-by dimension,
+    plus a tag→members drill-down. Spec: specs/023-tag-group-rollup/spec.md.
+    All endpoints require admin auth (existing /admin router protection).
+    NON-BREAKING: existing group_by values (member/allocation/model) unchanged.
+
+servers:
+  - url: /admin
+    description: Admin usage subsystem
+
+components:
+  securitySchemes:
+    AdminSession: { type: apiKey, in: cookie, name: session }
+    AdminToken: { type: apiKey, in: header, name: X-Admin-Token }
+
+  schemas:
+    UsageItem:
+      type: object
+      description: Existing shape, reused verbatim for the tag dimension (group_key = tag name).
+      properties:
+        group_key: { type: string, example: class-101 }
+        display_name: { type: string, nullable: true, example: class-101 }
+        total_tokens: { type: integer }
+        prompt_tokens: { type: integer }
+        completion_tokens: { type: integer }
+        total_cost_usd: { type: string, description: Decimal serialized as string }
+        call_count: { type: integer }
+        reasoning_tokens: { type: integer }
+        cached_tokens: { type: integer }
+        is_service_allocation: { type: boolean, nullable: true }
+      required: [group_key, total_tokens, call_count]
+
+    UsageResponse:
+      type: object
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        group_by: { type: string, example: tag }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/UsageItem' }
+      required: [from, to, group_by, items]
+
+    TagMembersResponse:
+      type: object
+      properties:
+        tag: { type: string, example: class-101 }
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        members:
+          type: array
+          items: { $ref: '#/components/schemas/UsageItem' }
+          description: Per-member usage for members belonging to this tag.
+      required: [tag, members]
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+
+paths:
+  /usage:
+    get:
+      summary: Aggregate usage by dimension (now incl. tag)
+      operationId: getUsage
+      security: [{ AdminSession: [] }, { AdminToken: [] }]
+      parameters:
+        - name: group_by
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [member, allocation, model, tag]   # tag = new
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date-time } }
+        - name: service_only
+          in: query
+          schema: { type: boolean, default: false }
+          description: For tag dimension, optionally limit to service allocations. (member_id scope is NOT accepted on tag.)
+      responses:
+        '200':
+          description: Aggregated usage. For group_by=tag, one item per tag; a member in N tags counts in each (intended overlap).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UsageResponse' }
+        '400':
+          description: Invalid range
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '401': { description: Not authenticated }
+
+  /usage.json:
+    get:
+      summary: Same as /usage but bare items array (incl. tag dimension)
+      operationId: getUsageJson
+      security: [{ AdminSession: [] }, { AdminToken: [] }]
+      parameters:
+        - { name: group_by, in: query, required: true, schema: { type: string, enum: [member, allocation, model, tag] } }
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: service_only, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          description: Items array
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/UsageItem' } }
+
+  /usage.csv:
+    get:
+      summary: Same as /usage but CSV (incl. tag dimension)
+      operationId: getUsageCsv
+      security: [{ AdminSession: [] }, { AdminToken: [] }]
+      parameters:
+        - { name: group_by, in: query, required: true, schema: { type: string, enum: [member, allocation, model, tag] } }
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: service_only, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          description: CSV stream
+          content: { text/csv: { schema: { type: string } } }
+
+  /usage/tag/{tag}/members:
+    get:
+      summary: Drill down — per-member usage for one tag
+      operationId: getTagMembers
+      security: [{ AdminSession: [] }, { AdminToken: [] }]
+      parameters:
+        - { name: tag, in: path, required: true, schema: { type: string } }
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date-time } }
+      responses:
+        '200':
+          description: Members belonging to the tag, each with their own usage.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TagMembersResponse' }
+        '400':
+          description: Invalid range
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '401': { description: Not authenticated }

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import * as React from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -38,6 +39,11 @@ interface UsageResponse {
   items: UsageItem[];
 }
 
+interface TagMembersResponse {
+  tag: string;
+  members: UsageItem[];
+}
+
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
@@ -54,7 +60,7 @@ export function AdminUsagePage() {
 
   const from = params.get("from") ?? thirtyDaysAgo();
   const to = params.get("to") ?? isoDate(new Date());
-  const groupBy = (params.get("group_by") ?? "member") as "member" | "allocation" | "model";
+  const groupBy = (params.get("group_by") ?? "member") as "member" | "allocation" | "model" | "tag";
   const serviceOnly = params.get("service_only") === "true";
 
   const fromIso = `${from}T00:00:00Z`;
@@ -142,6 +148,7 @@ export function AdminUsagePage() {
               <SelectItem value="member">依成員</SelectItem>
               <SelectItem value="allocation">依分配</SelectItem>
               <SelectItem value="model">依模型</SelectItem>
+              <SelectItem value="tag">依 Tag（班級／群組）</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -154,6 +161,15 @@ export function AdminUsagePage() {
           <Label htmlFor="service_only">只看服務型</Label>
         </div>
       </div>
+
+      {groupBy === "tag" && (
+        <Alert>
+          <AlertDescription>
+            成員可同時掛多個 tag，各 tag 的加總<strong>可能重複計算</strong>、不等於平台總用量。
+            點一列可展開該 tag 的成員明細。
+          </AlertDescription>
+        </Alert>
+      )}
 
       {query.isLoading && <p className="text-muted-foreground">載入中…</p>}
       {query.error && (
@@ -174,6 +190,7 @@ export function AdminUsagePage() {
                 {groupBy === "member" && "成員"}
                 {groupBy === "allocation" && "分配"}
                 {groupBy === "model" && "模型"}
+                {groupBy === "tag" && "Tag"}
               </TableHead>
               <TableHead className="text-right">輸入 tokens</TableHead>
               <TableHead className="text-right">輸出 tokens</TableHead>
@@ -185,18 +202,22 @@ export function AdminUsagePage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {query.data.items.map((it) => (
-              <TableRow key={it.group_key}>
-                <TableCell className="font-medium">{it.display_name ?? it.group_key}</TableCell>
-                <TableCell className="text-right">{it.prompt_tokens.toLocaleString()}</TableCell>
-                <TableCell className="text-right">{it.completion_tokens.toLocaleString()}</TableCell>
-                <TableCell className="text-right text-muted-foreground">{it.reasoning_tokens.toLocaleString()}</TableCell>
-                <TableCell className="text-right text-muted-foreground">{it.cached_tokens.toLocaleString()}</TableCell>
-                <TableCell className="text-right">{it.total_tokens.toLocaleString()}</TableCell>
-                <TableCell className="text-right">${it.total_cost_usd.toFixed(4)}</TableCell>
-                <TableCell className="text-right">{it.call_count}</TableCell>
-              </TableRow>
-            ))}
+            {query.data.items.map((it) =>
+              groupBy === "tag" ? (
+                <TagRow key={it.group_key} item={it} fromIso={fromIso} toIso={toIso} />
+              ) : (
+                <TableRow key={it.group_key}>
+                  <TableCell className="font-medium">{it.display_name ?? it.group_key}</TableCell>
+                  <TableCell className="text-right">{it.prompt_tokens.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">{it.completion_tokens.toLocaleString()}</TableCell>
+                  <TableCell className="text-right text-muted-foreground">{it.reasoning_tokens.toLocaleString()}</TableCell>
+                  <TableCell className="text-right text-muted-foreground">{it.cached_tokens.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">{it.total_tokens.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">${it.total_cost_usd.toFixed(4)}</TableCell>
+                  <TableCell className="text-right">{it.call_count}</TableCell>
+                </TableRow>
+              ),
+            )}
             {query.data.items.length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
@@ -208,5 +229,66 @@ export function AdminUsagePage() {
         </Table>
       )}
     </div>
+  );
+}
+
+function TagRow({ item, fromIso, toIso }: { item: UsageItem; fromIso: string; toIso: string }) {
+  const [open, setOpen] = React.useState(false);
+  const drill = useQuery<TagMembersResponse, ApiError>({
+    queryKey: ["admin", "usage", "tag-members", item.group_key, fromIso, toIso],
+    enabled: open,
+    queryFn: () => {
+      const sp = new URLSearchParams({ from: fromIso, to: toIso });
+      return api<TagMembersResponse>(
+        `/admin/usage/tag/${encodeURIComponent(item.group_key)}/members?${sp.toString()}`,
+      );
+    },
+  });
+
+  return (
+    <>
+      <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => setOpen((v) => !v)}>
+        <TableCell className="font-medium">
+          {open ? "▾ " : "▸ "}
+          {item.group_key}
+        </TableCell>
+        <TableCell className="text-right">{item.prompt_tokens.toLocaleString()}</TableCell>
+        <TableCell className="text-right">{item.completion_tokens.toLocaleString()}</TableCell>
+        <TableCell className="text-right text-muted-foreground">{item.reasoning_tokens.toLocaleString()}</TableCell>
+        <TableCell className="text-right text-muted-foreground">{item.cached_tokens.toLocaleString()}</TableCell>
+        <TableCell className="text-right">{item.total_tokens.toLocaleString()}</TableCell>
+        <TableCell className="text-right">${item.total_cost_usd.toFixed(4)}</TableCell>
+        <TableCell className="text-right">{item.call_count}</TableCell>
+      </TableRow>
+      {open && (
+        <TableRow>
+          <TableCell colSpan={8} className="bg-muted/30 p-0">
+            <div className="p-3">
+              <div className="mb-1 text-xs text-muted-foreground">
+                {item.group_key} 的成員明細
+              </div>
+              {drill.isLoading && <p className="text-sm text-muted-foreground">載入中…</p>}
+              {drill.data && drill.data.members.length === 0 && (
+                <p className="text-sm text-muted-foreground">此 tag 在區間內無用量。</p>
+              )}
+              {drill.data && drill.data.members.length > 0 && (
+                <table className="w-full text-sm">
+                  <tbody>
+                    {drill.data.members.map((m) => (
+                      <tr key={m.group_key} className="border-t border-border/50">
+                        <td className="py-1">{m.display_name ?? m.group_key}</td>
+                        <td className="py-1 text-right">{m.total_tokens.toLocaleString()} tokens</td>
+                        <td className="py-1 text-right">${m.total_cost_usd.toFixed(4)}</td>
+                        <td className="py-1 text-right">{m.call_count} 次</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
   );
 }

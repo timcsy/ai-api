@@ -16,6 +16,7 @@ from ai_api.services.usage import (
     Bucket,
     GroupBy,
     aggregate_usage,
+    aggregate_usage_for_tag_members,
     usage_timeseries,
 )
 
@@ -156,6 +157,27 @@ async def get_usage_csv(
             buf.truncate()
 
     return StreamingResponse(_gen(), media_type="text/csv")  # type: ignore[no-untyped-call]
+
+
+@router.get("/usage/tag/{tag}/members")
+async def get_tag_members(
+    tag: str,
+    from_: datetime = Query(..., alias="from"),
+    to: datetime = Query(...),
+    service_only: bool = Query(default=False),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Phase 15 drill-down: per-member usage for members belonging to `tag`."""
+    _validate_range(from_, to)
+    items = await aggregate_usage_for_tag_members(
+        session, tag=tag, from_=from_, to=to, service_only=service_only
+    )
+    return {
+        "tag": tag,
+        "from": from_.isoformat(),
+        "to": to.isoformat(),
+        "members": _serialize_items(items),
+    }
 
 
 @router.get("/allocations/{allocation_id}/usage-timeseries")
