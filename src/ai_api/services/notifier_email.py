@@ -182,8 +182,71 @@ def _render_generic_email(event: NotificationEvent) -> tuple[str, str]:
     return subject, body
 
 
+def _render_upstream_burst_email(event: NotificationEvent) -> tuple[str, str]:
+    details = event.details or {}
+    count = details.get("failure_count", "?")
+    window = details.get("window_minutes", "?")
+    model = details.get("latest_model") or event.target_id or "（未知）"
+    base_url = _public_base_url()
+    subject = "[AI API] 上游連續失敗警示"
+    body = (
+        "管理員您好，\n\n"
+        "偵測到上游 AI provider 在短時間內連續失敗，可能是 provider 故障或設定錯誤。\n\n"
+        f"  - 失敗次數：過去 {window} 分鐘內 {count} 次\n"
+        f"  - 最近失敗的 model：{model}\n"
+        f"  - 時間：{_fmt_taipei(event.occurred_at)}\n\n"
+        "請至以下頁面檢查 provider 憑證與用量：\n"
+        f"{base_url}/admin/observability/usage\n\n"
+        "— AI API Manager\n"
+    )
+    return subject, body
+
+
+def _render_credential_invalid_email(event: NotificationEvent) -> tuple[str, str]:
+    details = event.details or {}
+    provider = details.get("provider") or "（未知）"
+    cred_id = (event.target_id or "unknown")[:12]
+    base_url = _public_base_url()
+    subject = "[AI API] Provider 憑證失效"
+    body = (
+        "管理員您好，\n\n"
+        "一張 provider 憑證在呼叫上游時驗證失敗（可能已被撤銷或過期）。\n\n"
+        f"  - Provider：{provider}\n"
+        f"  - 憑證：{cred_id}\n"
+        f"  - 時間：{_fmt_taipei(event.occurred_at)}\n\n"
+        "請至以下頁面更新或輪替該憑證：\n"
+        f"{base_url}/admin/providers\n\n"
+        "— AI API Manager\n"
+    )
+    return subject, body
+
+
+def _render_daily_cap_email(event: NotificationEvent) -> tuple[str, str]:
+    target_id_short = (event.target_id or "unknown")[:8]
+    display = event.target_display_name or f"分配 {target_id_short}"
+    details = event.details or {}
+    cap = details.get("daily_token_cap", "?")
+    used = details.get("today_tokens", "?")
+    base_url = _public_base_url()
+    subject = f"[AI API] 每日上限觸發 — {target_id_short}"
+    body = (
+        "管理員您好，\n\n"
+        "一筆分配今天已達到設定的每日 token 上限，後續呼叫會被拒絕直到隔日重置。\n\n"
+        f"  - 分配：{target_id_short}（{display}）\n"
+        f"  - 今日已用 / 上限：{used} / {cap} tokens\n"
+        f"  - 時間：{_fmt_taipei(event.occurred_at)}\n\n"
+        "如需臨時放寬，請至以下頁面調整：\n"
+        f"{base_url}/admin/observability/allocations\n\n"
+        "— AI API Manager\n"
+    )
+    return subject, body
+
+
 _EVENT_RENDERERS = {
     "allocation_quarantined": _render_quarantine_email,
+    "responses_upstream_error_burst": _render_upstream_burst_email,
+    "provider_credential_auth_failed": _render_credential_invalid_email,
+    "allocation_daily_cap_exceeded": _render_daily_cap_email,
 }
 
 

@@ -79,6 +79,11 @@ class Settings(BaseSettings):
     notify_event_types_override: list[str] = Field(
         default=[], alias="NOTIFY_EVENT_TYPES_OVERRIDE"
     )
+    # Phase 13 US3: upstream error-burst detector thresholds.
+    upstream_burst_threshold: int = Field(default=10, alias="UPSTREAM_BURST_THRESHOLD")
+    upstream_burst_window_minutes: int = Field(
+        default=5, alias="UPSTREAM_BURST_WINDOW_MINUTES"
+    )
 
     # Phase 12: edge request body limit (informational, mirrors the value baked
     # into the frontend nginx pod via Helm — admin UI shows it so users know

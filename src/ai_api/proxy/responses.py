@@ -118,6 +118,45 @@ def _sse(event_type: str | None, data: str) -> bytes:
     return f"{prefix}data: {data}\n\n".encode()
 
 
+def _is_auth_failure(exc: BaseException) -> bool:
+    """True if an upstream exception looks like a credential auth failure (401/403)."""
+    code = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    if isinstance(code, int) and code in (401, 403):
+        return True
+    text = str(exc).lower()
+    return "401" in text or "403" in text or "invalid api key" in text or "unauthorized" in text
+
+
+async def _maybe_emit_credential_auth_failed(
+    exc: BaseException, *, provider: str, credential_id: str | None
+) -> None:
+    """Phase 13 US3: if an upstream call fails with auth error, emit an audit
+    event so admins get notified that a provider credential has gone invalid.
+
+    Uses a fresh session (the request session may be mid-teardown / in error
+    state) and never raises — observability must not break the proxy path.
+    """
+    if not _is_auth_failure(exc):
+        return
+    try:
+        from ai_api.auth import audit
+        from ai_api.db import get_sessionmaker
+        from ai_api.models import ActorType, AuditEventType
+
+        async with get_sessionmaker()() as s:
+            await audit.record(
+                s,
+                event_type=AuditEventType.provider_credential_auth_failed,
+                actor_type=ActorType.system,
+                target_type="provider_credential",
+                target_id=credential_id,
+                details={"provider": provider, "error": str(exc)[:300]},
+            )
+            await s.commit()
+    except BaseException:
+        logger.exception("failed to emit provider_credential_auth_failed audit event")
+
+
 async def _persist_responses_call(
     session: AsyncSession,
     *,
@@ -281,6 +320,9 @@ async def proxy_responses(
             )
         except Exception as e:
             logger.exception("upstream responses (stream) failed")
+            await _maybe_emit_credential_auth_failed(
+                e, provider=provider, credential_id=getattr(resolved, "id", None)
+            )
             return await reject("upstream_error", f"upstream call failed: {e}", 502)
 
         async def _record_fresh(usage: Any, resp_id: str | None) -> None:
@@ -429,6 +471,9 @@ async def proxy_responses(
         )
     except Exception as e:
         logger.exception("upstream responses failed")
+        await _maybe_emit_credential_auth_failed(
+            e, provider=provider, credential_id=getattr(resolved, "id", None)
+        )
         return await reject("upstream_error", f"upstream call failed: {e}", 502)
 
     payload = _as_dict(upstream_result) if not isinstance(upstream_result, dict) else upstream_result

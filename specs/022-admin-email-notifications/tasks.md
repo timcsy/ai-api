@@ -119,18 +119,18 @@ description: "Tasks for Phase 13 — admin email notifications"
 
 ### Tests First (Red)
 
-- [ ] T040 [US3] 在 `tests/integration/test_notification_hooks.py` 加 `test_upstream_error_burst_triggers_notification`：模擬 5 分鐘內 10 筆 `outcome=upstream_error` 的 `call_records`、確認 detector 觸發 `responses_upstream_error_burst` audit event、確認對應 email 寄出含 provider 名稱 + 失敗筆數 + 最近 model
-- [ ] T041 [P] [US3] 同檔加 `test_provider_credential_auth_failed_triggers_notification`：mock proxy 對 upstream 收到 401/403、發 `provider_credential_auth_failed` audit event、驗證對應 email
-- [ ] T042 [P] [US3] 同檔加 `test_daily_cap_exceeded_event_template_renders`：直接觸發 `allocation_daily_cap_exceeded` audit event（即使 Phase 16 尚未上線此事件來源），驗證 email 內容正確 — 確保模板就位以待 Phase 16 整合
-- [ ] T043 [US3] 跑 T040–T042 確認 **全 Red**
+- [X] T040 [US3] 在 `tests/integration/test_notification_hooks.py` 加 `test_upstream_error_burst_triggers_notification`：模擬 5 分鐘內 10 筆 `outcome=upstream_error` 的 `call_records`、確認 detector 觸發 `responses_upstream_error_burst` audit event、確認對應 email 寄出含 provider 名稱 + 失敗筆數 + 最近 model
+- [X] T041 [P] [US3] 同檔加 `test_provider_credential_auth_failed_triggers_notification`：mock proxy 對 upstream 收到 401/403、發 `provider_credential_auth_failed` audit event、驗證對應 email
+- [X] T042 [P] [US3] 同檔加 `test_daily_cap_exceeded_event_template_renders`：直接觸發 `allocation_daily_cap_exceeded` audit event（即使 Phase 16 尚未上線此事件來源），驗證 email 內容正確 — 確保模板就位以待 Phase 16 整合
+- [X] T043 [US3] 跑 T040–T042 確認 **全 Red**
 
 ### Implementation (Green)
 
-- [ ] T044 [US3] 新增 `src/ai_api/services/upstream_burst_detector.py`：sliding 5-min window 計數 `outcome=upstream_error` `call_records`，跨過門檻（預設 10，env `UPSTREAM_BURST_THRESHOLD` 可調）即觸發 `audit.record(responses_upstream_error_burst)`；以 helm cronjob（每分鐘）執行類似 anomaly detector pattern
-- [ ] T045 [P] [US3] 在 `src/ai_api/proxy/responses.py` 與 `src/ai_api/proxy/router.py` 上游回 401/403 的 catch 點加 `audit.record(provider_credential_auth_failed, target_type="provider_credential", target_id=<credential_id>, ...)`
-- [ ] T046 [P] [US3] 在 `src/ai_api/services/notifier.py` 加 3 個 template renderer：`_render_upstream_burst_email`、`_render_credential_invalid_email`、`_render_daily_cap_email`；各依 FR-014 含 subject ≤50 字、body 中文白話 + admin 頁連結
-- [ ] T047 [P] [US3] 新增 `deploy/helm/ai-api/templates/upstream-burst-cronjob.yaml`（mirror anomaly-cronjob.yaml；schedule `* * * * *`）
-- [ ] T048 [US3] 跑 T040–T042 確認 **全 Green**
+- [X] T044 [US3] 新增 `src/ai_api/services/upstream_burst_detector.py`：sliding 5-min window 計數 `outcome=upstream_error` `call_records`，跨過門檻（預設 10，env `UPSTREAM_BURST_THRESHOLD` 可調）即觸發 `audit.record(responses_upstream_error_burst)`；以 helm cronjob（每分鐘）執行類似 anomaly detector pattern
+- [X] T045 [P] [US3] 在 `src/ai_api/proxy/responses.py` 與 `src/ai_api/proxy/router.py` 上游回 401/403 的 catch 點加 `audit.record(provider_credential_auth_failed, target_type="provider_credential", target_id=<credential_id>, ...)`
+- [X] T046 [P] [US3] 在 `src/ai_api/services/notifier.py` 加 3 個 template renderer：`_render_upstream_burst_email`、`_render_credential_invalid_email`、`_render_daily_cap_email`；各依 FR-014 含 subject ≤50 字、body 中文白話 + admin 頁連結
+- [X] T047 [P] [US3] 新增 `deploy/helm/ai-api/templates/upstream-burst-cronjob.yaml`（mirror anomaly-cronjob.yaml；schedule `* * * * *`）
+- [X] T048 [US3] 跑 T040–T042 確認 **全 Green**
 
 ---
 

@@ -281,6 +281,157 @@ async def test_email_send_failure_does_not_break_audit(fresh_db: Any) -> None:
     assert "connection refused" in (records[0].error_message or "")
 
 
+# ===== Phase 5 (US3): other event types =====
+
+async def _add_upstream_error_calls(count: int) -> None:
+    """Seed `count` CallRecord rows with outcome=upstream_error within the window."""
+    from datetime import timedelta
+
+    from ai_api.models import CallOutcome, CallRecord
+    from ulid import ULID
+
+    sm = get_sessionmaker()
+    base = datetime.now(UTC)
+    async with sm() as session:
+        for i in range(count):
+            ts = base - timedelta(seconds=i * 2)
+            session.add(
+                CallRecord(
+                    id=str(ULID()),
+                    request_id=f"r-{ULID()}",
+                    allocation_id=None,
+                    subject="x@y.com",
+                    model="azure/gpt-5.4",
+                    started_at=ts,
+                    finished_at=ts,
+                    status_code=502,
+                    outcome=CallOutcome.upstream_error,
+                    prompt_tokens=None,
+                    completion_tokens=None,
+                    total_tokens=None,
+                )
+            )
+        await session.commit()
+
+
+# ----- T040 -----
+
+@pytest.mark.asyncio
+async def test_upstream_error_burst_triggers_notification(
+    fresh_db: Any, smtp_server: Any
+) -> None:
+    controller, handler = smtp_server
+    await _save_config(
+        smtp_host=controller.hostname,
+        smtp_port=controller.port,
+        recipients=["admin@example.com"],
+    )
+    # 10 upstream errors within the 5-min window crosses default threshold.
+    await _add_upstream_error_calls(10)
+
+    from ai_api.services.upstream_burst_detector import detect_upstream_burst
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        decision = await detect_upstream_burst(session)
+        await session.commit()
+    assert decision is not None
+    assert decision.failure_count == 10
+    await drain_notifier_tasks()
+
+    assert len(handler.messages) == 1
+    subject_text = str(make_header(decode_header(handler.messages[0]["Subject"])))
+    assert "上游連續失敗" in subject_text
+    body_part = handler.messages[0].get_payload(decode=True)
+    body = body_part.decode("utf-8") if isinstance(body_part, bytes) else ""
+    assert "10" in body
+    assert "azure/gpt-5.4" in body
+
+    records = await _list_records()
+    sent = [r for r in records if r.outcome == NotificationOutcome.sent]
+    assert len(sent) == 1
+    assert sent[0].event_type == "responses_upstream_error_burst"
+
+
+@pytest.mark.asyncio
+async def test_upstream_burst_below_threshold_does_not_fire(fresh_db: Any) -> None:
+    await _add_upstream_error_calls(5)  # below threshold 10
+    from ai_api.services.upstream_burst_detector import detect_upstream_burst
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        decision = await detect_upstream_burst(session)
+        await session.commit()
+    assert decision is None
+
+
+# ----- T041 -----
+
+@pytest.mark.asyncio
+async def test_provider_credential_auth_failed_triggers_notification(
+    fresh_db: Any, smtp_server: Any
+) -> None:
+    controller, handler = smtp_server
+    await _save_config(
+        smtp_host=controller.hostname,
+        smtp_port=controller.port,
+        recipients=["admin@example.com"],
+    )
+    sm = get_sessionmaker()
+    async with sm() as session:
+        await audit.record(
+            session,
+            event_type=AuditEventType.provider_credential_auth_failed,
+            actor_type=ActorType.system,
+            target_type="provider_credential",
+            target_id="cred_abc123",
+            details={"provider": "azure"},
+        )
+        await session.commit()
+    await drain_notifier_tasks()
+
+    assert len(handler.messages) == 1
+    subject_text = str(make_header(decode_header(handler.messages[0]["Subject"])))
+    assert "憑證失效" in subject_text
+    body_part = handler.messages[0].get_payload(decode=True)
+    body = body_part.decode("utf-8") if isinstance(body_part, bytes) else ""
+    assert "azure" in body
+
+
+# ----- T042 -----
+
+@pytest.mark.asyncio
+async def test_daily_cap_exceeded_event_template_renders(
+    fresh_db: Any, smtp_server: Any
+) -> None:
+    controller, handler = smtp_server
+    await _save_config(
+        smtp_host=controller.hostname,
+        smtp_port=controller.port,
+        recipients=["admin@example.com"],
+    )
+    sm = get_sessionmaker()
+    async with sm() as session:
+        await audit.record(
+            session,
+            event_type=AuditEventType.allocation_daily_cap_exceeded,
+            actor_type=ActorType.system,
+            target_type="allocation",
+            target_id="alloc_daily99",
+            details={"daily_token_cap": 50000, "today_tokens": 50120},
+        )
+        await session.commit()
+    await drain_notifier_tasks()
+
+    assert len(handler.messages) == 1
+    subject_text = str(make_header(decode_header(handler.messages[0]["Subject"])))
+    assert "每日上限" in subject_text
+    body_part = handler.messages[0].get_payload(decode=True)
+    body = body_part.decode("utf-8") if isinstance(body_part, bytes) else ""
+    assert "50000" in body
+    assert "50120" in body
+
+
 @pytest.fixture(autouse=True)
 def _setup_test_env() -> Any:
     """Make sure timestamps for the rendered email use today's date."""
