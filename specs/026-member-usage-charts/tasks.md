@@ -97,9 +97,9 @@ description: "Tasks for 階段 17 — 成員自助用量視覺化（成員端圖
 - [X] T023 [P] admin 零回歸抽查：admin 首頁/用量頁既有圖表與行為不變（SC-006）；確認成員端**未出現**任何跨成員聚合（provider/heatmap/Top 榜）
 - [X] T024 [P] 更新 `knowledge/vision.md`：新增階段 17 條目（成員端用量視覺化）標 ✅、列實際交付、連結 history；roadmap/狀態同步
 - [X] T025 [P] 在 `knowledge/history/completed-phases-detail.md` 追加「## 階段 17：成員自助用量視覺化」詳情（含 owner-scoping 與複用既有端點）
-- [ ] T026 commit + push + 開 PR；push 前先 `ruff check .` + 前端 lint/build；等 CI（test/frontend/image build）全綠後 squash merge 到 main
-- [ ] T027 main image build 綠後 `helm upgrade ai-api deploy/helm/ai-api -n ai-ccsh --reuse-values --set image.tag=sha-<main> --set frontend.image.tag=sha-<main> --set storedResponseCleanup.enabled=true --set storedResponseCleanup.schedule="0 3 * * *"`；rollout 後以**一般成員**在 live（ai-ccsh.tew.tw）手機抽查兩圖
-- [ ] T028 收尾：vision 階段 17 ✅、history 補上、roadmap 狀態一致；標記 tasks 全完成
+- [X] T026 commit + push + 開 PR；push 前先 `ruff check .` + 前端 lint/build；等 CI（test/frontend/image build）全綠後 squash merge 到 main
+- [X] T027 main image build 綠後 `helm upgrade ai-api deploy/helm/ai-api -n ai-ccsh --reuse-values --set image.tag=sha-<main> --set frontend.image.tag=sha-<main> --set storedResponseCleanup.enabled=true --set storedResponseCleanup.schedule="0 3 * * *"`；rollout 後以**一般成員**在 live（ai-ccsh.tew.tw）手機抽查兩圖
+- [X] T028 收尾：vision 階段 17 ✅、history 補上、roadmap 狀態一致；標記 tasks 全完成
 
 ---
 
