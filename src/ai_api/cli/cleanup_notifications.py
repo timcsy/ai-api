@@ -32,10 +32,9 @@ async def _main() -> int:
                 )
             )
             await session.commit()
-            print(
-                f"cleanup_notifications: removed records={rec_result.rowcount} "
-                f"buckets={bucket_result.rowcount}"
-            )
+            rec_n = rec_result.rowcount  # type: ignore[attr-defined]
+            bucket_n = bucket_result.rowcount  # type: ignore[attr-defined]
+            print(f"cleanup_notifications: removed records={rec_n} buckets={bucket_n}")
             return 0
         except Exception as exc:
             await session.rollback()

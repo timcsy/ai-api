@@ -8,6 +8,7 @@ import logging
 import time
 from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
+from typing import Any
 
 import aiosmtplib
 from sqlalchemy import select
@@ -82,7 +83,7 @@ async def _smtp_send(
     port: int,
     username: str | None,
     password: str | None,
-) -> tuple[dict[str, tuple[int, bytes]], str]:
+) -> tuple[dict[str, Any], str]:
     """Thin wrapper around aiosmtplib.send so tests can patch a single seam.
 
     Returns aiosmtplib's native `(per_recipient_errors, response_message)`. An
@@ -296,7 +297,8 @@ class EmailNotifier(Notifier):
         config = (
             await session.execute(select(NotificationConfig).limit(1))
         ).scalar_one_or_none()
-        latency_ms_so_far = lambda: int((time.monotonic() - start) * 1000)  # noqa: E731
+        def latency_ms_so_far() -> int:
+            return int((time.monotonic() - start) * 1000)
 
         if config is None or not config.enabled:
             return _persist_and_return_result(

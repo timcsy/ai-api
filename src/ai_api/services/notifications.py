@@ -127,7 +127,7 @@ class NotificationConfigService:
     async def delete(self) -> bool:
         result = await self._s.execute(delete(NotificationConfig))
         await self._s.flush()
-        return result.rowcount > 0
+        return bool(result.rowcount > 0)  # type: ignore[attr-defined]
 
     async def list_history(
         self,

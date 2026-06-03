@@ -287,8 +287,9 @@ async def _add_upstream_error_calls(count: int) -> None:
     """Seed `count` CallRecord rows with outcome=upstream_error within the window."""
     from datetime import timedelta
 
-    from ai_api.models import CallOutcome, CallRecord
     from ulid import ULID
+
+    from ai_api.models import CallOutcome, CallRecord
 
     sm = get_sessionmaker()
     base = datetime.now(UTC)

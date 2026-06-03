@@ -181,17 +181,17 @@ description: "Tasks for Phase 13 — admin email notifications"
 
 ## Phase 8：Polish 與跨領域
 
-- [ ] T066 新增 `deploy/helm/ai-api/templates/notification-cleanup-cronjob.yaml`：mirror `storedResponseCleanup` pattern；schedule `30 3 * * *` UTC；`DELETE FROM notification_record WHERE created_at < now() - interval '30 days'` 與 `DELETE FROM notification_dedup_bucket WHERE window_end < now() - interval '30 days'`
-- [ ] T067 在 `deploy/helm/ai-api/values.yaml` 加 `notificationCleanup: {enabled: true, schedule: "30 3 * * *"}` 與 `upstreamBurstDetector: {enabled: true, schedule: "* * * * *", thresholdCalls: 10, windowMinutes: 5}`
-- [ ] T068 [P] 新增 `knowledge/design/admin-notifications.md`：摘要 research.md 13 條決策 + plan.md 結構 + 主要圖示（migration 表關係 + audit hook 流程）；連結回本 spec / plan / research
-- [ ] T069 [P] 在 `knowledge/experience.md` 預留位置（先不寫內容，留待實作中遇到值得 distill 的教訓再加）
-- [ ] T070 [P] 更新 `knowledge/vision.md` 階段 13 條目（實作完成日期填入後改為 ✅；列出實際交付 + 連結 `history/completed-phases-detail.md`）
-- [ ] T071 [P] 在 `knowledge/history/completed-phases-detail.md` 末追加「## 階段 13：管理員 Email 通知」完整詳情條目（依現有 Phase 11/12 格式）
-- [ ] T072 在 `docs/deployment.md`（若存在；不存在則新增）加「通知 SMTP 設定章節」：Gmail App Password 申請步驟 + helm value `notifyEventTypesOverride` 用法 + 常見錯誤對照表
-- [ ] T073 跑 `uv run pytest tests/` 全測試套件確認既有測試零退化；以 `pytest --co -q` 確認新增測試 ≥ 24 筆（T009–T017, T029–T033, T040–T042, T049–T052, T056–T059）
-- [ ] T074 跑 `uv run ruff check . && uv run mypy src/` 確認 lint + 型別零警告
-- [ ] T075 跑 `npm --prefix frontend run lint && npm --prefix frontend run typecheck && npm --prefix frontend run build` 確認前端零警告
-- [ ] T076 端到端煙霧：在 staging（或本機 docker-compose + Mailpit）跑 `quickstart.md` 全 8 情境
+- [X] T066 新增 `deploy/helm/ai-api/templates/notification-cleanup-cronjob.yaml`：mirror `storedResponseCleanup` pattern；schedule `30 3 * * *` UTC；`DELETE FROM notification_record WHERE created_at < now() - interval '30 days'` 與 `DELETE FROM notification_dedup_bucket WHERE window_end < now() - interval '30 days'`
+- [X] T067 在 `deploy/helm/ai-api/values.yaml` 加 `notificationCleanup: {enabled: true, schedule: "30 3 * * *"}` 與 `upstreamBurstDetector: {enabled: true, schedule: "* * * * *", thresholdCalls: 10, windowMinutes: 5}`
+- [X] T068 [P] 新增 `knowledge/design/admin-notifications.md`：摘要 research.md 13 條決策 + plan.md 結構 + 主要圖示（migration 表關係 + audit hook 流程）；連結回本 spec / plan / research
+- [X] T069 [P] 在 `knowledge/experience.md` 預留位置（先不寫內容，留待實作中遇到值得 distill 的教訓再加）
+- [X] T070 [P] 更新 `knowledge/vision.md` 階段 13 條目（實作完成日期填入後改為 ✅；列出實際交付 + 連結 `history/completed-phases-detail.md`）
+- [X] T071 [P] 在 `knowledge/history/completed-phases-detail.md` 末追加「## 階段 13：管理員 Email 通知」完整詳情條目（依現有 Phase 11/12 格式）
+- [X] T072 在 `docs/deployment.md`（若存在；不存在則新增）加「通知 SMTP 設定章節」：Gmail App Password 申請步驟 + helm value `notifyEventTypesOverride` 用法 + 常見錯誤對照表
+- [X] T073 跑 `uv run pytest tests/` 全測試套件確認既有測試零退化；以 `pytest --co -q` 確認新增測試 ≥ 24 筆（T009–T017, T029–T033, T040–T042, T049–T052, T056–T059）
+- [X] T074 跑 `uv run ruff check . && uv run mypy src/` 確認 lint + 型別零警告
+- [X] T075 跑 `npm --prefix frontend run lint && npm --prefix frontend run typecheck && npm --prefix frontend run build` 確認前端零警告
+- [X] T076 端到端煙霧：在 staging（或本機 docker-compose + Mailpit）跑 `quickstart.md` 全 8 情境
 - [ ] T077 [P] commit + push + 等 image build；helm upgrade 至 ai-ccsh ns；live cluster 跑 quickstart 情境 1 + 3 真實 SMTP 驗證（用 Gmail App Password + 真 admin 信箱）
 - [ ] T078 收尾：將 spec / plan / tasks 中提到的「實作後待辦」（vision 條目改 ✅、history 補上等）逐項確認完成
 

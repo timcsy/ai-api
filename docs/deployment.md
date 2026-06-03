@@ -168,3 +168,46 @@ codex "在這個 repo 新增一個 hello world 並跑起來"
 接續（跨分配回 `403 response_forbidden`，不存在/逾期回 `404 response_not_found`）。逾期
 記錄由 `storedResponseCleanup` CronJob 每日清理（`values.yaml` 預設 03:00 UTC，可關閉）。
 Codex 預設 `store=false`、自帶 context，不經此路徑。
+
+## 8. 管理員 Email 通知（階段 13）
+
+平台對重要事件（分配自動隔離、上游連續失敗、provider 憑證失效、每日上限觸發）主動
+寄信給管理員。**SMTP 由 admin 在 web UI 自助設定，不需 Helm value。**
+
+### 8.1 申請 Gmail App Password（最容易的選擇）
+
+1. 用一個 Google 帳號（建議專用，如 `ai-api-bot@school.edu.tw`）開啟兩步驟驗證
+2. Google 帳號 → 安全性 → App passwords → 產生一組 16 字元密碼
+3. 在 `/admin/notifications` 填：
+   - SMTP host：`smtp.gmail.com`
+   - SMTP port：`587`
+   - 帳號：該 Google email
+   - 密碼：剛產生的 App Password
+   - 寄件者 / 收件人清單
+4. 按「發測試信」（填自己的 email）確認收得到 → 狀態變「✓ 已驗證」
+
+> 每日 500 封上限對告警用途綽綽有餘。學校 Workspace SMTP Relay 也可（量大時）。
+
+### 8.2 Helm value（背景偵測器，非 SMTP 本身）
+
+```yaml
+upstreamBurstDetector:
+  enabled: true
+  schedule: "* * * * *"   # 每分鐘掃一次
+  thresholdCalls: 10      # 5 分鐘內 N 次 upstream_error 觸發警示
+  windowMinutes: 5
+notificationCleanup:
+  enabled: true
+  schedule: "30 3 * * *"  # 每日 03:30 UTC，刪 30 天前的通知歷史
+```
+
+### 8.3 行為與限制
+
+- **未設定 SMTP**：通知停用，不擋啟動、不影響任何功能
+- **去重**：同事件型別 5 分鐘內最多一封信，歷史頁標示「N 筆合併」
+- **失敗不影響主流程**：寄信失敗只記在通知歷史，不影響 audit / proxy
+- **multi-replica**：真同時跨 replica 的事件可能各寄一封（上限 = replica 數），罕見可接受
+- **常見錯誤對照**：
+  - `驗證失敗（535）` → App Password 錯或沒用 App Password（用了帳號密碼）
+  - `連線失敗` → host/port 錯或網路不通
+  - `寄件者被拒` → sender_email 未獲授權

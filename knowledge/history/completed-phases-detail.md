@@ -407,3 +407,46 @@
 **明確排除：**
 - ❌ 黑名單設計（封鎖某 email/IP）——當下無需求，保留純白名單心智模型
 - ❌ 異常偵測規則可設定化（首版 service flag 即足夠豁免；門檻值仍寫死）
+
+## 階段 13：管理員突發狀況通知（Email）
+
+完成（2026-06-03；spec 022-admin-email-notifications）。前置：階段 2（auth/audit）、
+階段 12（quarantine 可視性）。以 speckit 全流程（spec → plan → tasks → 78 任務 TDD 實作）。
+
+**動機：** Phase 12 把 quarantine/paused 做進 admin 首頁卡片，但 admin 只有「開著 UI 才看得到」。
+分配被自動隔離、upstream 短時間大量失敗、provider 憑證失效等事件**離線時無感**，等使用者回報才知道。
+台灣學校環境 Slack/Discord/Google Chat 都不友善、LINE Bot 設定過重，**Email 是「最容易安裝」的選擇**
+（admin 用既有學校 email；server 端只需 4 個 SMTP value）。
+
+**核心設計（research 13 條決策）：**
+- **立即寄 + DB 去重 gate**（不引入排程器 / retry / Jinja2）：滿足 30s SLO 與「每事件型別每 5 分鐘 ≤1 封」
+- **SMTP 密碼沿用 `PROVIDER_KEY_ENC_KEY` Fernet**，不新增加密基礎建設
+- **audit.record() hook + `asyncio.create_task` fire-and-forget**：寄信失敗不影響 audit 寫入（FR-025）
+- **`aiosmtplib`（async）+ `aiosmtpd`（測試 server）** 新依賴
+- **`Notifier` ABC + `EmailNotifier`** 第一版單一 channel；LINE Bot / Web Push 為平行 adapter
+
+**交付（依 user story）：**
+- **US1**：`/admin/notifications` 設定頁（SMTP 表單 + 收件人 + status badge）+ test-send（一次性收件人，
+  不打擾正式清單，FR-007 選 A）；4 endpoints（GET/PUT/DELETE config、POST test-send）
+- **US2**：`allocation_quarantined` 觸發 email（含原因具體數字、UTC+8 時間、admin 連結）；per-recipient
+  失敗不互相阻斷；未設定/停用/憑證無效皆靜默 skip
+- **US3**：另 3 種事件——`upstream_burst_detector`（cronjob 每分鐘，5 分鐘窗 ≥10 次 upstream_error）、
+  proxy 401/403 → `provider_credential_auth_failed`、`allocation_daily_cap_exceeded`（模板就緒待 Phase 16）
+- **US4**：`NotificationDedupBucket` 5 分鐘窗去重；primary record 連結 bucket；per-event-type 獨立
+- **US5**：`/admin/notifications/history` keyset 分頁 + event_type/outcome filter + bucket_event_count；
+  前端歷史區含合併標示與逐收件人失敗原因
+
+**資料表（migration 0014）：** `notification_config`（singleton CHECK id=1）、
+`notification_dedup_bucket`、`notification_record`。新 helm cronjob：`upstream-burst`（每分鐘）、
+`notification-cleanup`（每日，30 天 GC）。新 `AuditEventType` ×3。
+
+**測試：** 39 個（10 contract + 25 integration + 11 unit 中與本功能相關者；含 SMTP 真握手 via aiosmtpd、
+dedup 窗、hook fire、failure 不破 audit）。全套件 409 passed（54 error 為既有 PG/Docker 整合，無關）。
+mypy/ruff 全綠。
+
+**明確排除（第一版）：** Web Push / PWA、LINE Bot、Slack/Discord/Google Chat webhook、自架 SMTP server。
+
+**已知限制：** multi-replica 真同時事件可能各寄一封（上限 = replica 數）——SQLite/cross-connection
+row lock 無法序列化；research R3 接受此限（真同時跨 replica 機率近 0）。
+
+**待真機驗證：** 用真實 Gmail App Password 在 live cluster 跑 quickstart 情境 1 + 3（尚未部署）。
