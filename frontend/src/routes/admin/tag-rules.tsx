@@ -247,10 +247,12 @@ export function AdminTagRulesPage() {
                 </div>
               </TableCell>
               <TableCell data-label="條件">
-                <div className="text-sm">{MATCHER_LABELS[rule.matcher_type]}</div>
-                {rule.matcher_type !== "always" && (
-                  <code className="text-xs text-muted-foreground break-all">{rule.pattern}</code>
-                )}
+                <div className="min-w-0">
+                  <div className="text-sm">{MATCHER_LABELS[rule.matcher_type]}</div>
+                  {rule.matcher_type !== "always" && (
+                    <code className="text-xs text-muted-foreground break-all">{rule.pattern}</code>
+                  )}
+                </div>
               </TableCell>
               <TableCell data-label="貼上 Tag"><Badge variant="secondary">{rule.tag}</Badge></TableCell>
               <TableCell data-label="啟用">

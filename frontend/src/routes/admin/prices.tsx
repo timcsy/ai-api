@@ -161,8 +161,9 @@ export function AdminPricesPage() {
                 <React.Fragment key={row.slug}>
                   <TableRow className="border-0">
                     <TableCell className="pl-6 py-3" data-label="模型">
+                      <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm">{row.slug}</span>
+                        <span className="font-mono text-sm break-all">{row.slug}</span>
                         {!row.in_catalog && (
                           <Badge variant="outline" className="text-[10px]">不在 catalog</Badge>
                         )}
@@ -173,6 +174,7 @@ export function AdminPricesPage() {
                       >
                         {expanded === row.slug ? "▾ 收合歷史" : "▸ 歷史版本"}
                       </button>
+                      </div>
                     </TableCell>
                     {row.current ? (
                       <>

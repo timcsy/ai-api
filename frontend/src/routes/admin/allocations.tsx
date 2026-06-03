@@ -217,13 +217,15 @@ export function AdminAllocationsPage() {
                   </span>
                 </TableCell>
                 <TableCell data-label="模型">
-                  {a.display_name && <div className="text-xs font-medium">{a.display_name}</div>}
-                  <span className="font-mono text-xs text-muted-foreground">{a.resource_model}</span>
-                  {catalogSlugs.data && !knownSlugs.has(a.resource_model) && (
-                    <Badge variant="outline" className="ml-2 shrink-0 whitespace-nowrap text-amber-700 border-amber-500">
-                      ⚠ 已不在 catalog
-                    </Badge>
-                  )}
+                  <div className="min-w-0">
+                    {a.display_name && <div className="text-xs font-medium">{a.display_name}</div>}
+                    <span className="font-mono text-xs text-muted-foreground break-all">{a.resource_model}</span>
+                    {catalogSlugs.data && !knownSlugs.has(a.resource_model) && (
+                      <Badge variant="outline" className="ml-2 shrink-0 whitespace-nowrap text-amber-700 border-amber-500">
+                        ⚠ 已不在 catalog
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell data-label="狀態">
                   {a.status === "quarantined" ? (

@@ -50,7 +50,7 @@ export function AdminRebalanceLogListPage() {
       )}
 
       {query.data && (
-        <Table>
+        <Table className="responsive-table">
           <TableHeader>
             <TableRow>
               <TableHead>時間</TableHead>
@@ -64,14 +64,14 @@ export function AdminRebalanceLogListPage() {
           <TableBody>
             {query.data.map((row) => (
               <TableRow key={row.id}>
-                <TableCell className="text-xs">
+                <TableCell className="text-xs" data-label="時間">
                   {new Date(row.finished_at).toLocaleString("zh-TW")}
                 </TableCell>
-                <TableCell>{row.period_yyyymm}</TableCell>
-                <TableCell><Badge variant="outline">{row.triggered_by}</Badge></TableCell>
-                <TableCell className="text-right">{row.scanned} / {row.changed}</TableCell>
-                <TableCell className="text-right">{row.T_after.toLocaleString()}</TableCell>
-                <TableCell>
+                <TableCell data-label="期間">{row.period_yyyymm}</TableCell>
+                <TableCell data-label="觸發"><Badge variant="outline">{row.triggered_by}</Badge></TableCell>
+                <TableCell className="text-right" data-label="掃描 / 變更">{row.scanned} / {row.changed}</TableCell>
+                <TableCell className="text-right" data-label="T 值">{row.T_after.toLocaleString()}</TableCell>
+                <TableCell data-label="詳細">
                   <Button asChild variant="ghost" size="sm">
                     <Link to={`/admin/rebalance-log/${row.id}`}>詳細</Link>
                   </Button>

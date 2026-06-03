@@ -274,8 +274,10 @@ export function AdminMemberDetailPage() {
                 {memberAllocs.map((a) => (
                   <TableRow key={a.id}>
                     <TableCell className="text-xs" data-label="模型">
-                      {a.display_name && <div className="font-medium">{a.display_name}</div>}
-                      <div className="font-mono text-muted-foreground">{a.resource_model}</div>
+                      <div className="min-w-0">
+                        {a.display_name && <div className="font-medium">{a.display_name}</div>}
+                        <div className="font-mono text-muted-foreground break-all">{a.resource_model}</div>
+                      </div>
                     </TableCell>
                     <TableCell data-label="狀態">
                       <Badge variant={a.status === "active" ? "default" : "secondary"}>{a.status}</Badge>

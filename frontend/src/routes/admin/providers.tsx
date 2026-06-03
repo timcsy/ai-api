@@ -264,9 +264,9 @@ export function AdminProvidersPage() {
               <TableCell className="text-xs text-muted-foreground" data-label="建立時間">
                 {new Date(c.created_at).toLocaleString()}
               </TableCell>
-              <TableCell className="text-right space-x-2" data-label="動作">
+              <TableCell className="text-right" data-label="動作">
                 {c.status === "active" && (
-                  <>
+                  <div className="flex flex-wrap justify-end gap-2">
                     <Button
                       size="sm"
                       variant="outline"
@@ -288,7 +288,7 @@ export function AdminProvidersPage() {
                     <Button size="sm" variant="outline" onClick={() => setDisableConfirmFor(c)}>
                       停用
                     </Button>
-                  </>
+                  </div>
                 )}
               </TableCell>
             </TableRow>
