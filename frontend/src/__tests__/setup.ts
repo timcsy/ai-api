@@ -19,6 +19,15 @@ if (!window.matchMedia) {
     }) as unknown as MediaQueryList;
 }
 
+// jsdom has no ResizeObserver; radix Select + recharts need it. Provide a no-op.
+if (!("ResizeObserver" in globalThis)) {
+  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();

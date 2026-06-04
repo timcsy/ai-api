@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ApiUsageExample } from "@/components/api-usage-example";
+import { AllocationUsageCharts } from "@/components/allocation-usage-charts";
 import { DeviceCredentialsCard } from "@/components/device-credentials-card";
 import { per1kToPer1m } from "@/lib/price-format";
 import { useToast } from "@/components/ui/use-toast";
@@ -205,6 +206,8 @@ export function AllocationDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      <AllocationUsageCharts allocationId={id} />
 
       <Card>
         <CardHeader>

@@ -429,12 +429,15 @@ async def usage_heatmap(
     *,
     from_: datetime,
     to: datetime,
+    allocation_id: str | None = None,
 ) -> list[HeatCell]:
     """Phase 14: weekday x hour usage heatmap, bucketed in UTC+8.
 
     Shifts started_at by +8h before extracting weekday/hour so the grid reflects
     local (Taiwan) time. weekday: 0=Sunday..6=Saturday (matches both Postgres
-    `dow` and SQLite `%w`). Returns only non-empty cells (≤168)."""
+    `dow` and SQLite `%w`). Returns only non-empty cells (≤168). `allocation_id`
+    (Phase 18 follow-up) scopes to one allocation for the per-allocation member
+    view; None = platform-wide (admin)."""
     dialect = db.bind.dialect.name if db.bind else "sqlite"
     if dialect == "postgresql":
         shifted = CallRecord.started_at + timedelta(hours=8)
@@ -456,6 +459,7 @@ async def usage_heatmap(
             CallRecord.outcome == CallOutcome.success,
             CallRecord.started_at >= from_,
             CallRecord.started_at < to,
+            *([CallRecord.allocation_id == allocation_id] if allocation_id else []),
         )
         .group_by(weekday_expr, hour_expr)
         .order_by(weekday_expr, hour_expr)
