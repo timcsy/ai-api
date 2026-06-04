@@ -348,3 +348,22 @@ class AllocationService:
             credential.revoked_at = datetime.now(UTC)
             await self._s.flush()
         return credential
+
+    async def rotate_credential(
+        self, credential_id: str
+    ) -> tuple[Credential, GeneratedToken] | None:
+        """Issue a fresh token for an existing credential in place — keeps the
+        device name and creation date, the old token immediately invalid. The
+        convenient alternative to revoke-then-add for one device. Returns None if
+        not found; raises ValueError if the credential is already revoked."""
+        credential = await self._s.get(Credential, credential_id)
+        if credential is None:
+            return None
+        if credential.revoked_at is not None:
+            raise ValueError("cannot rotate a revoked credential")
+        token = generate_token()
+        credential.token_fingerprint = token.fingerprint
+        credential.token_prefix = token.prefix
+        credential.last_used_at = None
+        await self._s.flush()
+        return credential, token

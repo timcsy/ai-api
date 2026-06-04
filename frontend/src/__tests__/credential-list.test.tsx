@@ -84,4 +84,39 @@ describe("<DeviceCredentialsCard />", () => {
     );
     expect(screen.getByRole("button", { name: "複製" })).toBeInTheDocument();
   });
+
+  it("regenerates a device token in place (no delete-then-add) and reveals it once", async () => {
+    const rotated = {
+      id: "c2",
+      name: "我的筆電",
+      token: "aiapi_rotatedrotatedrotated",
+      token_prefix: "aiapi_dd",
+    };
+    const calls: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : (input as Request).url;
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (url.endsWith("/me/allocations/a1/credentials/c2/rotate") && method === "POST") {
+        calls.push(url);
+        return jsonResponse(201, rotated);
+      }
+      return jsonResponse(200, CREDS);
+    });
+
+    const user = userEvent.setup();
+    renderCard();
+    await waitFor(() => expect(screen.getByText("我的筆電")).toBeInTheDocument());
+
+    // The row for "我的筆電" carries a 重新產生 action.
+    const regenButtons = screen.getAllByRole("button", { name: "重新產生" });
+    expect(regenButtons.length).toBe(2); // one per active credential
+    const second = regenButtons[1];
+    if (!second) throw new Error("expected a second 重新產生 button");
+    await user.click(second);
+
+    await waitFor(() =>
+      expect(screen.getByText("aiapi_rotatedrotatedrotated")).toBeInTheDocument(),
+    );
+    expect(calls).toEqual(["/me/allocations/a1/credentials/c2/rotate"]);
+  });
 });
