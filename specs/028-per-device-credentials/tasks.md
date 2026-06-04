@@ -126,9 +126,9 @@ description: "Tasks for 階段 18 — 憑證模型重構（每分配多 per-devi
 - [X] T034 跑 `npm --prefix frontend run test && lint && typecheck && build`；裝置清單 + 新增面板在 **360px 手機**不溢出（沿用階段 16 RWD）
 - [X] T035 [P] 更新 `knowledge/vision.md` 階段 18 → ✅（填完成日、列實際交付、連結 history）；roadmap/狀態同步
 - [X] T036 [P] 在 `knowledge/history/completed-phases-detail.md` 追加「## 階段 18：憑證模型重構」詳情（schema 1:1→1:N、migration 0015、零回歸保證）
-- [ ] T037 commit + push + 開 PR；push 前先 `ruff check .` + 前端 lint/build；**特別檢視 migration**；等 CI 全綠後 squash merge 到 main
-- [ ] T038 main image build 綠後 `helm upgrade`（同既有指令 + 新 sha）；**確認 migration 0015 在部署套用**；live 驗：既有成員的舊 token **仍可呼叫**、可新增一把/撤一把
-- [ ] T039 收尾：vision 階段 18 改 ✅、history 補上、roadmap 狀態一致；標記 tasks 全完成
+- [X] T037 commit + push + 開 PR；push 前先 `ruff check .` + 前端 lint/build；**特別檢視 migration**；等 CI 全綠後 squash merge 到 main
+- [X] T038 main image build 綠後 `helm upgrade`（同既有指令 + 新 sha）；**確認 migration 0015 在部署套用**；live 驗：既有成員的舊 token **仍可呼叫**、可新增一把/撤一把
+- [X] T039 收尾：vision 階段 18 改 ✅、history 補上、roadmap 狀態一致；標記 tasks 全完成
 
 ---
 
