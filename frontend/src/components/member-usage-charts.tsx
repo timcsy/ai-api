@@ -16,6 +16,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Chart } from "@/components/ui/chart";
 import { ApiError, api } from "@/lib/api-client";
+import { fmtCompact } from "@/lib/number-format";
 import { CHART_COLORS, rangeToIso, type TimeRange } from "@/lib/time-range";
 
 interface TimeseriesPoint {
@@ -117,8 +118,8 @@ export function MemberUsageCharts({ range }: { range: TimeRange }) {
               <YAxis
                 fontSize={11}
                 tickLine={false}
-                width={48}
-                tickFormatter={(v: number) => (metric === "cost" ? fmtUsd(v) : fmtInt.format(v))}
+                width={40}
+                tickFormatter={(v: number) => (metric === "cost" ? fmtUsd(v) : fmtCompact(v))}
               />
               <Tooltip
                 formatter={(_v, _n, item) => {

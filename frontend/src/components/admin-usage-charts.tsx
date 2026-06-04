@@ -3,6 +3,7 @@ import { Cell, Legend, Pie, PieChart, Tooltip } from "recharts";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Chart } from "@/components/ui/chart";
+import { UsageHeatmap, type HeatCell } from "@/components/usage-heatmap";
 import { ApiError, api } from "@/lib/api-client";
 import { CHART_COLORS } from "@/lib/time-range";
 
@@ -16,24 +17,14 @@ interface UsageItem {
 interface UsageResponse {
   items: UsageItem[];
 }
-interface HeatCell {
-  weekday: number; // 0=Sunday
-  hour: number;
-  tokens: number;
-  call_count: number;
-}
 interface HeatmapResponse {
   timezone: string;
   cells: HeatCell[];
 }
 
-const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
-const fmtInt = new Intl.NumberFormat("zh-TW");
-
 /**
  * Phase 14 (US2): provider-share donut + 24×7 usage heatmap for the usage page.
- * The heatmap is a plain CSS grid (not recharts) — 168 coloured cells render far
- * cheaper as divs, per research §heatmap.
+ * The heatmap grid is the shared <UsageHeatmap> (plain CSS, cheap divs).
  */
 export function UsageCharts({ fromIso, toIso }: { fromIso: string; toIso: string }) {
   const byProvider = useQuery<UsageResponse, ApiError>({
@@ -57,8 +48,6 @@ export function UsageCharts({ fromIso, toIso }: { fromIso: string; toIso: string
   const providerTotal = providerData.reduce((s, d) => s + d.value, 0);
 
   const cells = heatmap.data?.cells ?? [];
-  const cellMap = new Map(cells.map((c) => [`${c.weekday}-${c.hour}`, c]));
-  const maxTokens = cells.reduce((m, c) => Math.max(m, c.tokens), 0);
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
@@ -95,70 +84,9 @@ export function UsageCharts({ fromIso, toIso }: { fromIso: string; toIso: string
           <CardDescription>星期 × 小時（時區 {heatmap.data?.timezone ?? "UTC+8"}），顏色越深用量越高</CardDescription>
         </CardHeader>
         <CardContent>
-          {heatmap.isLoading ? (
-            <div className="h-[200px] animate-pulse rounded-md bg-muted/50" />
-          ) : cells.length === 0 ? (
-            <div className="flex h-[200px] items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground">
-              此區間沒有資料
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              {/* 1fr hour columns so the grid fills the card width on desktop
-                  (bigger cells); min-w keeps it usable + scrollable on phones. */}
-              <div
-                className="grid w-full min-w-[560px] gap-[3px]"
-                style={{ gridTemplateColumns: "auto repeat(24, minmax(0, 1fr))" }}
-              >
-                {/* header row: hour labels (0,3,6,...) */}
-                <div />
-                {Array.from({ length: 24 }, (_, h) => (
-                  <div key={`h-${h}`} className="text-[9px] text-muted-foreground text-center">
-                    {h % 3 === 0 ? h : ""}
-                  </div>
-                ))}
-                {WEEKDAYS.map((label, wd) => (
-                  <Row key={wd} label={label} wd={wd} cellMap={cellMap} maxTokens={maxTokens} />
-                ))}
-              </div>
-              <p className="mt-2 text-[10px] text-muted-foreground">列＝星期（日～六），欄＝0–23 時</p>
-            </div>
-          )}
+          <UsageHeatmap cells={cells} isLoading={heatmap.isLoading} />
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function Row({
-  label,
-  wd,
-  cellMap,
-  maxTokens,
-}: {
-  label: string;
-  wd: number;
-  cellMap: Map<string, HeatCell>;
-  maxTokens: number;
-}) {
-  return (
-    <>
-      <div className="flex items-center pr-2 text-[11px] text-muted-foreground">週{label}</div>
-      {Array.from({ length: 24 }, (_, h) => {
-        const c = cellMap.get(`${wd}-${h}`);
-        const intensity = c && maxTokens > 0 ? 0.12 + 0.88 * (c.tokens / maxTokens) : 0;
-        return (
-          <div
-            key={h}
-            className="h-6 w-full rounded-[3px] border border-border/30"
-            style={{ backgroundColor: c ? `rgba(37, 99, 235, ${intensity})` : "transparent" }}
-            title={
-              c
-                ? `週${label} ${h}:00 — ${fmtInt.format(c.tokens)} tokens · ${c.call_count} 次`
-                : `週${label} ${h}:00 — 無`
-            }
-          />
-        );
-      })}
-    </>
   );
 }

@@ -309,6 +309,79 @@ async def list_my_allocation_calls(
     }
 
 
+@router.get("/me/allocations/{allocation_id}/usage/timeseries")
+async def get_my_allocation_timeseries(
+    allocation_id: str,
+    from_: datetime | None = Query(default=None, alias="from"),
+    to: datetime | None = Query(default=None),
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Daily usage timeseries for ONE of the member's own allocations. Owner-checked;
+    scope is the path allocation (verified to belong to the session member)."""
+    from ai_api.api.usage import _validate_range
+    from ai_api.services.usage import usage_timeseries
+
+    service = AllocationService(db)
+    await _own_allocation_or_error(service, allocation_id, member)
+    now = datetime.now(UTC)
+    to = to or now
+    from_ = from_ or now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    _validate_range(from_, to)
+    points = await usage_timeseries(
+        db, allocation_id=allocation_id, bucket="day", from_=from_, to=to
+    )
+    return {
+        "from": from_.isoformat(),
+        "to": to.isoformat(),
+        "bucket": "day",
+        "points": [
+            {
+                "ts": p.ts.isoformat() if hasattr(p.ts, "isoformat") else str(p.ts),
+                "tokens": p.tokens,
+                "cost_usd": float(p.cost_usd),
+                "call_count": p.call_count,
+            }
+            for p in points
+        ],
+    }
+
+
+@router.get("/me/allocations/{allocation_id}/usage/heatmap")
+async def get_my_allocation_heatmap(
+    allocation_id: str,
+    from_: datetime | None = Query(default=None, alias="from"),
+    to: datetime | None = Query(default=None),
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Weekday x hour (UTC+8) usage heatmap for ONE of the member's own allocations."""
+    from ai_api.api.usage import _validate_range
+    from ai_api.services.usage import usage_heatmap
+
+    service = AllocationService(db)
+    await _own_allocation_or_error(service, allocation_id, member)
+    now = datetime.now(UTC)
+    to = to or now
+    from_ = from_ or now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    _validate_range(from_, to)
+    cells = await usage_heatmap(db, from_=from_, to=to, allocation_id=allocation_id)
+    return {
+        "from": from_.isoformat(),
+        "to": to.isoformat(),
+        "timezone": "UTC+8",
+        "cells": [
+            {
+                "weekday": c.weekday,
+                "hour": c.hour,
+                "tokens": c.tokens,
+                "call_count": c.call_count,
+            }
+            for c in cells
+        ],
+    }
+
+
 @router.post(
     "/me/allocations/{allocation_id}/rotate-token",
     dependencies=[Depends(require_csrf)],
