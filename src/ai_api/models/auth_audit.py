@@ -61,6 +61,9 @@ class AuditEventType(enum.StrEnum):
     # Phase 13: admin email notifications — event types that trigger admin emails
     responses_upstream_error_burst = "responses_upstream_error_burst"
     provider_credential_auth_failed = "provider_credential_auth_failed"
+    # Phase 18: per-device credentials
+    credential_added = "credential_added"
+    credential_revoked = "credential_revoked"
 
 
 class ActorType(enum.StrEnum):

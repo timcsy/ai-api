@@ -134,7 +134,7 @@ class SelfServiceService:
         return created
 
     async def existing_active(self, member_id: str, slug: str) -> Allocation | None:
-        stmt = select(Allocation).options(selectinload(Allocation.credential)).where(
+        stmt = select(Allocation).options(selectinload(Allocation.credentials)).where(
             Allocation.member_id == member_id,
             Allocation.resource_model == slug,
             Allocation.origin == AllocationOrigin.self_service,

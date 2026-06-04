@@ -37,6 +37,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
+import { DeviceCredentialsCard } from "@/components/device-credentials-card";
 import { copyToClipboard } from "@/lib/clipboard";
 import { ApiError, api } from "@/lib/api-client";
 
@@ -85,6 +86,7 @@ export function AdminAllocationsPage() {
   const [showRevoked, setShowRevoked] = React.useState(false);
   const [quotaTarget, setQuotaTarget] = React.useState<AdminAllocation | null>(null);
   const [quotaValue, setQuotaValue] = React.useState("");
+  const [credsTarget, setCredsTarget] = React.useState<AdminAllocation | null>(null);
 
   const allocsQuery = useQuery<AdminAllocation[], ApiError>({
     queryKey: ["admin", "allocations"],
@@ -277,6 +279,9 @@ export function AdminAllocationsPage() {
                       >
                         切換服務型
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setCredsTarget(a)}>
+                        查看裝置憑證
+                      </DropdownMenuItem>
                       {a.status === "active" && (
                         <DropdownMenuItem
                           onClick={() => pauseResumeMut.mutate({ id: a.id, action: "pause" })}
@@ -372,6 +377,24 @@ export function AdminAllocationsPage() {
         members={membersQuery.data ?? []}
         onCreated={(token) => setTokenDialog(token)}
       />
+
+      <Dialog open={!!credsTarget} onOpenChange={(open) => !open && setCredsTarget(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>裝置憑證</DialogTitle>
+            <DialogDescription>
+              {credsTarget?.subject_snapshot} · {credsTarget?.resource_model}
+            </DialogDescription>
+          </DialogHeader>
+          {credsTarget && (
+            <DeviceCredentialsCard
+              allocationId={credsTarget.id}
+              basePath="/admin/allocations"
+              scope="admin"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!tokenDialog} onOpenChange={(open) => !open && setTokenDialog(null)}>
         <DialogContent>

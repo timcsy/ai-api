@@ -42,6 +42,7 @@ async def _seed_call_at(email: str, tokens: int, when: datetime) -> None:
         )
         s.add(a)
         s.add(Credential(
+            id=str(ULID()), name="預設",
             allocation_id=a.id, token_fingerprint=str(ULID()) + "x" * 20,
             token_prefix="aiapi_xx", created_at=now,
         ))

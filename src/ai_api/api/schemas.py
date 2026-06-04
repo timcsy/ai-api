@@ -52,7 +52,7 @@ class AllocationOut(BaseModel):
     revoked_at: datetime | None
     created_by: str
     note: str | None
-    token_prefix: str
+    token_prefix: str | None = None  # Phase 18: representative credential prefix
     # Phase 3a
     quota_tokens_per_month: int | None = None
     is_service_allocation: bool = False
@@ -66,6 +66,35 @@ class AllocationOut(BaseModel):
 
 class AllocationCreatedOut(AllocationOut):
     token: str
+
+
+# ---- Phase 18: per-device credentials ----
+
+CredentialNameStr = Annotated[str, StringConstraints(min_length=1, max_length=64)]
+
+
+class AddCredentialRequest(BaseModel):
+    name: CredentialNameStr
+
+
+class CredentialOut(BaseModel):
+    """A per-device credential without plaintext (list/detail view)."""
+
+    id: str
+    name: str
+    token_prefix: str
+    created_at: datetime
+    last_used_at: datetime | None = None
+    status: str  # "active" | "revoked"
+
+
+class CredentialCreatedOut(BaseModel):
+    """Returned once on creation — carries the plaintext token."""
+
+    id: str
+    name: str
+    token: str
+    token_prefix: str
 
 
 class CallRecordOut(BaseModel):

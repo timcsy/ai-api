@@ -11,11 +11,23 @@ from ai_api.api.schemas import (
     AllocationCreatedOut,
     AllocationOut,
     CreateAllocationRequest,
+    CredentialOut,
 )
 from ai_api.models import AllocationStatus
 from ai_api.services.allocations import AllocationService
 
 router = APIRouter(dependencies=[Depends(require_admin_token)])
+
+
+def _repr_token_prefix(a: Any) -> str | None:
+    """Phase 18: pick a representative credential prefix for legacy single-prefix
+    display — first active credential, else the first one (none → None)."""
+    creds = list(a.credentials)
+    if not creds:
+        return None
+    active = next((c for c in creds if c.revoked_at is None), None)
+    prefix: str = (active or creds[0]).token_prefix
+    return prefix
 
 
 def _to_out(a: Any, display_name: str | None = None) -> AllocationOut:
@@ -30,7 +42,7 @@ def _to_out(a: Any, display_name: str | None = None) -> AllocationOut:
         revoked_at=a.revoked_at,
         created_by=a.created_by,
         note=a.note,
-        token_prefix=a.credential.token_prefix,
+        token_prefix=_repr_token_prefix(a),
         quota_tokens_per_month=a.quota_tokens_per_month,
         is_service_allocation=a.is_service_allocation,
     )
@@ -222,3 +234,70 @@ async def patch_allocation(
         allocation.note = payload["note"]
     await session.flush()
     return _to_out(allocation)
+
+
+# ---- Phase 18: per-device credentials (admin view) ----
+
+
+def _cred_out(c: Any) -> CredentialOut:
+    return CredentialOut(
+        id=c.id,
+        name=c.name,
+        token_prefix=c.token_prefix,
+        created_at=c.created_at,
+        last_used_at=c.last_used_at,
+        status="revoked" if c.revoked_at else "active",
+    )
+
+
+@router.get(
+    "/allocations/{allocation_id}/credentials",
+    response_model=list[CredentialOut],
+)
+async def admin_list_credentials(
+    allocation_id: str,
+    session: AsyncSession = Depends(get_db_session),
+) -> list[CredentialOut]:
+    """List every per-device credential of an allocation (no plaintext)."""
+    service = AllocationService(session)
+    allocation = await service.get(allocation_id)
+    if allocation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "not_found", "message": "allocation not found"}},
+        )
+    creds = await service.list_credentials(allocation_id)
+    return [_cred_out(c) for c in creds]
+
+
+@router.delete(
+    "/allocations/{allocation_id}/credentials/{credential_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def admin_revoke_credential(
+    allocation_id: str,
+    credential_id: str,
+    session: AsyncSession = Depends(get_db_session),
+) -> None:
+    """Revoke a single credential (soft) and write an audit record. Other
+    credentials of the allocation are unaffected."""
+    from ai_api.auth import audit
+    from ai_api.models import ActorType, AuditEventType
+
+    service = AllocationService(session)
+    credential = await service.get_credential(credential_id)
+    if credential is None or credential.allocation_id != allocation_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "not_found", "message": "credential not found"}},
+        )
+    await service.revoke_credential(credential_id)
+    await audit.record(
+        session,
+        event_type=AuditEventType.credential_revoked,
+        actor_type=ActorType.admin,
+        target_type="credential",
+        target_id=credential_id,
+        details={"allocation_id": allocation_id},
+    )
+    await session.flush()

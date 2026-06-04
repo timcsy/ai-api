@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import current_member, get_db_session, require_csrf
+from ai_api.api.schemas import AddCredentialRequest, CredentialCreatedOut, CredentialOut
 from ai_api.auth import local
 from ai_api.config import get_settings
 from ai_api.models import Member, MemberProvider
@@ -38,6 +39,17 @@ async def get_me(member: Member = Depends(current_member)) -> dict[str, Any]:
     return _member_public(member)
 
 
+def _repr_token_prefix(a: Any) -> str | None:
+    """Phase 18: an allocation has many per-device credentials. For the legacy
+    single-prefix display, pick the first active one, else the first credential."""
+    creds = list(a.credentials)
+    if not creds:
+        return None
+    active = next((c for c in creds if c.revoked_at is None), None)
+    prefix: str = (active or creds[0]).token_prefix
+    return prefix
+
+
 def _alloc_public(
     a: Any, price: dict[str, str] | None = None, display_name: str | None = None
 ) -> dict[str, Any]:
@@ -52,7 +64,7 @@ def _alloc_public(
         "quota_tokens_per_month": a.quota_tokens_per_month,
         "created_at": a.created_at.isoformat(),
         "revoked_at": a.revoked_at.isoformat() if a.revoked_at else None,
-        "token_prefix": a.credential.token_prefix,
+        "token_prefix": _repr_token_prefix(a),
         "price": price,  # current per-1K price of the resource_model, or null
     }
 
@@ -437,3 +449,76 @@ async def change_password(
         ) from exc
     fresh.password_hash = local.hash_password(payload.new_password)
     await db.flush()
+
+
+# ---- Phase 18: per-device credentials ----
+
+
+def _cred_out(c: Any) -> CredentialOut:
+    return CredentialOut(
+        id=c.id,
+        name=c.name,
+        token_prefix=c.token_prefix,
+        created_at=c.created_at,
+        last_used_at=c.last_used_at,
+        status="revoked" if c.revoked_at else "active",
+    )
+
+
+@router.get("/me/allocations/{allocation_id}/credentials")
+async def list_my_credentials(
+    allocation_id: str,
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[CredentialOut]:
+    """List the per-device credentials of one's own allocation (no plaintext)."""
+    service = AllocationService(db)
+    await _own_allocation_or_error(service, allocation_id, member)
+    creds = await service.list_credentials(allocation_id)
+    return [_cred_out(c) for c in creds]
+
+
+@router.post(
+    "/me/allocations/{allocation_id}/credentials",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+async def add_my_credential(
+    allocation_id: str,
+    payload: AddCredentialRequest,
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> CredentialCreatedOut:
+    """Issue a new named per-device credential. Returns the plaintext token ONCE."""
+    service = AllocationService(db)
+    allocation = await _own_allocation_or_error(service, allocation_id, member)
+    credential, token = await service.add_credential(allocation, payload.name)
+    return CredentialCreatedOut(
+        id=credential.id,
+        name=credential.name,
+        token=token.plaintext,
+        token_prefix=token.prefix,
+    )
+
+
+@router.delete(
+    "/me/allocations/{allocation_id}/credentials/{credential_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_csrf)],
+)
+async def revoke_my_credential(
+    allocation_id: str,
+    credential_id: str,
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> None:
+    """Soft-revoke one of one's own credentials. Other credentials are untouched."""
+    service = AllocationService(db)
+    await _own_allocation_or_error(service, allocation_id, member)
+    credential = await service.get_credential(credential_id)
+    if credential is None or credential.allocation_id != allocation_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "not_found", "message": "credential not found"}},
+        )
+    await service.revoke_credential(credential_id)
