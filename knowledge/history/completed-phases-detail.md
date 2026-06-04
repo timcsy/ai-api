@@ -624,6 +624,20 @@ Postgres 整合測試 `test_credential_migration.py`：seed 舊式單憑證 → 
 owner-isolation）+ `test_admin_credentials.py`（3：admin list/revoke+稽核、未認證 401）+ 整合 2（migration 零回歸、
 多憑證 lookup/revoke）先 Red → 實作 → Green。**501 後端 + 117 前端測試綠，ruff/mypy 零警告。**
 
+**收尾增補（上線同批，PR #54/#55）：**
+- **per-device 就地 rotate**（PR #54）：每把裝置憑證可一鍵「重新產生」——`service.rotate_credential`（保留
+  `name`/`created_at`、換 fingerprint/prefix、`last_used_at` 歸零、舊 token 立即失效）+ `POST /me/allocations/{id}/credentials/{cid}/rotate`。
+  使用者回饋「合併之後仍要能為裝置重新產生憑證，不用刪了再加」。
+- **憑證 UI 合併**（PR #54）：移除與裝置清單重疊的舊「你的憑證」卡（同一個代表性 prefix + 舊 rotate-token），
+  裝置清單成為唯一憑證介面；暫停/恢復（分配層、與逐把撤回不同概念）移到頁首狀態徽章旁。對應原則 5/6（單一介面、少混淆）。
+- **每個分配的用量圖表**（PR #55）：分配詳情頁加 `AllocationUsageCharts`（每日時序折線 + 週x時用量熱度圖 +
+  時段選擇器）——後端 `usage_heatmap` 加 `allocation_id` 過濾、新增 `/me/allocations/{id}/usage/{timeseries,heatmap}`
+  （擁有者隔離 403；`usage_timeseries` 本就支援 allocation scope）；熱度圖抽成共用 `<UsageHeatmap>`（admin 用量頁
+  改用）；新增 `fmtCompact`（K/M/B）修掉被裁切的大數字軸。對應原則 6（成員逐分配自助掌握消耗，延伸階段 17 整體總覽）。
+- 測試累計 **504 後端 + 121 前端綠**（+rotate contract、+per-allocation usage contract×2、+fmtCompact/charts 前端）。
+
+**部署：** rev 49 · `sha-5274f0d`（2026-06-04），含階段 18 全部三批（核心模型 + UI 合併 + 用量圖表）。
+
 **經驗：** ① 改主鍵在 SQLite 不能 in-place ALTER → migration 用「建新表+複製+swap」一招吃兩種 DB。
 ② Postgres migration 整合測試要驅動真 alembic（test DB 平時用 `metadata.create_all`），且測試結束要 `DROP SCHEMA
 public CASCADE` 還原，否則 alembic 建出的具名約束會讓後續 `metadata.drop_all` 踩雷。③ class 內若有名為 `list` 的
