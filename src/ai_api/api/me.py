@@ -522,3 +522,41 @@ async def revoke_my_credential(
             detail={"error": {"code": "not_found", "message": "credential not found"}},
         )
     await service.revoke_credential(credential_id)
+
+
+@router.post(
+    "/me/allocations/{allocation_id}/credentials/{credential_id}/rotate",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+async def rotate_my_credential(
+    allocation_id: str,
+    credential_id: str,
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> CredentialCreatedOut:
+    """Re-issue this device's token in place (keeps name; old token invalid).
+    Returns the new plaintext token ONCE."""
+    service = AllocationService(db)
+    await _own_allocation_or_error(service, allocation_id, member)
+    credential = await service.get_credential(credential_id)
+    if credential is None or credential.allocation_id != allocation_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "not_found", "message": "credential not found"}},
+        )
+    try:
+        result = await service.rotate_credential(credential_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": {"code": "cannot_rotate", "message": str(exc)}},
+        ) from exc
+    assert result is not None
+    cred, token = result
+    return CredentialCreatedOut(
+        id=cred.id,
+        name=cred.name,
+        token=token.plaintext,
+        token_prefix=token.prefix,
+    )

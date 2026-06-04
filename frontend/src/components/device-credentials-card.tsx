@@ -129,6 +129,21 @@ export function DeviceCredentialsCard({
     },
   });
 
+  const rotateMut = useMutation({
+    mutationFn: (credId: string) =>
+      api<CreatedCredential>(`${basePath}/${allocationId}/credentials/${credId}/rotate`, {
+        method: "POST",
+      }),
+    onSuccess: (data) => {
+      setFreshToken(data);
+      invalidate();
+      toast({ title: "已重新產生 token", description: "舊 token 立即失效，請複製新的" });
+    },
+    onError: (err: ApiError) => {
+      toast({ title: "重新產生失敗", description: err.message, variant: "destructive" });
+    },
+  });
+
   const creds = credsQuery.data ?? [];
 
   return (
@@ -190,14 +205,26 @@ export function DeviceCredentialsCard({
                   {(allowAdd || scope === "admin") && (
                     <TableCell className="text-right" data-label="操作">
                       {c.status === "active" ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => setRevokeTarget(c)}
-                        >
-                          撤回
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          {allowAdd && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={rotateMut.isPending}
+                              onClick={() => rotateMut.mutate(c.id)}
+                            >
+                              重新產生
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setRevokeTarget(c)}
+                          >
+                            撤回
+                          </Button>
+                        </div>
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>
                       )}

@@ -1,36 +1,16 @@
-import * as React from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { ApiUsageExample } from "@/components/api-usage-example";
 import { DeviceCredentialsCard } from "@/components/device-credentials-card";
 import { per1kToPer1m } from "@/lib/price-format";
 import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
-import { copyToClipboard } from "@/lib/clipboard";
 
 interface Allocation {
   id: string;
@@ -63,25 +43,6 @@ export function AllocationDetailPage() {
   const { id = "" } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [rotateConfirmOpen, setRotateConfirmOpen] = React.useState(false);
-  const [freshToken, setFreshToken] = React.useState<string | null>(null);
-
-  const rotateMut = useMutation({
-    mutationFn: () =>
-      api<{ token: string; token_prefix: string }>(
-        `/me/allocations/${id}/rotate-token`,
-        { method: "POST", headers: { "X-CSRF-Token": document.cookie.match(/aiapi_csrf=([^;]+)/)?.[1] ?? "" } },
-      ),
-    onSuccess: (data) => {
-      setFreshToken(data.token);
-      queryClient.invalidateQueries({ queryKey: ["me", "allocations"] });
-      queryClient.invalidateQueries({ queryKey: ["me", "allocation-detail", id] });
-      toast({ title: "新 token 已產生", description: "舊 token 立即失效" });
-    },
-    onError: (err: ApiError) => {
-      toast({ title: "重新產生失敗", description: err.message, variant: "destructive" });
-    },
-  });
 
   const csrf = () => document.cookie.match(/aiapi_csrf=([^;]+)/)?.[1] ?? "";
   const pauseResumeMut = useMutation({
@@ -169,66 +130,42 @@ export function AllocationDetailPage() {
         <Link to="/dashboard" className="text-sm text-muted-foreground hover:underline">
           ← 回 Dashboard
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-3xl font-bold min-w-0 truncate">{alloc?.display_name ?? alloc?.resource_model ?? id}</h1>
           {alloc && (
             <Badge variant={alloc.status === "active" ? "default" : "secondary"} className="shrink-0">
               {alloc.status}
             </Badge>
           )}
-        </div>
-        {alloc && (
-          <div className="space-y-0.5 text-xs text-muted-foreground">
-            <div>呼叫用 model 名稱：<span className="font-mono text-foreground">{alloc.resource_model}</span></div>
-            <div>憑證：<span className="font-mono">{alloc.token_prefix}…</span></div>
-          </div>
-        )}
-      </section>
-
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <CardTitle className="text-lg">你的憑證</CardTitle>
-              <CardDescription>token 僅在建立時顯示一次；系統只存雜湊</CardDescription>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {alloc?.status === "active" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => pauseResumeMut.mutate("pause")}
-                  disabled={pauseResumeMut.isPending}
-                >
-                  {pauseResumeMut.isPending ? "處理中…" : "暫停"}
-                </Button>
-              )}
-              {alloc?.status === "paused" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => pauseResumeMut.mutate("resume")}
-                  disabled={pauseResumeMut.isPending}
-                >
-                  {pauseResumeMut.isPending ? "處理中…" : "恢復"}
-                </Button>
-              )}
+          <div className="ml-auto flex gap-2">
+            {alloc?.status === "active" && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setRotateConfirmOpen(true)}
-                disabled={rotateMut.isPending || alloc?.status !== "active"}
+                onClick={() => pauseResumeMut.mutate("pause")}
+                disabled={pauseResumeMut.isPending}
               >
-                {rotateMut.isPending ? "產生中…" : "重新產生 token"}
+                {pauseResumeMut.isPending ? "處理中…" : "暫停整筆分配"}
               </Button>
-            </div>
+            )}
+            {alloc?.status === "paused" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => pauseResumeMut.mutate("resume")}
+                disabled={pauseResumeMut.isPending}
+              >
+                {pauseResumeMut.isPending ? "處理中…" : "恢復分配"}
+              </Button>
+            )}
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="text-xs text-muted-foreground mb-1">Token 前綴</div>
-          <code className="text-sm bg-muted px-2 py-1 rounded font-mono">{alloc?.token_prefix}…</code>
-        </CardContent>
-      </Card>
+        </div>
+        {alloc && (
+          <div className="text-xs text-muted-foreground">
+            呼叫用 model 名稱：<span className="font-mono text-foreground">{alloc.resource_model}</span>
+          </div>
+        )}
+      </section>
 
       <DeviceCredentialsCard
         allocationId={id}
@@ -319,54 +256,6 @@ export function AllocationDetailPage() {
           )}
         </CardContent>
       </Card>
-
-      <AlertDialog open={rotateConfirmOpen} onOpenChange={setRotateConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>確認重新產生 token？</AlertDialogTitle>
-            <AlertDialogDescription>
-              產生新 token 後，舊 token <strong>立即失效</strong>。請確保已準備好更新所有使用此 token 的程式 / 腳本。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setRotateConfirmOpen(false);
-                rotateMut.mutate();
-              }}
-            >
-              確認重新產生
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <Dialog open={!!freshToken} onOpenChange={(open) => !open && setFreshToken(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>新 token — 此次顯示後無法再取得</DialogTitle>
-            <DialogDescription>
-              請立即複製並安全保存。關閉後系統僅保留雜湊。
-            </DialogDescription>
-          </DialogHeader>
-          <pre className="bg-muted p-3 rounded text-xs overflow-x-auto break-all">
-            {freshToken}
-          </pre>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={async () => {
-                if (freshToken) await copyToClipboard(freshToken);
-                toast({ title: "已複製" });
-              }}
-            >
-              複製
-            </Button>
-            <Button onClick={() => setFreshToken(null)}>我已複製</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

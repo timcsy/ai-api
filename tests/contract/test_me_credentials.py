@@ -169,6 +169,37 @@ async def test_revoke_one_does_not_affect_others(
 
 
 @pytest.mark.asyncio
+async def test_rotate_credential_in_place_keeps_name_invalidates_old(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    alloc_id, _ = await _login_with_allocation(app_client, admin_headers)
+    add = await app_client.post(
+        f"/me/allocations/{alloc_id}/credentials",
+        headers=_csrf(app_client),
+        json={"name": "筆電"},
+    )
+    cred = add.json()
+    old_token = cred["token"]
+    assert await _call_proxy(app_client, old_token) == 200
+
+    r = await app_client.post(
+        f"/me/allocations/{alloc_id}/credentials/{cred['id']}/rotate",
+        headers=_csrf(app_client),
+    )
+    assert r.status_code == 201, r.text
+    rotated = r.json()
+    assert rotated["id"] == cred["id"]  # same credential row
+    assert rotated["name"] == "筆電"  # name preserved
+    assert rotated["token"] != old_token
+
+    # Old token dead, new token works; still only one credential (no add).
+    assert await _call_proxy(app_client, old_token) == 401
+    assert await _call_proxy(app_client, rotated["token"]) == 200
+    creds = (await app_client.get(f"/me/allocations/{alloc_id}/credentials")).json()
+    assert len(creds) == 2  # 預設 + 筆電 (rotate did not add a row)
+
+
+@pytest.mark.asyncio
 async def test_revoke_owner_isolation(
     app_client: AsyncClient, admin_headers: dict[str, str]
 ) -> None:
