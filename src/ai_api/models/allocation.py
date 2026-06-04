@@ -57,8 +57,9 @@ class Allocation(Base):
         default=AllocationOrigin.admin,
     )
 
-    credential: Mapped[Credential] = relationship(
-        back_populates="allocation", uselist=False, cascade="all, delete-orphan"
+    # Phase 18: an allocation can have many per-device credentials.
+    credentials: Mapped[list[Credential]] = relationship(
+        back_populates="allocation", cascade="all, delete-orphan"
     )
     member: Mapped[Member] = relationship(back_populates="allocations")
 

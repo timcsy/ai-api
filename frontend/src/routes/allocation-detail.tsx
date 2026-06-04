@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { ApiUsageExample } from "@/components/api-usage-example";
+import { DeviceCredentialsCard } from "@/components/device-credentials-card";
 import { per1kToPer1m } from "@/lib/price-format";
 import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
@@ -228,6 +229,13 @@ export function AllocationDetailPage() {
           <code className="text-sm bg-muted px-2 py-1 rounded font-mono">{alloc?.token_prefix}…</code>
         </CardContent>
       </Card>
+
+      <DeviceCredentialsCard
+        allocationId={id}
+        basePath="/me/allocations"
+        scope="me"
+        allowAdd
+      />
 
       <ApiUsageExample model={alloc?.resource_model ?? ""} supportsResponses={supportsResponses} />
 

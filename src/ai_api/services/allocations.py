@@ -1,6 +1,7 @@
 """AllocationService: create / revoke / list allocations."""
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import cast
@@ -43,6 +44,7 @@ class AllocationCreated:
 
 class AllocationService:
     BOOTSTRAP_ADMIN = "bootstrap-admin"
+    DEFAULT_CREDENTIAL_NAME = "預設"
 
     def __init__(self, session: AsyncSession) -> None:
         self._s = session
@@ -86,13 +88,16 @@ class AllocationService:
             quota_tokens_per_month=quota_tokens_per_month,
             origin=origin,
         )
+        # Phase 18: the allocation starts with one default per-device credential.
         credential = Credential(
+            id=str(ULID()),
             allocation_id=allocation.id,
+            name=self.DEFAULT_CREDENTIAL_NAME,
             token_fingerprint=token.fingerprint,
             token_prefix=token.prefix,
             created_at=now,
         )
-        allocation.credential = credential
+        allocation.credentials = [credential]
         self._s.add(allocation)
         await self._s.flush()
         return AllocationCreated(allocation=allocation, token=token)
@@ -100,10 +105,12 @@ class AllocationService:
     async def rotate_token(
         self, allocation_id: str
     ) -> tuple[Allocation, GeneratedToken] | None:
-        """Issue a new token for an existing allocation. Old token immediately invalid."""
+        """Issue a new token for this allocation. Back-compat (Phase 18): rotates
+        the first active credential in place; the new per-device add/revoke is the
+        proper multi-device interface."""
         stmt = (
             select(Allocation)
-            .options(selectinload(Allocation.credential))
+            .options(selectinload(Allocation.credentials))
             .where(Allocation.id == allocation_id)
         )
         allocation = (await self._s.execute(stmt)).scalar_one_or_none()
@@ -112,17 +119,30 @@ class AllocationService:
         if allocation.status != AllocationStatus.active:
             raise ValueError("only active allocations can rotate token")
         token = generate_token()
-        cred = allocation.credential
-        cred.token_fingerprint = token.fingerprint
-        cred.token_prefix = token.prefix
-        cred.created_at = datetime.now(UTC)
+        now = datetime.now(UTC)
+        cred = next((c for c in allocation.credentials if c.revoked_at is None), None)
+        if cred is None:
+            # No active credential left — issue a fresh default one.
+            cred = Credential(
+                id=str(ULID()),
+                allocation_id=allocation.id,
+                name=self.DEFAULT_CREDENTIAL_NAME,
+                token_fingerprint=token.fingerprint,
+                token_prefix=token.prefix,
+                created_at=now,
+            )
+            allocation.credentials.append(cred)
+        else:
+            cred.token_fingerprint = token.fingerprint
+            cred.token_prefix = token.prefix
+            cred.created_at = now
         await self._s.flush()
         return allocation, token
 
     async def revoke(self, allocation_id: str, *, revoked_by: str | None = None) -> Allocation | None:
         stmt = (
             select(Allocation)
-            .options(selectinload(Allocation.credential))
+            .options(selectinload(Allocation.credentials))
             .where(Allocation.id == allocation_id)
         )
         allocation = (await self._s.execute(stmt)).scalar_one_or_none()
@@ -209,7 +229,7 @@ class AllocationService:
     async def get(self, allocation_id: str) -> Allocation | None:
         stmt = (
             select(Allocation)
-            .options(selectinload(Allocation.credential))
+            .options(selectinload(Allocation.credentials))
             .where(Allocation.id == allocation_id)
         )
         return (await self._s.execute(stmt)).scalar_one_or_none()
@@ -221,7 +241,7 @@ class AllocationService:
     ) -> list[Allocation]:
         stmt = (
             select(Allocation)
-            .options(selectinload(Allocation.credential))
+            .options(selectinload(Allocation.credentials))
             .order_by(Allocation.created_at.desc())
         )
         if member_id is not None:
@@ -255,12 +275,76 @@ class AllocationService:
         return member
 
     async def lookup_by_token(self, plaintext: str) -> Allocation | None:
+        """Resolve a token to its allocation. Phase 18: a revoked credential
+        (`revoked_at` set) no longer resolves; the fingerprint is unique so at
+        most one credential matches. Updates `last_used_at` throttled (>5 min)."""
         fp = fingerprint_for(plaintext)
+        cred = (
+            await self._s.execute(
+                select(Credential).where(
+                    Credential.token_fingerprint == fp,
+                    Credential.revoked_at.is_(None),
+                )
+            )
+        ).scalar_one_or_none()
+        if cred is None:
+            return None
+        now = datetime.now(UTC)
+        last = cred.last_used_at
+        if last is not None and last.tzinfo is None:
+            # SQLite returns naive datetimes for DateTime(timezone=True).
+            last = last.replace(tzinfo=UTC)
+        if last is None or (now - last).total_seconds() > 300:
+            cred.last_used_at = now
+        allocation = (
+            await self._s.execute(
+                select(Allocation)
+                .where(Allocation.id == cred.allocation_id)
+                .options(selectinload(Allocation.credentials))
+            )
+        ).scalar_one_or_none()
+        return allocation
+
+    # ---- Phase 18: per-device credentials ----
+
+    async def add_credential(
+        self, allocation: Allocation, name: str
+    ) -> tuple[Credential, GeneratedToken]:
+        """Issue a new named per-device credential for an allocation. The plaintext
+        token is returned once (show-once); only its fingerprint is stored."""
+        token = generate_token()
+        credential = Credential(
+            id=str(ULID()),
+            allocation_id=allocation.id,
+            name=name,
+            token_fingerprint=token.fingerprint,
+            token_prefix=token.prefix,
+            created_at=datetime.now(UTC),
+        )
+        self._s.add(credential)
+        await self._s.flush()
+        return credential, token
+
+    async def list_credentials(self, allocation_id: str) -> Sequence[Credential]:
+        """All credentials of an allocation (incl. revoked), newest first."""
         stmt = (
-            select(Allocation)
-            .join(Credential, Credential.allocation_id == Allocation.id)
-            .where(Credential.token_fingerprint == fp)
-            .options(selectinload(Allocation.credential))
+            select(Credential)
+            .where(Credential.allocation_id == allocation_id)
+            .order_by(Credential.created_at.desc())
         )
         result = await self._s.execute(stmt)
-        return result.scalar_one_or_none()
+        return cast(list[Credential], list(result.scalars().all()))
+
+    async def get_credential(self, credential_id: str) -> Credential | None:
+        return await self._s.get(Credential, credential_id)
+
+    async def revoke_credential(self, credential_id: str) -> Credential | None:
+        """Soft-revoke a single credential (`revoked_at = now`); idempotent. Other
+        credentials of the same allocation keep working (no collateral revoke)."""
+        credential = await self._s.get(Credential, credential_id)
+        if credential is None:
+            return None
+        if credential.revoked_at is None:
+            credential.revoked_at = datetime.now(UTC)
+            await self._s.flush()
+        return credential

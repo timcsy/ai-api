@@ -1,4 +1,8 @@
-"""Credential ORM model — 1:1 with Allocation; persists fingerprint, not plaintext."""
+"""Credential ORM model — Phase 18: 1:N with Allocation (per-device tokens).
+
+A single allocation can hold many independent named credentials (one per
+device); each is independently revocable. Persists fingerprint, not plaintext.
+"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -16,17 +20,25 @@ if TYPE_CHECKING:
 class Credential(Base):
     __tablename__ = "credentials"
 
+    # Phase 18: independent PK so an allocation can have many credentials.
+    id: Mapped[str] = mapped_column(String(26), primary_key=True)
     allocation_id: Mapped[str] = mapped_column(
         String(26),
         ForeignKey("allocations.id", ondelete="CASCADE"),
-        primary_key=True,
+        nullable=False,
+        index=True,
     )
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
     token_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     token_prefix: Mapped[str] = mapped_column(String(8), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Phase 18: last successful use (throttled update) + soft revoke.
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    allocation: Mapped[Allocation] = relationship(back_populates="credential")
+    allocation: Mapped[Allocation] = relationship(back_populates="credentials")
 
     __table_args__ = (
         Index("idx_credential_fingerprint", "token_fingerprint", unique=True),
+        Index("idx_credential_allocation", "allocation_id"),
     )

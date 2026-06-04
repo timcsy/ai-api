@@ -448,3 +448,20 @@
   因為它用量到的容器寬反推圖寬，形成「容器被內容撐大 → 圖更大」的放大迴圈。
 - **來源**：`frontend/src/components/{admin-usage-charts,admin-home-charts,ui/chart}.tsx`、
   `routes/{catalog,dashboard}.tsx`；階段 16 收尾（手機真機才暴露）
+
+### 改主鍵的 migration 要「建新表+複製+swap」；驗它的整合測試要 DROP SCHEMA 還原
+
+- **理論說**：改一張表的主鍵，`op.alter_column` 之類就能搞定。測試 DB 平常用 `metadata.create_all`，跑得過就行。
+- **實際發生**（階段 18，`Credential` 由 `allocation_id` PK 改獨立 `id` PK）：①SQLite **不能** in-place 改 PK，
+  唯一可攜（SQLite + Postgres 同碼）的做法是「create 新表 → `bulk_insert` 搬舊資料（補新 `id`/`name`）→ drop 舊 →
+  `rename_table`」。②要固化「migration 後既有 token 零回歸」必須驅動**真 alembic**（`command.upgrade(cfg, ...)`），
+  但整合測試平常靠 `Base.metadata.create_all` 建 schema、根本不跑 migration → 得另寫一支 sync 測試：
+  `DROP SCHEMA public CASCADE; CREATE SCHEMA public` 清乾淨 → `upgrade` 到前一版 → 用 raw SQL seed 舊式列
+  （ORM 已是新 schema、欄位對不上）→ `upgrade head` → 斷言。③**這支測試結束一定要 finally 再 DROP SCHEMA**——
+  否則 alembic 建出的具名約束（如 `fk_xxx`）會讓後續吃 `metadata.drop_all` 的 `app_client` 測試噴
+  `constraint ... does not exist`（metadata 用自己的命名慣例去 drop，名字對不上）。alembic-built schema 與
+  metadata-built schema **不能共用同一個 Postgres**而不清場。
+- **教訓**：碰到改 PK / 重建表的 migration——(a) 一律 build-new-table + swap，別指望 in-place ALTER 可攜；
+  (b) seed 舊資料用 raw SQL（ORM 反映的是 head schema，會跟舊欄位打架）；(c) 任何「自己跑 alembic」的整合測試
+  要把 schema 當共享資源，跑前清、跑後也清（try/finally DROP SCHEMA），免得污染 metadata-based 測試。
+- **來源**：`alembic/versions/0015_per_device_credentials.py`、`tests/integration/test_credential_migration.py`；階段 18

@@ -54,6 +54,8 @@ async def _seed(member_email: str, model: str, calls: int, tokens_each: int) -> 
         s.add(a)
         s.add(
             Credential(
+                id=str(ULID()),
+                name="預設",
                 allocation_id=a.id,
                 token_fingerprint=str(ULID()) + "xxxxxxxxxxxxxxxxxxxx",
                 token_prefix="aiapi_xx",
