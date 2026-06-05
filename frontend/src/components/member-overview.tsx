@@ -50,9 +50,6 @@ export function MemberOverview() {
       <section>
         <h1 className="text-3xl font-bold tracking-tight">我的儀表板</h1>
         <p className="text-muted-foreground mt-1">歡迎，{member?.email}</p>
-        <div className="mt-2 flex gap-2 text-sm text-muted-foreground">
-          <span>登入方式：{member?.provider}</span>
-        </div>
       </section>
 
       {(hasNoKey || hasClaimable) && (

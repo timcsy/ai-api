@@ -91,4 +91,12 @@ describe("mobile navigation (Phase 16 US1)", () => {
     // inline nav still routes
     expect(screen.getByText("模型目錄")).toBeInTheDocument();
   });
+
+  it("hides the admin sub-nav on member pages, shows it only on admin routes", async () => {
+    setViewport(1280);
+    renderShell(true); // admin, but rendered at /dashboard
+    await waitFor(() => expect(screen.getByTestId("dash")).toBeInTheDocument());
+    // second-row admin sub-nav (e.g. 觀測) is NOT shown on a member page
+    expect(screen.queryByText("觀測")).not.toBeInTheDocument();
+  });
 });

@@ -1,6 +1,6 @@
 import { Github, Menu } from "lucide-react";
 import { useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -81,6 +81,9 @@ function DesktopHeader({
   email: string | undefined;
   onLogout: () => void;
 }) {
+  // Only surface the admin sub-nav while actually inside the admin area —
+  // it shouldn't clutter a member-facing page just because you're an admin.
+  const onAdminRoute = useLocation().pathname.startsWith("/admin");
   return (
     <>
       <div className="container mx-auto flex h-14 items-center">
@@ -116,7 +119,7 @@ function DesktopHeader({
           </Button>
         </div>
       </div>
-      {isAdmin && (
+      {isAdmin && onAdminRoute && (
         <div className="border-t bg-background/60">
           <div className="container mx-auto flex h-10 items-center gap-5 overflow-x-auto">
             {ADMIN_SUBNAV.map((item) => (
