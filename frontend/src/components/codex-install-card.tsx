@@ -106,6 +106,18 @@ export function CodexInstallCard({ baseUrl }: { baseUrl: string }) {
             </div>
           </div>
         </details>
+        <p className="text-xs text-muted-foreground">
+          想了解 Codex 怎麼用（指令、功能）？見{" "}
+          <a
+            href="https://developers.openai.com/codex"
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            Codex 官方說明
+          </a>
+          。（登入／連線本平台請用上面的一行指令，不要在官方頁面用 ChatGPT 帳號重新登入。）
+        </p>
       </CardContent>
     </Card>
   );

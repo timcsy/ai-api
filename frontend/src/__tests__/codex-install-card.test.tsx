@@ -36,7 +36,14 @@ describe("<CodexInstallCard />", () => {
     // The note is collapsed behind a summary; expand it.
     await user.click(screen.getByText(/已經裝過 Codex/));
     expect(screen.getByText(/不會重裝/)).toBeInTheDocument();
-    // Desktop app is explicitly called out as NOT supported (account-bound).
+    // Desktop app is explicitly called out (works but not recommended yet).
     expect(screen.getByText(/Codex 桌面 App/)).toBeInTheDocument();
+  });
+
+  it("links to the official Codex docs", () => {
+    render(<CodexInstallCard baseUrl="https://ai.example.com/" />);
+    const link = screen.getByRole("link", { name: /Codex 官方說明/ });
+    expect(link).toHaveAttribute("href", "https://developers.openai.com/codex");
+    expect(link).toHaveAttribute("target", "_blank");
   });
 });
