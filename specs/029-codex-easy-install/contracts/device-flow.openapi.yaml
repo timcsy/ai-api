@@ -1,0 +1,150 @@
+openapi: 3.0.3
+info:
+  title: Codex device-flow + install (Phase 19)
+  version: 0.1.0
+  description: |
+    RFC 8628 風格的裝置授權：CLI 安裝腳本起 device-flow，成員在已登入瀏覽器核可並選分配，
+    平台 mint 一把 per-device 憑證（階段 18），明文經輪詢單次交付。亦含安裝腳本端點。
+    Spec: specs/029-codex-easy-install/spec.md。
+
+servers:
+  - url: /
+
+components:
+  securitySchemes:
+    MemberSession: { type: apiKey, in: cookie, name: session }
+  schemas:
+    AuthorizeRequest:
+      type: object
+      properties:
+        device_label: { type: string, description: 裝置提示（如 "Codex on host-x"），可選 }
+    AuthorizeResponse:
+      type: object
+      properties:
+        device_code: { type: string }
+        user_code: { type: string, example: ABCD-EFGH }
+        verification_uri: { type: string, example: /device }
+        verification_uri_complete: { type: string, example: /device?code=ABCD-EFGH }
+        expires_in: { type: integer, example: 600 }
+        interval: { type: integer, example: 5 }
+      required: [device_code, user_code, verification_uri, expires_in, interval]
+    TokenRequest:
+      type: object
+      properties:
+        device_code: { type: string }
+      required: [device_code]
+    TokenPending:
+      type: object
+      description: 授權尚未完成（RFC 8628 風格 error）
+      properties:
+        error:
+          type: string
+          enum: [authorization_pending, slow_down, expired_token, access_denied]
+      required: [error]
+    TokenSuccess:
+      type: object
+      description: 核可後**單次**交付明文 token
+      properties:
+        token: { type: string, description: 明文，只交付這一次 }
+        token_prefix: { type: string }
+        credential_id: { type: string }
+      required: [token, token_prefix, credential_id]
+    DeviceRequestSummary:
+      type: object
+      properties:
+        user_code: { type: string }
+        device_label: { type: string, nullable: true }
+        status: { type: string, enum: [pending, approved, denied, expired] }
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+      required: [user_code, status, expires_at]
+    ApproveRequest:
+      type: object
+      properties:
+        allocation_id: { type: string, description: 成員選定要綁定的分配（model） }
+      required: [allocation_id]
+
+paths:
+  /device/authorize:
+    post:
+      summary: （公開，CLI）起手——取得 device_code / user_code
+      operationId: deviceAuthorize
+      requestBody:
+        required: false
+        content: { application/json: { schema: { $ref: '#/components/schemas/AuthorizeRequest' } } }
+      responses:
+        '201': { description: 已建立待授權請求, content: { application/json: { schema: { $ref: '#/components/schemas/AuthorizeResponse' } } } }
+
+  /device/token:
+    post:
+      summary: （公開，CLI 輪詢）以 device_code 換結果；成功時單次交付明文 token
+      operationId: deviceToken
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/TokenRequest' } } }
+      responses:
+        '200': { description: 已核可，交付 token（之後再輪詢回 expired_token）, content: { application/json: { schema: { $ref: '#/components/schemas/TokenSuccess' } } } }
+        '400':
+          description: 尚未完成 / 放慢 / 逾時 / 被拒（RFC 8628 風格）
+          content: { application/json: { schema: { $ref: '#/components/schemas/TokenPending' } } }
+        '404': { description: device_code 不存在 }
+
+  /me/device/{user_code}:
+    get:
+      summary: （member）讀待授權請求摘要，供授權頁顯示
+      operationId: getDeviceRequest
+      security: [{ MemberSession: [] }]
+      parameters: [{ name: user_code, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: 摘要, content: { application/json: { schema: { $ref: '#/components/schemas/DeviceRequestSummary' } } } }
+        '401': { description: 未登入 }
+        '404': { description: 找不到 / 已過期 }
+
+  /me/device/{user_code}/approve:
+    post:
+      summary: （member）核可並選分配 → mint per-device 憑證
+      operationId: approveDeviceRequest
+      security: [{ MemberSession: [] }]
+      parameters: [{ name: user_code, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ApproveRequest' } } }
+      responses:
+        '204': { description: 已核可（憑證已 mint、明文待 CLI 輪詢取回） }
+        '401': { description: 未登入 }
+        '403': { description: 非該分配擁有者 }
+        '404': { description: 找不到 / 已過期 / 已終結 }
+
+  /me/device/{user_code}/deny:
+    post:
+      summary: （member）拒絕此裝置授權
+      operationId: denyDeviceRequest
+      security: [{ MemberSession: [] }]
+      parameters: [{ name: user_code, in: path, required: true, schema: { type: string } }]
+      responses:
+        '204': { description: 已拒絕 }
+        '401': { description: 未登入 }
+        '404': { description: 找不到 / 已終結 }
+
+  /install/codex.sh:
+    get:
+      summary: （公開）回 macOS/Linux 安裝腳本（純文字，注入平台 base_url）
+      operationId: installCodexSh
+      responses:
+        '200': { description: shell 腳本, content: { text/plain: { schema: { type: string } } } }
+
+  /install/codex.ps1:
+    get:
+      summary: （公開）回 Windows PowerShell 安裝腳本（純文字，注入平台 base_url）
+      operationId: installCodexPs1
+      responses:
+        '200': { description: PowerShell 腳本, content: { text/plain: { schema: { type: string } } } }
+
+# ---- 契約測試應斷言 ----
+# 1. authorize 回 device_code/user_code/uri/expires/interval。
+# 2. 未核可前 token 回 authorization_pending；過快輪詢回 slow_down。
+# 3. 非擁有者 approve → 403、不 mint；未登入 → 401。
+# 4. 擁有者 approve 後 token 回明文一次 + credential_id；再次 token 回 expired_token（明文已清）。
+# 5. 交付的 token 可成功打 proxy；該憑證出現在 /me/allocations/{id}/credentials、可撤回。
+# 6. 過 expires_at 後 token 回 expired_token；deny 後回 access_denied。
+# 7. 安裝端點回非空純文字且含平台 base_url 與 provider 設定關鍵字。

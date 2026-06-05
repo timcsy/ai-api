@@ -24,7 +24,9 @@ from ai_api.api import (
     allocations,
     auth,
     catalog,
+    device,
     health,
+    install,
     me,
     quota_pool,
     records,
@@ -68,6 +70,8 @@ def create_app() -> FastAPI:
     app.include_router(health.router, tags=[])
     app.include_router(auth.router, tags=["auth"])
     app.include_router(me.router, tags=["me"])
+    app.include_router(device.router, tags=["device"])
+    app.include_router(install.router, tags=["install"])
     app.include_router(allocations.router, prefix="/admin", tags=["admin"])
     app.include_router(records.router, prefix="/admin", tags=["admin"])
     app.include_router(admin_members.router, prefix="/admin", tags=["admin-members"])

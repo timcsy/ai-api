@@ -1,0 +1,111 @@
+#!/bin/sh
+# Codex one-line installer for this platform (macOS / Linux).
+# Usage:  curl -fsSL __BASE_URL__/install/codex.sh | sh
+# No Node, no env vars, no token copy-paste: a browser device-flow mints a
+# per-device credential and writes it into Codex auth.json.
+set -eu
+
+BASE_URL="__BASE_URL__"
+CCSH_BASE="$BASE_URL/v1"
+CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+CONFIG="$CODEX_HOME/config.toml"
+mkdir -p "$CODEX_HOME"
+
+say() { printf '%s\n' "$*"; }
+need() { command -v "$1" >/dev/null 2>&1 || { say "ERROR: '$1' is required but not found."; exit 1; }; }
+need curl
+need python3
+
+# ---------------------------------------------------------------------------
+# 1. Install the Codex CLI (standalone binary from GitHub Releases; no Node).
+# ---------------------------------------------------------------------------
+if ! command -v codex >/dev/null 2>&1; then
+  say "Installing Codex CLI..."
+  OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+  ARCH="$(uname -m)"
+  case "$ARCH" in x86_64|amd64) ARCH=x86_64 ;; arm64|aarch64) ARCH=aarch64 ;; esac
+  TARGET=""
+  case "$OS" in
+    darwin) TARGET="${ARCH}-apple-darwin" ;;
+    linux)  TARGET="${ARCH}-unknown-linux-musl" ;;
+    *) say "ERROR: unsupported OS '$OS'. Install Codex manually, then re-run."; exit 1 ;;
+  esac
+  BIN_DIR="$HOME/.local/bin"; mkdir -p "$BIN_DIR"
+  URL="https://github.com/openai/codex/releases/latest/download/codex-${TARGET}.tar.gz"
+  if ! curl -fsSL "$URL" | tar -xz -C "$BIN_DIR" 2>/dev/null; then
+    say "ERROR: could not download Codex for ${TARGET}. Check your network / antivirus, then re-run."
+    exit 1
+  fi
+  # Some archives unpack to codex-<target>; normalise to 'codex'.
+  [ -f "$BIN_DIR/codex-${TARGET}" ] && mv "$BIN_DIR/codex-${TARGET}" "$BIN_DIR/codex"
+  chmod +x "$BIN_DIR/codex" 2>/dev/null || true
+  case ":$PATH:" in *":$BIN_DIR:"*) : ;; *) PATH="$BIN_DIR:$PATH"; export PATH ;; esac
+fi
+
+# ---------------------------------------------------------------------------
+# 2. Write config.toml MERGE-style: only our provider block + default provider.
+#    No read-only config, no wrapper/alias — a /model switch keeps 'ccsh'.
+# ---------------------------------------------------------------------------
+python3 - "$CONFIG" "$CCSH_BASE" <<'PY'
+import sys, re, pathlib
+cfg, base = pathlib.Path(sys.argv[1]), sys.argv[2]
+text = cfg.read_text() if cfg.exists() else ""
+block = f'''model_provider = "ccsh"
+
+[model_providers.ccsh]
+name = "CCSH"
+base_url = "{base}"
+wire_api = "responses"
+requires_openai_auth = true
+supports_websockets = false
+'''
+# Drop any prior 'model_provider = ...' line and our [model_providers.ccsh] block,
+# preserving everything else the user has.
+text = re.sub(r'(?m)^\s*model_provider\s*=.*$\n?', '', text)
+text = re.sub(r'(?ms)^\[model_providers\.ccsh\].*?(?=^\[|\Z)', '', text)
+cfg.write_text(block + "\n" + text.lstrip())
+PY
+say "Wrote $CONFIG (provider 'ccsh' -> $CCSH_BASE)"
+
+# ---------------------------------------------------------------------------
+# 3. Device-flow: authorize in the browser, no token copy-paste.
+# ---------------------------------------------------------------------------
+LABEL="Codex on $(hostname 2>/dev/null || echo device)"
+AUTH=$(curl -fsSL -X POST "$BASE_URL/device/authorize" \
+  -H 'Content-Type: application/json' -d "{\"device_label\":\"$LABEL\"}")
+DEVICE_CODE=$(printf '%s' "$AUTH" | python3 -c 'import sys,json;print(json.load(sys.stdin)["device_code"])')
+USER_CODE=$(printf '%s' "$AUTH" | python3 -c 'import sys,json;print(json.load(sys.stdin)["user_code"])')
+INTERVAL=$(printf '%s' "$AUTH" | python3 -c 'import sys,json;print(json.load(sys.stdin)["interval"])')
+
+say ""
+say "  Open this page in your browser (you must be logged in):"
+say "    $BASE_URL/device?code=$USER_CODE"
+say "  and confirm the code:  $USER_CODE"
+say ""
+say "Waiting for authorization..."
+
+TOKEN=""
+while [ -z "$TOKEN" ]; do
+  sleep "${INTERVAL:-5}"
+  RESP=$(curl -s -X POST "$BASE_URL/device/token" \
+    -H 'Content-Type: application/json' -d "{\"device_code\":\"$DEVICE_CODE\"}")
+  TOKEN=$(printf '%s' "$RESP" | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d.get("token",""))' 2>/dev/null || true)
+  ERR=$(printf '%s' "$RESP" | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d.get("error",""))' 2>/dev/null || true)
+  case "$ERR" in
+    expired_token) say "ERROR: the code expired. Re-run this command."; exit 1 ;;
+    access_denied) say "Authorization was denied."; exit 1 ;;
+  esac
+done
+
+# ---------------------------------------------------------------------------
+# 4. Store the credential in auth.json (no env var) and verify.
+# ---------------------------------------------------------------------------
+printf '%s' "$TOKEN" | codex login --with-api-key >/dev/null 2>&1 || {
+  say "ERROR: codex login failed."; exit 1; }
+
+say "Verifying connection..."
+if codex exec --skip-git-repo-check "say only: ok" >/dev/null 2>&1; then
+  say "✓ 連線成功 — just run 'codex' from any new terminal."
+else
+  say "Installed, but the test call did not confirm. Try running 'codex' yourself."
+fi

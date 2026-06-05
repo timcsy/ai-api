@@ -1,0 +1,97 @@
+# Codex one-line installer for this platform (Windows PowerShell).
+# Usage:  irm __BASE_URL__/install/codex.ps1 | iex
+# No Node, no env vars, no token copy-paste: a browser device-flow mints a
+# per-device credential and writes it into Codex auth.json.
+$ErrorActionPreference = "Stop"
+
+$BaseUrl  = "__BASE_URL__"
+$CcshBase = "$BaseUrl/v1"
+$CodexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME ".codex" }
+$Config = Join-Path $CodexHome "config.toml"
+New-Item -ItemType Directory -Force -Path $CodexHome | Out-Null
+
+# ---------------------------------------------------------------------------
+# 1. Install the Codex CLI (standalone binary from GitHub Releases; no Node).
+# ---------------------------------------------------------------------------
+if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
+  Write-Host "Installing Codex CLI..."
+  $BinDir = Join-Path $HOME ".local\bin"
+  New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
+  $Url = "https://github.com/openai/codex/releases/latest/download/codex-x86_64-pc-windows-msvc.zip"
+  $Zip = Join-Path $env:TEMP "codex.zip"
+  try {
+    Invoke-WebRequest -Uri $Url -OutFile $Zip
+    Expand-Archive -Path $Zip -DestinationPath $BinDir -Force
+  } catch {
+    Write-Host "ERROR: could not download Codex. Check your network / antivirus (SmartScreen), then re-run."
+    exit 1
+  }
+  if (";$env:PATH;" -notlike "*;$BinDir;*") { $env:PATH = "$BinDir;$env:PATH" }
+}
+
+# ---------------------------------------------------------------------------
+# 2. Write config.toml MERGE-style: only our provider block + default provider.
+#    No read-only config, no wrapper/alias — a /model switch keeps 'ccsh'.
+# ---------------------------------------------------------------------------
+$block = @"
+model_provider = "ccsh"
+
+[model_providers.ccsh]
+name = "CCSH"
+base_url = "$CcshBase"
+wire_api = "responses"
+requires_openai_auth = true
+supports_websockets = false
+"@
+$existing = ""
+if (Test-Path $Config) { $existing = Get-Content -Raw $Config }
+# Drop any prior model_provider line and our [model_providers.ccsh] block.
+$existing = [regex]::Replace($existing, '(?m)^\s*model_provider\s*=.*\r?\n?', '')
+$existing = [regex]::Replace($existing, '(?ms)^\[model_providers\.ccsh\].*?(?=^\[|\Z)', '')
+Set-Content -Path $Config -Value ($block + "`n" + $existing.TrimStart())
+Write-Host "Wrote $Config (provider 'ccsh' -> $CcshBase)"
+
+# ---------------------------------------------------------------------------
+# 3. Device-flow: authorize in the browser, no token copy-paste.
+# ---------------------------------------------------------------------------
+$label = "Codex on $env:COMPUTERNAME"
+$auth = Invoke-RestMethod -Method Post -Uri "$BaseUrl/device/authorize" `
+  -ContentType "application/json" -Body (@{ device_label = $label } | ConvertTo-Json)
+$deviceCode = $auth.device_code
+$userCode   = $auth.user_code
+$interval   = if ($auth.interval) { [int]$auth.interval } else { 5 }
+
+Write-Host ""
+Write-Host "  Open this page in your browser (you must be logged in):"
+Write-Host "    $BaseUrl/device?code=$userCode"
+Write-Host "  and confirm the code:  $userCode"
+Write-Host ""
+Write-Host "Waiting for authorization..."
+
+$token = ""
+while (-not $token) {
+  Start-Sleep -Seconds $interval
+  try {
+    $resp = Invoke-RestMethod -Method Post -Uri "$BaseUrl/device/token" `
+      -ContentType "application/json" -Body (@{ device_code = $deviceCode } | ConvertTo-Json)
+    if ($resp.token) { $token = $resp.token }
+  } catch {
+    $err = ""
+    try { $err = ($_.ErrorDetails.Message | ConvertFrom-Json).error } catch {}
+    if ($err -eq "expired_token") { Write-Host "ERROR: the code expired. Re-run this command."; exit 1 }
+    if ($err -eq "access_denied") { Write-Host "Authorization was denied."; exit 1 }
+    # authorization_pending / slow_down -> keep waiting
+  }
+}
+
+# ---------------------------------------------------------------------------
+# 4. Store the credential in auth.json (no env var) and verify.
+# ---------------------------------------------------------------------------
+$token | codex login --with-api-key | Out-Null
+Write-Host "Verifying connection..."
+try {
+  codex exec --skip-git-repo-check "say only: ok" | Out-Null
+  Write-Host "OK - just run 'codex' from any new terminal."
+} catch {
+  Write-Host "Installed, but the test call did not confirm. Try running 'codex' yourself."
+}

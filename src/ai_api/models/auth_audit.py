@@ -64,6 +64,9 @@ class AuditEventType(enum.StrEnum):
     # Phase 18: per-device credentials
     credential_added = "credential_added"
     credential_revoked = "credential_revoked"
+    # Phase 19: Codex device-flow
+    device_authorization_approved = "device_authorization_approved"
+    device_authorization_denied = "device_authorization_denied"
 
 
 class ActorType(enum.StrEnum):
