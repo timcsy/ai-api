@@ -29,4 +29,13 @@ describe("<CodexInstallCard />", () => {
       "irm https://ai.example.com/install/codex.ps1 | iex",
     );
   });
+
+  it("explains what happens for members who already have Codex installed", async () => {
+    const user = userEvent.setup();
+    render(<CodexInstallCard baseUrl="https://ai.example.com/" />);
+    // The note is collapsed behind a summary; expand it.
+    await user.click(screen.getByText(/已經裝過 Codex/));
+    expect(screen.getByText(/不會重裝/)).toBeInTheDocument();
+    expect(screen.getByText(/ChatGPT 桌面 App/)).toBeInTheDocument();
+  });
 });

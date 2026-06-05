@@ -67,6 +67,24 @@ export function CodexInstallCard({ baseUrl }: { baseUrl: string }) {
             複製
           </Button>
         </div>
+        <details className="text-xs text-muted-foreground">
+          <summary className="cursor-pointer select-none">已經裝過 Codex？點此看會發生什麼</summary>
+          <div className="mt-2 space-y-1.5 pl-1">
+            <p>
+              <strong>已裝 Codex 指令列（CLI）</strong>：不會重裝、也會保留你其他設定；只會把
+              <strong>預設連線對象切到本平台</strong>，並用平台發的金鑰取代目前的登入。之後想換回自己的
+              OpenAI 帳號，重新執行 <code className="break-all">codex login</code> 即可。
+            </p>
+            <p>
+              <strong>已裝編輯器擴充（VS Code / Cursor 等的 Codex）</strong>：新版擴充與 CLI 共用同一份設定，
+              通常會一起指向本平台。
+            </p>
+            <p>
+              <strong>ChatGPT 桌面 App / 網頁版 Codex</strong>：那是綁 ChatGPT 帳號的版本，
+              <strong>不適用</strong>本平台（請用上面的 CLI 安裝）。
+            </p>
+          </div>
+        </details>
       </CardContent>
     </Card>
   );

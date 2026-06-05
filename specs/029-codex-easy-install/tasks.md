@@ -157,6 +157,8 @@ description: "Tasks for 階段 19 — 一鍵安裝 Codex + device-flow 免貼 to
 - [X] T034 跑 `uv run ruff check . && uv run mypy src/` 零警告；`npm --prefix frontend run test && lint && typecheck && build` 綠。
 - [ ] T035 **三平台真機驗收（SC-006）**：Windows / macOS / Linux 各跑 quickstart 真機清單——
       一行指令 → 瀏覽器授權 → 新終端機零參數 `codex` → `/model` 切換不脫鉤 → 清單可見可撤回。記錄結果。
+      **含「已裝過 Codex」情境**（quickstart 新增段）：已裝 CLI（不重裝、保留設定、切預設 provider、可逆登入）、
+      已裝編輯器擴充（與 CLI 共用 `~/.codex/`，支援度如實記錄）、ChatGPT App/網頁版（確認不適用、引導改用 CLI）。
 - [X] T036 [P] 更新 `knowledge/vision.md` 階段 19 → ✅（填完成日、實際交付、連結 history）；roadmap/狀態同步；
       修掉殘留狀態行（342 行「階段 18、19 規劃中」）。
 - [X] T037 [P] 在 `knowledge/history/completed-phases-detail.md` 追加「## 階段 19」詳情（device-flow 設計、0016、明文單次交付、三平台真機結論）；

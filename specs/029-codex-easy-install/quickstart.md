@@ -27,6 +27,17 @@
 - [ ] Codex 內 `/model` 切換 → 再呼叫仍走本平台（**不打 api.openai.com**）；未開放 model 回清楚訊息而非 401。
 - [ ] dashboard「裝置與憑證」看到新憑證（`Codex on <host>`）→ 撤回 → 該台 Codex 失效。
 
+### 機器上「已裝過 Codex」的情境（每個 OS 至少各驗一種）
+
+- [ ] **已裝 CLI**（`codex` 已在 PATH）：跑一行指令 → 腳本**不重裝**（沿用現有 binary）、保留 `config.toml`
+      其他設定、只覆寫 `model_provider` + `[model_providers.ccsh]`；授權後新終端機 `codex` 走本平台。
+      驗：原本若以個人 OpenAI 帳號登入，裝後預設 provider 切成 `ccsh`、`auth.json` 換成平台金鑰；
+      重跑 `codex login` 可切回個人帳號（可逆）。
+- [ ] **已裝編輯器擴充**（VS Code / Cursor 的 Codex，與 CLI 共用 `~/.codex/`）：裝後擴充是否也指向本平台、
+      可正常呼叫。**未驗證項要如實記錄**（擴充對自訂 provider + api-key 的支援度尚未實機確認）。
+- [ ] **ChatGPT 桌面 App / 網頁版 Codex**：確認**不適用**（帳號綁定、不讀本地 `config.toml`）——
+      此為預期行為，記錄為「不支援、引導改用 CLI」。
+
 ## 前端（vitest + 手動）
 
 - [ ] 授權頁 `/device`：輸入/確認 user_code → 顯示請求摘要 → 選分配 → 核可/拒絕；非本人分配不可選。
