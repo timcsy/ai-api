@@ -71,28 +71,36 @@ export function CodexInstallCard({ baseUrl }: { baseUrl: string }) {
           <summary className="cursor-pointer select-none">已經裝過 Codex？點此看會發生什麼</summary>
           <div className="mt-2 space-y-2 pl-1">
             <p>
-              關鍵不是「哪個 Codex」，是<strong>它怎麼登入</strong>：吃「API key + 本地設定」的能指向本平台，
-              用「ChatGPT 帳號登入」的不行。
+              這個安裝寫進 <code className="break-all">~/.codex</code> 設定 + 一把平台金鑰。讀這份設定的 Codex
+              介面都能指向本平台；跑在雲端、綁 ChatGPT 帳號的則不行。
             </p>
             <div>
-              <p className="font-medium text-foreground">✓ 適用（吃本地設定 + API key）</p>
+              <p className="font-medium text-foreground">✓ 適用</p>
               <ul className="mt-1 list-disc space-y-1 pl-5">
                 <li>
-                  <strong>指令列（CLI）</strong>：不會重裝、保留你其他設定；只把<strong>預設連線對象切到本平台</strong>、
+                  <strong>指令列（CLI）</strong>（最穩、推薦）：不會重裝、保留你其他設定；只把<strong>預設連線對象切到本平台</strong>、
                   用平台金鑰取代目前登入。想換回自己的 OpenAI 帳號，重跑 <code className="break-all">codex login</code> 即可（可逆）。
                 </li>
                 <li>
-                  <strong>編輯器擴充（VS Code / Cursor 的 Codex）</strong>：新版與 CLI 共用同一份設定，通常會一起指向本平台。
+                  <strong>編輯器擴充（VS Code / Cursor / JetBrains 的 Codex）</strong>：與 CLI 共用同一份設定，通常會一起指向本平台。
                 </li>
               </ul>
             </div>
             <div>
-              <p className="font-medium text-foreground">✗ 不適用（用 ChatGPT 帳號登入、跑在 OpenAI 雲端）</p>
+              <p className="font-medium text-foreground">△ 技術上可以、但目前不建議</p>
               <ul className="mt-1 list-disc space-y-1 pl-5">
                 <li>
-                  <strong>Codex 桌面 App</strong>、<strong>ChatGPT 桌面版裡的 Codex</strong>、
-                  <strong>網頁版 Codex（chatgpt.com/codex）</strong>：綁 ChatGPT 帳號、不讀本地設定，無法指向本平台
-                  → 請改用上面的 <strong>CLI</strong>。
+                  <strong>Codex 桌面 App</strong>：也讀同一份 <code className="break-all">~/.codex</code> 設定、可用 API key 指向本平台，
+                  但 OpenAI 文件說「用 API key 時部分功能受限」，且目前有一個未修復的已知問題（指向自訂網址時可能帶錯金鑰）。
+                  現階段請用 <strong>CLI</strong> 最穩。
+                </li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">✗ 不適用</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5">
+                <li>
+                  <strong>網頁版 Codex（chatgpt.com/codex）</strong>：跑在 OpenAI 雲端、綁 ChatGPT 帳號，不經本地設定 → 請用 <strong>CLI</strong>。
                 </li>
               </ul>
             </div>

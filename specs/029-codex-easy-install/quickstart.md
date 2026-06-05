@@ -33,10 +33,13 @@
       其他設定、只覆寫 `model_provider` + `[model_providers.ccsh]`；授權後新終端機 `codex` 走本平台。
       驗：原本若以個人 OpenAI 帳號登入，裝後預設 provider 切成 `ccsh`、`auth.json` 換成平台金鑰；
       重跑 `codex login` 可切回個人帳號（可逆）。
-- [ ] **已裝編輯器擴充**（VS Code / Cursor 的 Codex，與 CLI 共用 `~/.codex/`）：裝後擴充是否也指向本平台、
+- [ ] **已裝編輯器擴充**（VS Code / Cursor / JetBrains 的 Codex，與 CLI 共用 `~/.codex/`）：裝後擴充是否也指向本平台、
       可正常呼叫。**未驗證項要如實記錄**（擴充對自訂 provider + api-key 的支援度尚未實機確認）。
-- [ ] **用 ChatGPT 帳號登入的 Codex**（Codex 桌面 App、ChatGPT 桌面版內的 Codex、網頁版 chatgpt.com/codex）：
-      確認**不適用**（帳號綁定、不讀本地 `config.toml`、無法指向自訂 base_url）——此為預期行為，記錄為「不支援、引導改用 CLI」。
+- [ ] **Codex 桌面 App**（獨立桌面程式，macOS/Windows）：它**也讀 `~/.codex/config.toml`** 自訂 provider，理論上可用 API key 指向本平台，
+      但有已知問題（OpenAI codex issue #24457：自訂 base_url 可能帶錯 auth.json key）＋ API-key 模式部分功能受限。
+      實機驗：能否成功呼叫、auth 是否正確；**結論記為「技術上可行但目前不建議，引導用 CLI」**並記下實際行為。
+- [ ] **網頁版 Codex（chatgpt.com/codex）**：確認**不適用**（跑在 OpenAI 雲端、綁 ChatGPT 帳號、不經本地設定）——
+      記錄為「不支援、引導改用 CLI」。
 
 ## 前端（vitest + 手動）
 
