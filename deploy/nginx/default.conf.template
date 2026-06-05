@@ -45,6 +45,8 @@ server {
     location /v1          { proxy_pass http://${BACKEND_UPSTREAM}; }
     location /docs        { proxy_pass http://${BACKEND_UPSTREAM}; }
     location /openapi.json { proxy_pass http://${BACKEND_UPSTREAM}; }
+    # Phase 19: Codex install scripts — backend-only (fetched by curl/irm).
+    location /install     { proxy_pass http://${BACKEND_UPSTREAM}; }
 
     # /admin and /catalog are BOTH SPA routes and backend APIs: browser
     # navigations (Accept: text/html) get the SPA; XHR/JSON go to the backend.
@@ -53,6 +55,13 @@ server {
         try_files $uri /index.html;
     }
     location /catalog {
+        if ($http_accept !~ text/html) { proxy_pass http://${BACKEND_UPSTREAM}; }
+        try_files $uri /index.html;
+    }
+    # Phase 19: /device is BOTH the SPA authorization page (browser navigation,
+    # Accept: text/html) and the device-flow API (CLI poll /device/authorize,
+    # /device/token — Accept: */*). Same split as /admin and /catalog.
+    location /device {
         if ($http_accept !~ text/html) { proxy_pass http://${BACKEND_UPSTREAM}; }
         try_files $uri /index.html;
     }
