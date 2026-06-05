@@ -149,13 +149,13 @@ export function AdminProvidersPage() {
       setRotateOpenFor(null);
       rotateForm.reset();
       setPlaintextDialog({
-        title: "新 token 已產生 — 舊 token 立即失效",
+        title: "新金鑰已生效 — 舊金鑰立即失效",
         api_key: cred.api_key!,
         fingerprint: cred.fingerprint,
       });
       queryClient.invalidateQueries({ queryKey: ["admin", "providers"] });
     },
-    onError: (e) => toast({ title: "Rotate 失敗", description: e.message, variant: "destructive" }),
+    onError: (e) => toast({ title: "重新填寫失敗", description: e.message, variant: "destructive" }),
   });
 
   const disableMut = useMutation<ProviderCredential, ApiError, string>({
@@ -283,7 +283,7 @@ export function AdminProvidersPage() {
                       {testMut.isPending && testMut.variables?.id === c.id ? "測試中…" : "測試連線"}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => setRotateOpenFor(c)}>
-                      Rotate
+                      重新填寫金鑰
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => setDisableConfirmFor(c)}>
                       停用
@@ -401,7 +401,7 @@ export function AdminProvidersPage() {
       <Dialog open={rotateOpenFor !== null} onOpenChange={(v) => !v && setRotateOpenFor(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Rotate Credential</DialogTitle>
+            <DialogTitle>重新填寫上游金鑰</DialogTitle>
             <DialogDescription>
               貼上新 API key。舊 key 立即失效；新 key 僅在下一個畫面顯示一次。
             </DialogDescription>
@@ -431,7 +431,7 @@ export function AdminProvidersPage() {
                   取消
                 </Button>
                 <Button type="submit" disabled={rotateMut.isPending}>
-                  Rotate
+                  重新填寫
                 </Button>
               </DialogFooter>
             </form>

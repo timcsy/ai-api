@@ -97,8 +97,7 @@ export function AppCredentialsCard() {
   const [revokeTarget, setRevokeTarget] = React.useState<AppCredential | null>(null);
   const [editTarget, setEditTarget] = React.useState<AppCredential | null>(null);
   const [editPick, setEditPick] = React.useState<Set<string>>(new Set());
-  const [renameTarget, setRenameTarget] = React.useState<AppCredential | null>(null);
-  const [renameName, setRenameName] = React.useState("");
+  const [editName, setEditName] = React.useState("");
 
   const invalidate = () => qc.invalidateQueries({ queryKey: key });
 
@@ -139,30 +138,22 @@ export function AppCredentialsCard() {
     onError: (e: ApiError) => toast({ title: "重新產生失敗", description: e.message, variant: "destructive" }),
   });
 
+  // Phase 22: a single "編輯" sends name + scope diff together. The backend
+  // PATCH accepts name/add/remove in one call (see test_credential_rename.py).
   const patchMut = useMutation({
-    mutationFn: (v: { id: string; add: string[]; remove: string[] }) =>
-      api(`/me/credentials/${v.id}`, { method: "PATCH", body: JSON.stringify({ add: v.add, remove: v.remove }) }),
+    mutationFn: (v: { id: string; body: Record<string, unknown> }) =>
+      api(`/me/credentials/${v.id}`, { method: "PATCH", body: JSON.stringify(v.body) }),
     onSuccess: () => {
       setEditTarget(null);
       invalidate();
-      toast({ title: "已更新可用 model" });
+      toast({ title: "已更新金鑰" });
     },
     onError: (e: ApiError) => toast({ title: "更新失敗", description: e.message, variant: "destructive" }),
   });
 
-  const renameMut = useMutation({
-    mutationFn: (v: { id: string; name: string }) =>
-      api(`/me/credentials/${v.id}`, { method: "PATCH", body: JSON.stringify({ name: v.name }) }),
-    onSuccess: () => {
-      setRenameTarget(null);
-      invalidate();
-      toast({ title: "已改名" });
-    },
-    onError: (e: ApiError) => toast({ title: "改名失敗", description: e.message, variant: "destructive" }),
-  });
-
   function openEdit(c: AppCredential) {
     setEditTarget(c);
+    setEditName(c.name);
     setEditPick(new Set(c.allocations.map((a) => a.allocation_id)));
   }
   function applyEdit() {
@@ -170,7 +161,16 @@ export function AppCredentialsCard() {
     const before = new Set(editTarget.allocations.map((a) => a.allocation_id));
     const add = [...editPick].filter((id) => !before.has(id));
     const remove = [...before].filter((id) => !editPick.has(id));
-    patchMut.mutate({ id: editTarget.id, add, remove });
+    const body: Record<string, unknown> = {};
+    const trimmed = editName.trim();
+    if (trimmed && trimmed !== editTarget.name) body.name = trimmed;
+    if (add.length) body.add = add;
+    if (remove.length) body.remove = remove;
+    if (Object.keys(body).length === 0) {
+      setEditTarget(null);
+      return;
+    }
+    patchMut.mutate({ id: editTarget.id, body });
   }
 
   const creds = credsQuery.data ?? [];
@@ -230,8 +230,7 @@ export function AppCredentialsCard() {
                   <TableCell className="text-right" data-label="操作">
                     {c.status === "active" ? (
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => { setRenameTarget(c); setRenameName(c.name); }}>改名</Button>
-                        <Button variant="ghost" size="sm" onClick={() => openEdit(c)}>編輯 model</Button>
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(c)}>編輯</Button>
                         <Button variant="ghost" size="sm" disabled={rotateMut.isPending} onClick={() => rotateMut.mutate(c.id)}>重新產生</Button>
                         <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setRevokeTarget(c)}>撤回</Button>
                       </div>
@@ -288,66 +287,48 @@ export function AppCredentialsCard() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit scope */}
+      {/* Edit (name + scope together) */}
       <Dialog open={!!editTarget} onOpenChange={(o) => !o && setEditTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>編輯「{editTarget?.name}」可用的 model</DialogTitle>
-            <DialogDescription>勾選的 model 會立即生效（同一把 token，不需換）。至少保留一個。</DialogDescription>
+            <DialogTitle>編輯金鑰</DialogTitle>
+            <DialogDescription>改名稱與可用 model 都在這裡，按儲存一次生效（同一把 token，不需換）。至少保留一個 model。</DialogDescription>
           </DialogHeader>
-          <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border p-2">
-            {activeAllocs.map((a) => (
-              <label key={a.id} className="flex items-center gap-2 py-1 text-sm">
-                <Checkbox
-                  checked={editPick.has(a.id)}
-                  onCheckedChange={(v) =>
-                    setEditPick((s) => {
-                      const n = new Set(s);
-                      if (v) n.add(a.id); else n.delete(a.id);
-                      return n;
-                    })
-                  }
-                />
-                <span className="font-mono text-xs">{a.display_name ?? a.resource_model}</span>
-              </label>
-            ))}
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">名稱</Label>
+              <Input
+                id="edit-name"
+                value={editName}
+                maxLength={64}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>可用 model</Label>
+              <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border p-2">
+                {activeAllocs.map((a) => (
+                  <label key={a.id} className="flex items-center gap-2 py-1 text-sm">
+                    <Checkbox
+                      checked={editPick.has(a.id)}
+                      onCheckedChange={(v) =>
+                        setEditPick((s) => {
+                          const n = new Set(s);
+                          if (v) n.add(a.id); else n.delete(a.id);
+                          return n;
+                        })
+                      }
+                    />
+                    <span className="font-mono text-xs">{a.display_name ?? a.resource_model}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditTarget(null)}>取消</Button>
-            <Button disabled={editPick.size === 0 || patchMut.isPending} onClick={applyEdit}>
-              {patchMut.isPending ? "更新中…" : "套用"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Rename */}
-      <Dialog open={!!renameTarget} onOpenChange={(o) => !o && setRenameTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>金鑰改名</DialogTitle>
-            <DialogDescription>只是改個好記的名字，不影響 token 或可用 model。</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="rename-input">名稱</Label>
-            <Input
-              id="rename-input"
-              value={renameName}
-              maxLength={64}
-              onChange={(e) => setRenameName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && renameName.trim() && renameTarget)
-                  renameMut.mutate({ id: renameTarget.id, name: renameName.trim() });
-              }}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameTarget(null)}>取消</Button>
-            <Button
-              disabled={!renameName.trim() || renameMut.isPending}
-              onClick={() => renameTarget && renameMut.mutate({ id: renameTarget.id, name: renameName.trim() })}
-            >
-              {renameMut.isPending ? "儲存中…" : "儲存"}
+            <Button disabled={!editName.trim() || editPick.size === 0 || patchMut.isPending} onClick={applyEdit}>
+              {patchMut.isPending ? "儲存中…" : "儲存"}
             </Button>
           </DialogFooter>
         </DialogContent>

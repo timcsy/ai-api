@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "@/contexts/auth";
-import { DashboardPage } from "@/routes/dashboard";
+import { AllocationsPage } from "@/routes/allocations";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -21,10 +21,10 @@ function setup(allocations: unknown[], claimable: unknown[] = []) {
   });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/dashboard"]}>
+      <MemoryRouter initialEntries={["/allocations"]}>
         <AuthProvider queryClient={qc}>
           <Routes>
-            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/allocations" element={<AllocationsPage />} />
           </Routes>
         </AuthProvider>
       </MemoryRouter>
@@ -78,13 +78,6 @@ describe("dashboard onboarding (US3)", () => {
     setup([ALLOC]);
     await waitFor(() => expect(screen.getByText("GPT-5.4 mini")).toBeInTheDocument());
     expect(screen.queryByText(/① 領取憑證/)).not.toBeInTheDocument();
-  });
-});
-
-describe("dashboard token hint (US6)", () => {
-  it("mentions self-service in the token hint", async () => {
-    setup([]);
-    await waitFor(() => expect(screen.getByText(/自助領取/)).toBeInTheDocument());
   });
 });
 

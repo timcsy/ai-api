@@ -72,6 +72,19 @@ describe("<AdminProvidersPage />", () => {
     expect(screen.getByText("abcd1234efgh5678")).toBeInTheDocument();
   });
 
+  it("uses Chinese wording for the rotate action (no English Rotate)", async () => {
+    setup([
+      {
+        id: "c1", provider: "openai", label: "prod",
+        fingerprint: "abcd1234efgh5678", base_url: null,
+        status: "active", last_used_at: null,
+        created_at: "2026-01-01T00:00:00Z", created_by: "admin", disabled_at: null,
+      },
+    ]);
+    expect(await screen.findByRole("button", { name: "重新填寫金鑰" })).toBeInTheDocument();
+    expect(screen.queryByText("Rotate")).not.toBeInTheDocument();
+  });
+
   it("opens create dialog, submits, then shows plaintext banner", async () => {
     const user = userEvent.setup();
     setup([]);
