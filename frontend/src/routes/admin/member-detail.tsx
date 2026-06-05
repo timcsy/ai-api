@@ -42,6 +42,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
+import { AdminMemberCredentials } from "@/components/admin-member-credentials";
 import { VisibilityDiagnose } from "@/components/visibility-diagnose";
 import { ApiError, api } from "@/lib/api-client";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -235,7 +236,7 @@ export function AdminMemberDetailPage() {
           <div className="flex items-start justify-between gap-2">
             <div>
               <CardTitle className="text-lg">分配（Allocations）</CardTitle>
-              <CardDescription>該成員的所有分配憑證；在此直接建立與撤回</CardDescription>
+              <CardDescription>該成員的所有分配（model 授權）；在此直接建立與撤回</CardDescription>
             </div>
             <div className="flex items-center gap-3 shrink-0">
               {revokedCount > 0 && (
@@ -319,6 +320,8 @@ export function AdminMemberDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <AdminMemberCredentials memberId={memberId} />
 
       <CreateAllocationDialog
         open={createOpen}

@@ -498,6 +498,15 @@ class AllocationService:
     async def get_credential(self, credential_id: str) -> Credential | None:
         return await self._s.get(Credential, credential_id)
 
+    async def rename_credential(self, credential_id: str, name: str) -> Credential | None:
+        """Rename a key (label only — does not touch token or scope)."""
+        cred = await self._s.get(Credential, credential_id)
+        if cred is None:
+            return None
+        cred.name = name
+        await self._s.flush()
+        return cred
+
     async def get_credential_with_scope(self, credential_id: str) -> Credential | None:
         """A credential with its scope (allocations) eager-loaded for serialisation."""
         return (

@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { ApiUsageExample } from "@/components/api-usage-example";
 import { AllocationUsageCharts } from "@/components/allocation-usage-charts";
-import { DeviceCredentialsCard } from "@/components/device-credentials-card";
+import { AllocationKeysReadonly } from "@/components/allocation-keys-readonly";
 import { per1kToPer1m } from "@/lib/price-format";
 import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
@@ -168,12 +168,7 @@ export function AllocationDetailPage() {
         )}
       </section>
 
-      <DeviceCredentialsCard
-        allocationId={id}
-        basePath="/me/allocations"
-        scope="me"
-        allowAdd
-      />
+      <AllocationKeysReadonly allocationId={id} />
 
       <ApiUsageExample model={alloc?.resource_model ?? ""} supportsResponses={supportsResponses} />
 

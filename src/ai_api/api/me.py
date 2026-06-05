@@ -823,9 +823,23 @@ async def patch_my_app_credential_scope(
     member: Member = Depends(current_member),
     db: AsyncSession = Depends(get_db_session),
 ) -> AppCredentialOut:
-    """Add/remove allocations from a key's scope (≥1 must remain; models distinct)."""
+    """Edit a key: rename (label only) and/or add/remove scope allocations
+    (≥1 must remain; models distinct)."""
+    from ai_api.auth import audit
+    from ai_api.models import ActorType, AuditEventType
+
     service = AllocationService(db)
     await _own_credential_or_error(service, credential_id, member)
+    if payload.name is not None:
+        await service.rename_credential(credential_id, payload.name)
+        await audit.record(
+            db,
+            event_type=AuditEventType.credential_renamed,
+            actor_type=ActorType.member,
+            actor_id=member.id,
+            target_type="credential",
+            target_id=credential_id,
+        )
     try:
         await service.patch_credential_scope(credential_id, payload.add, payload.remove)
     except PermissionError as exc:

@@ -83,9 +83,9 @@ export function DeviceAuthorizePage() {
     <div className="container mx-auto max-w-md py-10">
       <Card>
         <CardHeader>
-          <CardTitle>授權裝置安裝 Codex</CardTitle>
+          <CardTitle>授權安裝 Codex</CardTitle>
           <CardDescription>
-            確認終端機顯示的代碼，選擇要讓這台裝置使用的分配，再按授權。
+            確認終端機顯示的代碼、勾選這台裝置可用的 model，按授權後會在你的「我的應用金鑰」**新增一把**金鑰給它。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

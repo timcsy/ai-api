@@ -70,6 +70,8 @@ class AuditEventType(enum.StrEnum):
     # Phase 20: scoped application credentials
     credential_scope_added = "credential_scope_added"
     credential_scope_removed = "credential_scope_removed"
+    # Phase 21: rename
+    credential_renamed = "credential_renamed"
 
 
 class ActorType(enum.StrEnum):

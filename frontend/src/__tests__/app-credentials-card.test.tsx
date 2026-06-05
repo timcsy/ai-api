@@ -87,4 +87,30 @@ describe("<AppCredentialsCard />", () => {
 
     await waitFor(() => expect(screen.getByText("aiapi_secretsecret")).toBeInTheDocument());
   });
+
+  it("renames a key via PATCH name (label only)", async () => {
+    const calls: { url: string; method: string }[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : (input as Request).url;
+      const method = (init?.method ?? "GET").toUpperCase();
+      calls.push({ url, method });
+      if (url.endsWith("/me/credentials/c1") && method === "PATCH") return jsonResponse(200, { ...CREDS[0], name: "改好的名" });
+      if (url.endsWith("/me/credentials")) return jsonResponse(200, CREDS);
+      if (url.endsWith("/me/allocations")) return jsonResponse(200, ALLOCS);
+      return jsonResponse(404, { error: {} });
+    });
+    const user = userEvent.setup();
+    renderCard();
+    await waitFor(() => expect(screen.getByText("我的筆電")).toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: "改名" }));
+    const input = screen.getByLabelText("名稱");
+    await user.clear(input);
+    await user.type(input, "改好的名");
+    await user.click(screen.getByRole("button", { name: "儲存" }));
+
+    await waitFor(() =>
+      expect(calls.some((c) => c.url.endsWith("/me/credentials/c1") && c.method === "PATCH")).toBe(true),
+    );
+  });
 });
