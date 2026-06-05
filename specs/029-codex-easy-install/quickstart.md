@@ -35,8 +35,8 @@
       重跑 `codex login` 可切回個人帳號（可逆）。
 - [ ] **已裝編輯器擴充**（VS Code / Cursor 的 Codex，與 CLI 共用 `~/.codex/`）：裝後擴充是否也指向本平台、
       可正常呼叫。**未驗證項要如實記錄**（擴充對自訂 provider + api-key 的支援度尚未實機確認）。
-- [ ] **ChatGPT 桌面 App / 網頁版 Codex**：確認**不適用**（帳號綁定、不讀本地 `config.toml`）——
-      此為預期行為，記錄為「不支援、引導改用 CLI」。
+- [ ] **用 ChatGPT 帳號登入的 Codex**（Codex 桌面 App、ChatGPT 桌面版內的 Codex、網頁版 chatgpt.com/codex）：
+      確認**不適用**（帳號綁定、不讀本地 `config.toml`、無法指向自訂 base_url）——此為預期行為，記錄為「不支援、引導改用 CLI」。
 
 ## 前端（vitest + 手動）
 

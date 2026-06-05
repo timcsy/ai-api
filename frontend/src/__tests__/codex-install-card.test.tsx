@@ -36,6 +36,7 @@ describe("<CodexInstallCard />", () => {
     // The note is collapsed behind a summary; expand it.
     await user.click(screen.getByText(/已經裝過 Codex/));
     expect(screen.getByText(/不會重裝/)).toBeInTheDocument();
-    expect(screen.getByText(/ChatGPT 桌面 App/)).toBeInTheDocument();
+    // Desktop app is explicitly called out as NOT supported (account-bound).
+    expect(screen.getByText(/Codex 桌面 App/)).toBeInTheDocument();
   });
 });

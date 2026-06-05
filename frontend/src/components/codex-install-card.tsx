@@ -69,20 +69,33 @@ export function CodexInstallCard({ baseUrl }: { baseUrl: string }) {
         </div>
         <details className="text-xs text-muted-foreground">
           <summary className="cursor-pointer select-none">已經裝過 Codex？點此看會發生什麼</summary>
-          <div className="mt-2 space-y-1.5 pl-1">
+          <div className="mt-2 space-y-2 pl-1">
             <p>
-              <strong>已裝 Codex 指令列（CLI）</strong>：不會重裝、也會保留你其他設定；只會把
-              <strong>預設連線對象切到本平台</strong>，並用平台發的金鑰取代目前的登入。之後想換回自己的
-              OpenAI 帳號，重新執行 <code className="break-all">codex login</code> 即可。
+              關鍵不是「哪個 Codex」，是<strong>它怎麼登入</strong>：吃「API key + 本地設定」的能指向本平台，
+              用「ChatGPT 帳號登入」的不行。
             </p>
-            <p>
-              <strong>已裝編輯器擴充（VS Code / Cursor 等的 Codex）</strong>：新版擴充與 CLI 共用同一份設定，
-              通常會一起指向本平台。
-            </p>
-            <p>
-              <strong>ChatGPT 桌面 App / 網頁版 Codex</strong>：那是綁 ChatGPT 帳號的版本，
-              <strong>不適用</strong>本平台（請用上面的 CLI 安裝）。
-            </p>
+            <div>
+              <p className="font-medium text-foreground">✓ 適用（吃本地設定 + API key）</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5">
+                <li>
+                  <strong>指令列（CLI）</strong>：不會重裝、保留你其他設定；只把<strong>預設連線對象切到本平台</strong>、
+                  用平台金鑰取代目前登入。想換回自己的 OpenAI 帳號，重跑 <code className="break-all">codex login</code> 即可（可逆）。
+                </li>
+                <li>
+                  <strong>編輯器擴充（VS Code / Cursor 的 Codex）</strong>：新版與 CLI 共用同一份設定，通常會一起指向本平台。
+                </li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">✗ 不適用（用 ChatGPT 帳號登入、跑在 OpenAI 雲端）</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5">
+                <li>
+                  <strong>Codex 桌面 App</strong>、<strong>ChatGPT 桌面版裡的 Codex</strong>、
+                  <strong>網頁版 Codex（chatgpt.com/codex）</strong>：綁 ChatGPT 帳號、不讀本地設定，無法指向本平台
+                  → 請改用上面的 <strong>CLI</strong>。
+                </li>
+              </ul>
+            </div>
           </div>
         </details>
       </CardContent>
