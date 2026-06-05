@@ -52,11 +52,12 @@ async def _seed(member_email: str, model: str, calls: int, tokens_each: int) -> 
             is_service_allocation=False,
         )
         s.add(a)
+        await s.flush()
         s.add(
             Credential(
                 id=str(ULID()),
                 name="預設",
-                allocation_id=a.id,
+                member_id=a.member_id,
                 token_fingerprint=str(ULID()) + "xxxxxxxxxxxxxxxxxxxx",
                 token_prefix="aiapi_xx",
                 created_at=now,

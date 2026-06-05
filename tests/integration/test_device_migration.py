@@ -85,21 +85,31 @@ def test_migration_0016_adds_device_table_no_regression(postgres_url: str) -> No
                 )
             )
             await s.flush()
-            # Insert a credential directly (head schema already has the columns).
+            # Insert a credential directly (Phase 20 head schema: member-owned key
+            # scoped to one allocation via credential_allocations).
+            cred_id = str(ULID())
             await s.execute(
                 text(
                     "INSERT INTO credentials "
-                    "(id, allocation_id, name, token_fingerprint, token_prefix, created_at) "
-                    "VALUES (:id, :a, :n, :f, :p, :c)"
+                    "(id, member_id, name, token_fingerprint, token_prefix, created_at) "
+                    "VALUES (:id, :m, :n, :f, :p, :c)"
                 ),
                 {
-                    "id": str(ULID()),
-                    "a": alloc_id,
+                    "id": cred_id,
+                    "m": member_id,
                     "n": "預設",
                     "f": token.fingerprint,
                     "p": token.prefix,
                     "c": now,
                 },
+            )
+            await s.execute(
+                text(
+                    "INSERT INTO credential_allocations "
+                    "(credential_id, allocation_id, resource_model) "
+                    "VALUES (:cid, :a, :rm)"
+                ),
+                {"cid": cred_id, "a": alloc_id, "rm": "azure/gpt-test"},
             )
             await s.commit()
         await engine.dispose()

@@ -12,6 +12,7 @@ from ai_api.db import Base
 
 if TYPE_CHECKING:
     from ai_api.models.allocation import Allocation
+    from ai_api.models.credential import Credential
     from ai_api.models.session import Session
 
 
@@ -49,6 +50,10 @@ class Member(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     allocations: Mapped[list[Allocation]] = relationship(back_populates="member")
+    # Phase 20: member-owned application keys (scoped to a set of allocations).
+    credentials: Mapped[list[Credential]] = relationship(
+        back_populates="member", cascade="all, delete-orphan"
+    )
     sessions: Mapped[list[Session]] = relationship(
         back_populates="member", cascade="all, delete-orphan"
     )

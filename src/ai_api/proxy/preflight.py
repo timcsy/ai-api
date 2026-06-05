@@ -80,11 +80,23 @@ async def run_preflight(
             403,
         )
 
-    # Allocation lookup, then bind before status checks so rejects attribute.
+    # Phase 20: token → application key → pick the scope allocation by request
+    # model. Invalid token → 401; model outside the key's scope → model_mismatch.
     alloc_service = AllocationService(session)
-    allocation = await alloc_service.lookup_by_token(token)
-    if allocation is None:
+    credential = await alloc_service.lookup_credential_by_token(token)
+    if credential is None:
         return PreflightRejection("unauthorized", "invalid credential", 401)
+    allocation = await alloc_service.resolve_scope_allocation(credential, requested_model)
+    if allocation is None:
+        # Attribute the reject to a representative allocation in the key's scope
+        # (the only one, in the single-allocation case) so it shows in its calls.
+        repr_alloc = await alloc_service.first_scope_allocation(credential)
+        return PreflightRejection(
+            "model_mismatch",
+            f"model '{requested_model}' is not in this credential's scope",
+            403,
+            repr_alloc,
+        )
 
     if allocation.status.value == "revoked":
         return PreflightRejection(

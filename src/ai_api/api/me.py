@@ -589,7 +589,7 @@ async def revoke_my_credential(
     service = AllocationService(db)
     await _own_allocation_or_error(service, allocation_id, member)
     credential = await service.get_credential(credential_id)
-    if credential is None or credential.allocation_id != allocation_id:
+    if credential is None or credential.member_id != member.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": {"code": "not_found", "message": "credential not found"}},
@@ -613,7 +613,7 @@ async def rotate_my_credential(
     service = AllocationService(db)
     await _own_allocation_or_error(service, allocation_id, member)
     credential = await service.get_credential(credential_id)
-    if credential is None or credential.allocation_id != allocation_id:
+    if credential is None or credential.member_id != member.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": {"code": "not_found", "message": "credential not found"}},

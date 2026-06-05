@@ -47,7 +47,7 @@ async def _seed_tagged_member(email: str, tokens: int, *tags: str) -> str:
         s.add(a)
         s.add(Credential(
             id=str(ULID()), name="預設",
-            allocation_id=a.id, token_fingerprint=str(ULID()) + "x" * 20,
+            member_id=a.member_id, token_fingerprint=str(ULID()) + "x" * 20,
             token_prefix="aiapi_xx", created_at=now,
         ))
         ts = now - timedelta(minutes=5)
