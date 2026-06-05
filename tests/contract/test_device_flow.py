@@ -81,7 +81,7 @@ async def test_approve_owner_then_single_delivery(app_client: AsyncClient) -> No
     async with sm() as s:
         member = await s.get(Member, member_id)
         assert member is not None
-        row = await DeviceFlowService(s).approve(auth.user_code, member, alloc_id)
+        row = await DeviceFlowService(s).approve(auth.user_code, member, [alloc_id])
         await s.commit()
         assert row.status == DeviceAuthStatus.approved
         assert row.credential_id is not None
@@ -113,7 +113,7 @@ async def test_approve_non_owner_raises_and_mints_nothing(app_client: AsyncClien
         bob = await s.get(Member, bob_id)
         assert bob is not None
         with pytest.raises(PermissionError):
-            await DeviceFlowService(s).approve(auth.user_code, bob, alice_alloc)
+            await DeviceFlowService(s).approve(auth.user_code, bob, [alice_alloc])
         await s.rollback()
 
     # No credential minted on alice's allocation by the failed approve.
@@ -244,7 +244,7 @@ async def test_device_flow_happy_path_endpoints(
     appr = await app_client.post(
         f"/me/device/{auth['user_code']}/approve",
         headers=_csrf(app_client),
-        json={"allocation_id": alloc_id},
+        json={"allocation_ids": [alloc_id]},
     )
     assert appr.status_code == 204, appr.text
 
@@ -283,7 +283,7 @@ async def test_device_flow_credential_listed_and_revocable(
     await app_client.post(
         f"/me/device/{auth['user_code']}/approve",
         headers=_csrf(app_client),
-        json={"allocation_id": alloc_id},
+        json={"allocation_ids": [alloc_id]},
     )
     tok = (await app_client.post("/device/token", json={"device_code": auth["device_code"]})).json()
 

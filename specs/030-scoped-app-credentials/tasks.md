@@ -61,17 +61,17 @@ description: "Tasks for 階段 20 — scoped application credentials（憑證綁
 
 ### Tests First (Red)
 
-- [ ] T013 [US1] 新增 `tests/contract/test_scoped_credentials.py`：`POST /me/credentials`（name + allocation_ids=[A,B]）→ 201 回明文一次 + scope；該 token 打 A、B 皆 200；`GET /me/credentials` 回成員所有 key、**不含明文**。
-- [ ] T014 [P] [US1] 同檔加：scope 內 model 重複 → 409；scope 含**他人**分配 → 403、不建立。
-- [ ] T015 [US1] 跑 T013–T014 確認 **全 Red**。
+- [X] T013 [US1] 新增 `tests/contract/test_scoped_credentials.py`：`POST /me/credentials`（name + allocation_ids=[A,B]）→ 201 回明文一次 + scope；該 token 打 A、B 皆 200；`GET /me/credentials` 回成員所有 key、**不含明文**。
+- [X] T014 [P] [US1] 同檔加：scope 內 model 重複 → 409；scope 含**他人**分配 → 403、不建立。
+- [X] T015 [US1] 跑 T013–T014 確認 **全 Red**。
 
 ### Implementation (Green)
 
-- [ ] T016 [US1] 在 `src/ai_api/services/allocations.py` 完成 `add_credential(member, name, allocation_ids)`（驗每筆擁有者 + model 不重複 → 建 credential + 關聯）與 `list_member_credentials(member_id)`。
-- [ ] T017 [US1] 在 `src/ai_api/api/me.py` 加 `GET /me/credentials`、`POST /me/credentials`（`current_member` + CSRF；schema 對齊 contract，回 `AppCredentialCreated`）。
-- [ ] T018 [US1] 跑 T013–T014 確認 **全 Green**。
-- [ ] T019 [P] [US1] 前端：`frontend/src/components/app-credentials-card.tsx`（由 `device-credentials-card.tsx` 演進為成員層）——列出我的 key（名稱/可用 model/狀態/最後使用）+「建立」(命名 + **多選分配** + 一次性遮罩複製)；接進 `routes/dashboard.tsx`。
-- [ ] T020 [P] [US1] 前端 vitest：`frontend/src/__tests__/app-credentials-card.test.tsx` 驗清單 + 多選建立 + 複製內容；lint/typecheck/build 綠。
+- [X] T016 [US1] 在 `src/ai_api/services/allocations.py` 完成 `add_credential(member, name, allocation_ids)`（驗每筆擁有者 + model 不重複 → 建 credential + 關聯）與 `list_member_credentials(member_id)`。
+- [X] T017 [US1] 在 `src/ai_api/api/me.py` 加 `GET /me/credentials`、`POST /me/credentials`（`current_member` + CSRF；schema 對齊 contract，回 `AppCredentialCreated`）。
+- [X] T018 [US1] 跑 T013–T014 確認 **全 Green**。
+- [X] T019 [P] [US1] 前端：`frontend/src/components/app-credentials-card.tsx`（由 `device-credentials-card.tsx` 演進為成員層）——列出我的 key（名稱/可用 model/狀態/最後使用）+「建立」(命名 + **多選分配** + 一次性遮罩複製)；接進 `routes/dashboard.tsx`。
+- [X] T020 [P] [US1] 前端 vitest：`frontend/src/__tests__/app-credentials-card.test.tsx` 驗清單 + 多選建立 + 複製內容；lint/typecheck/build 綠。
 
 ---
 
@@ -81,12 +81,12 @@ description: "Tasks for 階段 20 — scoped application credentials（憑證綁
 
 ### Tests First (Red)
 
-- [ ] T021 [US2] 在 `tests/contract/test_proxy_multimodel.py` 加端到端：經 `/me/credentials` 建 A+B 的 token → `/v1/chat/completions` 打 A → `/me/usage`/呼叫紀錄歸戶 A、打 B 歸戶 B；打 C → 403 `model_mismatch`、無紀錄。
-- [ ] T022 [US2] 跑 T021 確認 **Red**（若 Foundational 已使其 Green，補齊缺口直到涵蓋歸戶斷言）。
+- [X] T021 [US2] 在 `tests/contract/test_proxy_multimodel.py` 加端到端：經 `/me/credentials` 建 A+B 的 token → `/v1/chat/completions` 打 A → `/me/usage`/呼叫紀錄歸戶 A、打 B 歸戶 B；打 C → 403 `model_mismatch`、無紀錄。
+- [X] T022 [US2] 跑 T021 確認 **Red**（若 Foundational 已使其 Green，補齊缺口直到涵蓋歸戶斷言）。
 
 ### Implementation (Green)
 
-- [ ] T023 [US2] 確認/補 `preflight.py` 在 reject（model_mismatch）時**不寫計費紀錄**、在 success 時把 CallRecord 綁解析出的分配；跑 T021 確認 **Green**。
+- [X] T023 [US2] 確認/補 `preflight.py` 在 reject（model_mismatch）時**不寫計費紀錄**、在 success 時把 CallRecord 綁解析出的分配；跑 T021 確認 **Green**。
 
 ---
 
@@ -96,15 +96,15 @@ description: "Tasks for 階段 20 — scoped application credentials（憑證綁
 
 ### Tests First (Red)
 
-- [ ] T024 [US4] 在 `tests/contract/test_scoped_credentials.py` 加：`PATCH /me/credentials/{id}`（add B）→ 同 token 立刻能打 B；（remove A）→ 立刻不能打 A、仍能打 B；移除至 0 → 409。`DELETE` → 其所有 model 失效、其他 key 不受影響。`POST .../rotate` → 換 token、scope 不變、舊失效。
-- [ ] T025 [US4] 跑 T024 確認 **Red**。
+- [X] T024 [US4] 在 `tests/contract/test_scoped_credentials.py` 加：`PATCH /me/credentials/{id}`（add B）→ 同 token 立刻能打 B；（remove A）→ 立刻不能打 A、仍能打 B；移除至 0 → 409。`DELETE` → 其所有 model 失效、其他 key 不受影響。`POST .../rotate` → 換 token、scope 不變、舊失效。
+- [X] T025 [US4] 跑 T024 確認 **Red**。
 
 ### Implementation (Green)
 
-- [ ] T026 [US4] 在 `src/ai_api/services/allocations.py` 加 `patch_credential_scope(credential_id, add, remove)`（驗擁有者 + model 不重複 + 不得到 0）、`revoke_credential`（沿用 + 連帶停用關聯解析）、`rotate_credential`（scope 不變）；皆寫稽核（`credential_scope_added`/`removed`、`credential_revoked`，VARCHAR enum 免 migration）。
-- [ ] T027 [US4] 在 `src/ai_api/api/me.py` 加 `PATCH /me/credentials/{id}`、`DELETE /me/credentials/{id}`、`POST /me/credentials/{id}/rotate`（擁有者 + CSRF）。
-- [ ] T028 [US4] 跑 T024 確認 **Green**。
-- [ ] T029 [P] [US4] 前端：`app-credentials-card.tsx` 每把加「編輯可用分配（多選）/ 撤回 / 重新產生」；撤回/rotate 沿用一次性遮罩；即時更新。
+- [X] T026 [US4] 在 `src/ai_api/services/allocations.py` 加 `patch_credential_scope(credential_id, add, remove)`（驗擁有者 + model 不重複 + 不得到 0）、`revoke_credential`（沿用 + 連帶停用關聯解析）、`rotate_credential`（scope 不變）；皆寫稽核（`credential_scope_added`/`removed`、`credential_revoked`，VARCHAR enum 免 migration）。
+- [X] T027 [US4] 在 `src/ai_api/api/me.py` 加 `PATCH /me/credentials/{id}`、`DELETE /me/credentials/{id}`、`POST /me/credentials/{id}/rotate`（擁有者 + CSRF）。
+- [X] T028 [US4] 跑 T024 確認 **Green**。
+- [X] T029 [P] [US4] 前端：`app-credentials-card.tsx` 每把加「編輯可用分配（多選）/ 撤回 / 重新產生」；撤回/rotate 沿用一次性遮罩；即時更新。
 
 ---
 
@@ -114,14 +114,14 @@ description: "Tasks for 階段 20 — scoped application credentials（憑證綁
 
 ### Tests First (Red)
 
-- [ ] T030 [US5] 新增 `tests/contract/test_credential_owner_isolation.py`：成員對**他人** key 的 GET/PATCH/DELETE → 403/404；成員 patch 加**他人**分配 → 403。`GET /admin/members/{id}/credentials` 列出；`DELETE/PATCH /admin/credentials/{id}` 改/撤 → 留稽核；未認證 → 401。
-- [ ] T031 [US5] 跑 T030 確認 **Red**。
+- [X] T030 [US5] 新增 `tests/contract/test_credential_owner_isolation.py`：成員對**他人** key 的 GET/PATCH/DELETE → 403/404；成員 patch 加**他人**分配 → 403。`GET /admin/members/{id}/credentials` 列出；`DELETE/PATCH /admin/credentials/{id}` 改/撤 → 留稽核；未認證 → 401。
+- [X] T031 [US5] 跑 T030 確認 **Red**。
 
 ### Implementation (Green)
 
-- [ ] T032 [US5] 新增 `src/ai_api/api/credentials.py`（admin）：`GET /admin/members/{id}/credentials`、`DELETE`/`PATCH /admin/credentials/{id}`（複用 service，撤/改寫稽核）；於 `main.py` `include_router`（`/admin` prefix）。
-- [ ] T033 [US5] 跑 T030 確認 **Green**。
-- [ ] T034 [P] [US5] 前端：`frontend/src/routes/admin/member-detail.tsx`（或 allocations）加某成員的 app key 清單 + 撤回/改 scope；lint/typecheck/build 綠。
+- [X] T032 [US5] 新增 `src/ai_api/api/credentials.py`（admin）：`GET /admin/members/{id}/credentials`、`DELETE`/`PATCH /admin/credentials/{id}`（複用 service，撤/改寫稽核）；於 `main.py` `include_router`（`/admin` prefix）。
+- [X] T033 [US5] 跑 T030 確認 **Green**。
+- [X] T034 [P] [US5] 前端：`frontend/src/routes/admin/member-detail.tsx`（或 allocations）加某成員的 app key 清單 + 撤回/改 scope；lint/typecheck/build 綠。
 
 ---
 
@@ -131,23 +131,23 @@ description: "Tasks for 階段 20 — scoped application credentials（憑證綁
 
 ### Tests First (Red)
 
-- [ ] T035 [US6] 新增 `tests/contract/test_device_multi_alloc.py`：`POST /me/device/{code}/approve {allocation_ids:[A,B]}` → mint 一把 scope=A+B 的 key；`/device/token` 取回 token → 打 A、B 皆通；含他人分配 → 403。
-- [ ] T036 [US6] 跑 T035 確認 **Red**。
+- [X] T035 [US6] 新增 `tests/contract/test_device_multi_alloc.py`：`POST /me/device/{code}/approve {allocation_ids:[A,B]}` → mint 一把 scope=A+B 的 key；`/device/token` 取回 token → 打 A、B 皆通；含他人分配 → 403。
+- [X] T036 [US6] 跑 T035 確認 **Red**。
 
 ### Implementation (Green)
 
-- [ ] T037 [US6] 改 `src/ai_api/services/device_flow.py` + `src/ai_api/api/me.py` approve：body `allocation_ids`（≥1，逐筆驗擁有者）→ `add_credential(member, device_label, allocation_ids)`；`/device/token` 成功回應附 scope 的 model 清單。
-- [ ] T038 [US6] 跑 T035 確認 **Green**。
-- [ ] T039 [P] [US6] 前端：`frontend/src/routes/device-authorize.tsx` 分配選單改**多選 checkbox**；安裝腳本樣板 `src/ai_api/install/codex.{sh,ps1}.tmpl` 寫入預設 `model = "<scope 首選>"`。
-- [ ] T040 [P] [US6] 前端：**移除** `frontend/src/components/api-usage-example.tsx` 的 Codex 分頁（收尾 A）；確認全站只剩一處 Codex 安裝（dashboard 一行指令卡）；改相關測試。
+- [X] T037 [US6] 改 `src/ai_api/services/device_flow.py` + `src/ai_api/api/me.py` approve：body `allocation_ids`（≥1，逐筆驗擁有者）→ `add_credential(member, device_label, allocation_ids)`；`/device/token` 成功回應附 scope 的 model 清單。
+- [X] T038 [US6] 跑 T035 確認 **Green**。
+- [X] T039 [P] [US6] 前端：`frontend/src/routes/device-authorize.tsx` 分配選單改**多選 checkbox**；安裝腳本樣板 `src/ai_api/install/codex.{sh,ps1}.tmpl` 寫入預設 `model = "<scope 首選>"`。
+- [X] T040 [P] [US6] 前端：**移除** `frontend/src/components/api-usage-example.tsx` 的 Codex 分頁（收尾 A）；確認全站只剩一處 Codex 安裝（dashboard 一行指令卡）；改相關測試。
 
 ---
 
 ## Phase 8：Polish 與跨領域
 
-- [ ] T041 跑 `uv run pytest tests/` 全套零回歸（M:N + 既有 token/proxy/計費/配額/device-flow，SC-004/007）；`ruff check . && mypy src/` 零警告。
-- [ ] T042 前端：`allocation-detail.tsx` 原 per-allocation 憑證卡改唯讀「哪些 app key 含此分配」+「用此分配建 app key」捷徑；`npm --prefix frontend run test && lint && typecheck && build` 綠；清單/建立面板 **360px** 不溢出（沿用階段 16 RWD）。
-- [ ] T043 [P] 更新 `knowledge/vision.md` 階段 20 → ✅（完成日、實際交付、連結 history）；`knowledge/history/completed-phases-detail.md` 追加「## 階段 20」（M:N、migration 0017、proxy 解析、收尾 A）；若有新教訓補 `knowledge/experience.md`。
+- [X] T041 跑 `uv run pytest tests/` 全套零回歸（M:N + 既有 token/proxy/計費/配額/device-flow，SC-004/007）；`ruff check . && mypy src/` 零警告。
+- [X] T042 前端：`allocation-detail.tsx` 原 per-allocation 憑證卡改唯讀「哪些 app key 含此分配」+「用此分配建 app key」捷徑；`npm --prefix frontend run test && lint && typecheck && build` 綠；清單/建立面板 **360px** 不溢出（沿用階段 16 RWD）。
+- [X] T043 [P] 更新 `knowledge/vision.md` 階段 20 → ✅（完成日、實際交付、連結 history）；`knowledge/history/completed-phases-detail.md` 追加「## 階段 20」（M:N、migration 0017、proxy 解析、收尾 A）；若有新教訓補 `knowledge/experience.md`。
 - [ ] T044 commit + push + 開 PR；push 前 `ruff check .` + 前端 build；**特別檢視 migration 0017（in-place + device_authorizations FK 並存）與 proxy 熱路徑**；等 CI 全綠後 squash merge 到 main。
 - [ ] T045 main image build 綠後 `helm upgrade`（同既有指令 + `--set migrationJob.enabled=true` 套 0017 + 新 sha）；live 驗：**既有舊 token 仍可呼叫**、建一把多 model key 打多 model、撤一把不連坐。
 - [ ] T046 收尾：vision 階段 20 改 ✅、history 補上、roadmap 一致；標記 tasks 全完成。

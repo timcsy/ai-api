@@ -7,13 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
 
@@ -43,7 +37,7 @@ export function DeviceAuthorizePage() {
   const { toast } = useToast();
   const [code, setCode] = React.useState(params.get("code") ?? "");
   const [submittedCode, setSubmittedCode] = React.useState(params.get("code") ?? "");
-  const [allocationId, setAllocationId] = React.useState<string>("");
+  const [pick, setPick] = React.useState<Set<string>>(new Set());
   const [done, setDone] = React.useState<"approved" | "denied" | null>(null);
 
   const reqQuery = useQuery<DeviceRequest, ApiError>({
@@ -64,7 +58,7 @@ export function DeviceAuthorizePage() {
     mutationFn: () =>
       api(`/me/device/${encodeURIComponent(submittedCode)}/approve`, {
         method: "POST",
-        body: JSON.stringify({ allocation_id: allocationId }),
+        body: JSON.stringify({ allocation_ids: [...pick] }),
       }),
     onSuccess: () => {
       setDone("approved");
@@ -136,19 +130,25 @@ export function DeviceAuthorizePage() {
                     裝置：<span className="text-foreground">{reqQuery.data.device_label ?? "未命名裝置"}</span>
                   </div>
                   <div className="space-y-2">
-                    <Label>使用哪個分配（model）</Label>
-                    <Select value={allocationId} onValueChange={setAllocationId}>
-                      <SelectTrigger aria-label="選擇分配">
-                        <SelectValue placeholder="選擇一個分配" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {activeAllocs.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.display_name ?? a.resource_model}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label>這台裝置可用哪些 model（可多選）</Label>
+                    <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-2">
+                      {activeAllocs.map((a) => (
+                        <label key={a.id} className="flex items-center gap-2 py-1 text-sm">
+                          <Checkbox
+                            checked={pick.has(a.id)}
+                            onCheckedChange={(v) =>
+                              setPick((s) => {
+                                const n = new Set(s);
+                                if (v) n.add(a.id);
+                                else n.delete(a.id);
+                                return n;
+                              })
+                            }
+                          />
+                          <span className="font-mono text-xs">{a.display_name ?? a.resource_model}</span>
+                        </label>
+                      ))}
+                    </div>
                     {activeAllocs.length === 0 && allocsQuery.isSuccess && (
                       <p className="text-xs text-muted-foreground">
                         你還沒有可用的分配，請先到 Dashboard 領取一個 model。
@@ -158,7 +158,7 @@ export function DeviceAuthorizePage() {
                   <div className="flex gap-2">
                     <Button
                       className="flex-1"
-                      disabled={!allocationId || approveMut.isPending}
+                      disabled={pick.size === 0 || approveMut.isPending}
                       onClick={() => approveMut.mutate()}
                     >
                       {approveMut.isPending ? "授權中…" : "授權這台裝置"}

@@ -67,6 +67,9 @@ class AuditEventType(enum.StrEnum):
     # Phase 19: Codex device-flow
     device_authorization_approved = "device_authorization_approved"
     device_authorization_denied = "device_authorization_denied"
+    # Phase 20: scoped application credentials
+    credential_scope_added = "credential_scope_added"
+    credential_scope_removed = "credential_scope_removed"
 
 
 class ActorType(enum.StrEnum):

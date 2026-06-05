@@ -427,6 +427,51 @@ class AllocationService:
             allocs.append(a)
         return allocs
 
+    async def patch_credential_scope(
+        self, credential_id: str, add: Sequence[str], remove: Sequence[str]
+    ) -> Credential | None:
+        """Add/remove allocations from a key's scope. Verifies added allocations
+        belong to the key's owner and that the resulting scope has distinct models
+        and ≥1 allocation. Returns None if not found; raises PermissionError /
+        ValueError."""
+        cred = await self._s.get(Credential, credential_id)
+        if cred is None:
+            return None
+        links = list(
+            (
+                await self._s.execute(
+                    select(CredentialAllocation).where(
+                        CredentialAllocation.credential_id == credential_id
+                    )
+                )
+            ).scalars().all()
+        )
+        by_alloc = {ln.allocation_id: ln for ln in links}
+        remove_set = set(remove)
+        add_allocs = await self._owned_allocations(
+            cred.member_id, [a for a in add if a not in by_alloc]
+        )
+        kept = [ln for ln in links if ln.allocation_id not in remove_set]
+        kept_models = {ln.resource_model for ln in kept}
+        for a in add_allocs:
+            if a.resource_model in kept_models:
+                raise ValueError(f"duplicate model '{a.resource_model}' in scope")
+        if not kept and not add_allocs:
+            raise ValueError("a credential needs at least one allocation")
+        for ln in links:
+            if ln.allocation_id in remove_set:
+                await self._s.delete(ln)
+        for a in add_allocs:
+            self._s.add(
+                CredentialAllocation(
+                    credential_id=credential_id,
+                    allocation_id=a.id,
+                    resource_model=a.resource_model,
+                )
+            )
+        await self._s.flush()
+        return cred
+
     async def list_member_credentials(self, member_id: str) -> Sequence[Credential]:
         """All of a member's application keys (incl. revoked), with scope loaded."""
         stmt = (
@@ -452,6 +497,16 @@ class AllocationService:
 
     async def get_credential(self, credential_id: str) -> Credential | None:
         return await self._s.get(Credential, credential_id)
+
+    async def get_credential_with_scope(self, credential_id: str) -> Credential | None:
+        """A credential with its scope (allocations) eager-loaded for serialisation."""
+        return (
+            await self._s.execute(
+                select(Credential)
+                .where(Credential.id == credential_id)
+                .options(selectinload(Credential.allocations))
+            )
+        ).scalar_one_or_none()
 
     async def credential_in_allocation_scope(
         self, credential_id: str, allocation_id: str

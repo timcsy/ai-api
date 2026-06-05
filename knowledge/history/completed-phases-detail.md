@@ -678,3 +678,38 @@ install-card vitest。**519 後端 + 124 前端綠，ruff/mypy/typecheck/lint/bu
 hash-only 的例外面積壓到最小，勝過明文存 DB 或同步阻塞等待。② mutating member 端點的 `require_csrf`（decorator）在
 `current_member`（param dep）**之前**evaluate → 未登入打 approve 得 403（CSRF）而非 401；契約測試對未登入的 mutating
 端點要接受 401/403（讀取端點才穩定 401）。③ `.bat`/PowerShell 中英混排易亂碼 → 安裝腳本訊息以英文為主。
+
+---
+
+## 階段 20：scoped application credentials（credential ↔ allocation 多對多）
+
+**完成（程式）：** 2026-06-05（spec 030-scoped-app-credentials）。**待部署。**
+
+**動機：** 一把憑證綁單一 model 是業界少見的細粒度；一個 app（Codex 切 `/model`、agent 要 chat+embedding）需要一把 key 跨多 model。
+收斂回業界主流 **scoped application credential**（GitHub fine-grained PAT 選一組 repo、service account 被授予一組資源、Azure APIM
+subscription→product、OAuth scopes）。對應原則 1（措辭一般化為 N:M）+ 原則 2 + 原則 5。
+
+**模型轉變：** `Credential` 從「屬於一筆分配（1:N）」→「**成員擁有、可命名的 key，scope = 一組分配（M:N）**」；呼叫**依 request 的
+model 歸戶到對應分配**。額度/歸戶仍 per-allocation（不移到 token）。階段 18 的 1:N 是 scope-of-one 的特例。
+
+**核心交付：**
+- schema：`credentials` 去 `allocation_id` + 加 `member_id`；新 `CredentialAllocation(credential_id, allocation_id, resource_model)`，
+  **`UNIQUE(credential_id, resource_model)`** 保證 `(token, model)` 唯一決定計費分配（歸戶無歧義）。
+- migration `0017`：**in-place ALTER**（`credentials` 被 `device_authorizations.credential_id` 階段 19 FK 參照，不可 drop+rename）+
+  backfill（每把舊憑證→member_id + scope-of-one 一列）。**既有 token 零回歸**（Postgres 整合測試 `test_credential_migration_0017` 固化）。
+- proxy 熱路徑：`lookup_credential_by_token`（None→401）→ `resolve_scope_allocation(cred, requested_model)`（None→`model_mismatch` 403，
+  attribute 到 scope 代表分配）→ 下游 status/quota/access/billing **零改、per-allocation**。
+- 端點：member `/me/credentials`（GET/POST/PATCH scope/DELETE/rotate，CSRF + 擁有者）；admin `/admin/members/{id}/credentials` +
+  `/admin/credentials/{id}`（治理 + 稽核 `credential_scope_added/removed`、`credential_revoked`）；device-flow approve 改 `allocation_ids`（多選）。
+- 前端：`app-credentials-card`（成員層清單 + 多選建立 + 編輯 model + rotate/撤回）接 dashboard；device 授權頁 Select→多選 checkbox；
+  **移除 `api-usage-example` 的舊 Codex 分頁**（收尾 A，全站單一 Codex 安裝來源）。
+
+**測試（TDD）：** `test_proxy_multimodel`（一 key 多 model 各自歸戶 + scope 外拒）、`test_scoped_credentials`（建/列/scope PATCH/rotate/撤回）、
+`test_credential_owner_isolation`（成員不可碰他人 + admin 治理 + 稽核）、`test_device_multi_alloc`、`test_credential_migration_0017`（Postgres 零回歸）。
+**529 後端 + 125 前端綠；ruff/mypy/typecheck/lint/build 清。**
+
+**經驗（補）：** ① **移掉一個 FK 欄會改變 SQLAlchemy 的 flush 插入順序**——舊 `Credential.allocation_id`（FK→allocations）讓 UOW 把
+allocation 排在 CallRecord 之前；改 M:N 後 `CallRecord.allocation_id`（純欄、無 relationship）失去這個隱性排序，Postgres 嚴格 FK 就
+在 seed 時炸（SQLite 寬鬆沒事）。修法：seed 時對 allocation 顯式 `await s.flush()`。又一個「SQLite 過 ≠ Postgres 過」。
+② 改 PK/重建表的 migration，若該表**被別表 FK 參照**（如 device_authorizations→credentials），**只能 in-place ALTER**，不能用階段 18 的
+build-new-table+swap（會破壞參照）。③ 熱路徑重構要把「解析」與「下游」切乾淨——只動「挑哪筆分配」，status/quota/billing 一律不碰 → 零回歸最好證。

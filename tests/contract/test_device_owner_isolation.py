@@ -54,7 +54,7 @@ async def test_unauthenticated_cannot_read_or_approve(app_client: AsyncClient) -
         await app_client.post(
             f"/me/device/{auth['user_code']}/approve",
             headers=_csrf(app_client),
-            json={"allocation_id": "x"},
+            json={"allocation_ids": ["x"]},
         )
     ).status_code
     assert approve_status in (401, 403)
@@ -74,7 +74,7 @@ async def test_member_cannot_approve_others_allocation(
     r = await app_client.post(
         f"/me/device/{auth['user_code']}/approve",
         headers=_csrf(app_client),
-        json={"allocation_id": bob_alloc},
+        json={"allocation_ids": [bob_alloc]},
     )
     assert r.status_code == 403
 

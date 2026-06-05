@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
+import { AppCredentialsCard } from "@/components/app-credentials-card";
 import { CodexInstallCard } from "@/components/codex-install-card";
 import { MemberUsageCharts } from "@/components/member-usage-charts";
 import { TimeRangeSelect } from "@/components/time-range-select";
@@ -144,6 +145,10 @@ export function DashboardPage() {
             如需取得新 token，請進入單筆分配後點「重新產生 token」（舊 token 立即失效）。
           </AlertDescription>
         </Alert>
+      </section>
+
+      <section>
+        <AppCredentialsCard />
       </section>
 
       <section className="space-y-4">
