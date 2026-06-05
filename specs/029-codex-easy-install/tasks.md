@@ -161,8 +161,8 @@ description: "Tasks for 階段 19 — 一鍵安裝 Codex + device-flow 免貼 to
       修掉殘留狀態行（342 行「階段 18、19 規劃中」）。
 - [X] T037 [P] 在 `knowledge/history/completed-phases-detail.md` 追加「## 階段 19」詳情（device-flow 設計、0016、明文單次交付、三平台真機結論）；
       若有新教訓（如 `.bat` 編碼、Gatekeeper）補 `knowledge/experience.md`。
-- [ ] T038 commit + push + 開 PR；push 前 `ruff check .` + 前端 build；**特別檢視 migration 0016 與明文暫存清除路徑**；等 CI 全綠後 squash merge 到 main。
-- [ ] T039 main image build 綠後 `helm upgrade`（同既有指令 + `--set migrationJob.enabled=true` 套 0016 + 新 sha）；
+- [X] T038 commit + push + 開 PR；push 前 `ruff check .` + 前端 build；**特別檢視 migration 0016 與明文暫存清除路徑**；等 CI 全綠後 squash merge 到 main。
+- [X] T039 main image build 綠後 `helm upgrade`（同既有指令 + `--set migrationJob.enabled=true` 套 0016 + 新 sha）；
       live 驗：`/device/authorize`、`/install/codex.sh` 可達；既有 proxy/計費零回歸。
 - [ ] T040 收尾：刪除被取代的舊分支 `027-codex-easy-install`（本機 + remote）；vision/history/roadmap 一致；標記 tasks 全完成。
 
