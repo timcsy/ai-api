@@ -633,3 +633,84 @@ async def rotate_my_credential(
         token=token.plaintext,
         token_prefix=token.prefix,
     )
+
+
+# ---- Phase 19: Codex device-flow (member-side approval) ----
+
+
+class ApproveDeviceRequest(BaseModel):
+    allocation_id: str
+
+
+@router.get("/me/device/{user_code}")
+async def get_my_device_request(
+    user_code: str,
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Summary of a pending device-flow request, for the authorization page."""
+    from ai_api.services.device_flow import DeviceFlowService
+
+    row = await DeviceFlowService(db).get_pending(user_code)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "not_found", "message": "device request not found or expired"}},
+        )
+    return {
+        "user_code": row.user_code,
+        "device_label": row.device_label,
+        "status": row.status,
+        "created_at": row.created_at.isoformat(),
+        "expires_at": row.expires_at.isoformat(),
+    }
+
+
+@router.post(
+    "/me/device/{user_code}/approve",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_csrf)],
+)
+async def approve_my_device_request(
+    user_code: str,
+    payload: ApproveDeviceRequest,
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> None:
+    """Approve a device-flow request, binding one of the member's own allocations;
+    mints a per-device credential whose plaintext the CLI fetches once."""
+    from ai_api.services.device_flow import DeviceAuthError, DeviceFlowService
+
+    try:
+        await DeviceFlowService(db).approve(user_code, member, payload.allocation_id)
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"error": {"code": "forbidden", "message": "not your allocation"}},
+        ) from exc
+    except DeviceAuthError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "not_found", "message": str(exc)}},
+        ) from exc
+
+
+@router.post(
+    "/me/device/{user_code}/deny",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_csrf)],
+)
+async def deny_my_device_request(
+    user_code: str,
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> None:
+    """Deny a pending device-flow request."""
+    from ai_api.services.device_flow import DeviceFlowService
+
+    ok = await DeviceFlowService(db).deny(user_code, member)
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "not_found", "message": "device request not found or expired"}},
+        )

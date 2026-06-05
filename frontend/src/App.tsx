@@ -31,6 +31,7 @@ import {
 import { AdminUsagePage } from "@/routes/admin/usage";
 import { AllocationDetailPage } from "@/routes/allocation-detail";
 import { CatalogPage } from "@/routes/catalog";
+import { DeviceAuthorizePage } from "@/routes/device-authorize";
 import { CatalogDetailPage } from "@/routes/catalog-detail";
 import { DashboardPage } from "@/routes/dashboard";
 import { LoginPage } from "@/routes/login";
@@ -62,6 +63,7 @@ export function App() {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/dashboard/allocations/:id" element={<AllocationDetailPage />} />
+              <Route path="/device" element={<DeviceAuthorizePage />} />
               <Route path="/catalog" element={<CatalogPage />} />
               <Route path="/catalog/*" element={<CatalogDetailPage />} />
 

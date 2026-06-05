@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
+import { CodexInstallCard } from "@/components/codex-install-card";
 import { MemberUsageCharts } from "@/components/member-usage-charts";
 import { TimeRangeSelect } from "@/components/time-range-select";
 import { UsageSummary } from "@/components/usage-summary";
@@ -136,6 +137,7 @@ export function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        <CodexInstallCard baseUrl={member?.gateway_base_url ?? window.location.origin} />
         <Alert className="mt-3">
           <AlertDescription>
             API token 在你<strong>自助領取</strong>或管理員建立分配時一次性顯示；系統僅保存雜湊。
