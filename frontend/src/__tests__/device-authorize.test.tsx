@@ -50,7 +50,7 @@ describe("<DeviceAuthorizePage />", () => {
 
     await waitFor(() => expect(screen.getByText("Codex on host-x")).toBeInTheDocument());
     expect(screen.getByRole("button", { name: "授權這台裝置" })).toBeInTheDocument();
-    expect(screen.getByText("使用哪個分配（model）")).toBeInTheDocument();
+    expect(screen.getByText("這台裝置可用哪些 model（可多選）")).toBeInTheDocument();
   });
 
   it("surfaces an error for an unknown / expired code", async () => {

@@ -55,7 +55,7 @@ async def _seed_member_and_alloc(*, is_service: bool = False) -> str:
             Credential(
                 id=str(ULID()),
                 name="預設",
-                allocation_id=a.id,
+                member_id=a.member_id,
                 token_fingerprint="dummy" * 12 + "abcd",
                 token_prefix="aiapi_xx",
                 created_at=datetime.now(UTC),

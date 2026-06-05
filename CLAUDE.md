@@ -1,6 +1,6 @@
 # ai-api Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-06-04
+Auto-generated from all feature plans. Last updated: 2026-06-05
 
 ## Active Technologies
 - Python 3.11+（同 Phase 1） (002-auth-membership)
@@ -41,6 +41,8 @@ Auto-generated from all feature plans. Last updated: 2026-06-04
 - PostgreSQL（生產）/ SQLite（dev、CI）；**新 migration `0015`**（`credentials` 表改主鍵 + 加欄；保留既有資料） (028-per-device-credentials)
 - Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端）/ POSIX `sh` + Windows PowerShell（安裝腳本） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2、`cryptography`（Fernet，既有）、TanStack Query、shadcn/ui（**皆既有，不新增套件**）；安裝腳本下載 OpenAI Codex CLI 獨立 binary（GitHub Releases，client-side） (029-codex-easy-install)
 - PostgreSQL（生產）/ SQLite（dev、CI）；**新表 `device_authorizations` + migration `0016`** (029-codex-easy-install)
+- Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2、TanStack Query、shadcn/ui（**皆既有，不新增套件**） (030-scoped-app-credentials)
+- PostgreSQL（生產）/ SQLite（dev、CI）；**schema 重構 + migration `0017`**（改 `credentials` + 新 `credential_allocations`） (030-scoped-app-credentials)
 
 - Python 3.11+ + LiteLLM（proxy core）、FastAPI（admin API）、 (001-gateway-core)
 
@@ -61,9 +63,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 030-scoped-app-credentials: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2、TanStack Query、shadcn/ui（**皆既有，不新增套件**）
 - 029-codex-easy-install: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端）/ POSIX `sh` + Windows PowerShell（安裝腳本） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2、`cryptography`（Fernet，既有）、TanStack Query、shadcn/ui（**皆既有，不新增套件**）；安裝腳本下載 OpenAI Codex CLI 獨立 binary（GitHub Releases，client-side）
 - 028-per-device-credentials: Added Python 3.11+（後端為主）/ TypeScript strict + React 19（前端裝置清單） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2（皆既有）；前端既有 stack——**不新增套件**
-- 026-member-usage-charts: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Pydantic v2（後端，既有）；Tailwind、shadcn/ui、
 
 
 <!-- MANUAL ADDITIONS START -->

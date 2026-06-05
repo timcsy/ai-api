@@ -57,9 +57,10 @@ class Allocation(Base):
         default=AllocationOrigin.admin,
     )
 
-    # Phase 18: an allocation can have many per-device credentials.
+    # Phase 20: M:N — credentials (application keys) whose scope includes this
+    # allocation. (Phase 18's 1:N is the single-allocation-scope special case.)
     credentials: Mapped[list[Credential]] = relationship(
-        back_populates="allocation", cascade="all, delete-orphan"
+        secondary="credential_allocations", back_populates="allocations"
     )
     member: Mapped[Member] = relationship(back_populates="allocations")
 

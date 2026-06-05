@@ -8,6 +8,7 @@ the row; the script's next `poll()` delivers that plaintext exactly once.
 from __future__ import annotations
 
 import secrets
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -18,7 +19,6 @@ from ulid import ULID
 from ai_api.auth.audit import record as audit_record
 from ai_api.models import (
     ActorType,
-    Allocation,
     AuditEventType,
     DeviceAuthorization,
     DeviceAuthStatus,
@@ -133,24 +133,23 @@ class DeviceFlowService:
         return row
 
     async def approve(
-        self, user_code: str, member: Member, allocation_id: str
+        self, user_code: str, member: Member, allocation_ids: Sequence[str]
     ) -> DeviceAuthorization:
-        """Approve a pending request for an allocation the member owns; mint a
-        per-device credential and stash its plaintext (encrypted) for one-time
-        delivery. Raises DeviceAuthError if not actionable, PermissionError if the
-        allocation isn't the member's."""
+        """Approve a pending request, minting one application key scoped to the
+        chosen allocations (Phase 20: a Codex install can cover several models).
+        Raises DeviceAuthError if not actionable, PermissionError if any allocation
+        isn't the member's, ValueError on duplicate models."""
         row = await self.get_pending(user_code)
         if row is None:
             raise DeviceAuthError("device authorization not found, expired, or already used")
-        allocation = await self._s.get(Allocation, allocation_id)
-        if allocation is None or allocation.member_id != member.id:
-            raise PermissionError("allocation does not belong to this member")
-        credential, token = await AllocationService(self._s).add_credential(
-            allocation, row.device_label or "Codex"
+        if not allocation_ids:
+            raise ValueError("at least one allocation is required")
+        credential, token = await AllocationService(self._s).create_member_credential(
+            member.id, row.device_label or "Codex", allocation_ids
         )
         now = datetime.now(UTC)
         row.member_id = member.id
-        row.allocation_id = allocation_id
+        row.allocation_id = allocation_ids[0]  # representative (back-compat column)
         row.credential_id = credential.id
         row.encrypted_token = encrypt_str(token.plaintext).decode("ascii")
         row.status = DeviceAuthStatus.approved
@@ -162,7 +161,7 @@ class DeviceFlowService:
             actor_id=member.id,
             target_type="device_authorization",
             target_id=row.id,
-            details={"allocation_id": allocation_id, "credential_id": credential.id},
+            details={"allocation_ids": list(allocation_ids), "credential_id": credential.id},
         )
         await self._s.flush()
         return row

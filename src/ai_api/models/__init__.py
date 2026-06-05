@@ -11,6 +11,7 @@ from ai_api.models.allocation import Allocation, AllocationOrigin, AllocationSta
 from ai_api.models.auth_audit import ActorType, AuditEventType, AuthAuditLog
 from ai_api.models.call_record import CallOutcome, CallRecord
 from ai_api.models.credential import Credential
+from ai_api.models.credential_allocation import CredentialAllocation
 from ai_api.models.device_authorization import DeviceAuthorization, DeviceAuthStatus
 from ai_api.models.invitation import InvitationToken
 from ai_api.models.member import Member, MemberProvider, MemberStatus
@@ -45,6 +46,7 @@ __all__ = [
     "CallOutcome",
     "CallRecord",
     "Credential",
+    "CredentialAllocation",
     "DefaultAccess",
     "DeviceAuthStatus",
     "DeviceAuthorization",

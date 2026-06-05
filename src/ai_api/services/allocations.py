@@ -19,6 +19,7 @@ from ai_api.models import (
     AllocationStatus,
     AuditEventType,
     Credential,
+    CredentialAllocation,
     Member,
     MemberProvider,
     MemberStatus,
@@ -88,18 +89,31 @@ class AllocationService:
             quota_tokens_per_month=quota_tokens_per_month,
             origin=origin,
         )
-        # Phase 18: the allocation starts with one default per-device credential.
+        self._s.add(allocation)
+        await self._s.flush()
+        # Phase 20: the allocation starts with one default application key whose
+        # scope is just this allocation (the 1:N special case of M:N).
         credential = Credential(
             id=str(ULID()),
-            allocation_id=allocation.id,
+            member_id=member.id,
             name=self.DEFAULT_CREDENTIAL_NAME,
             token_fingerprint=token.fingerprint,
             token_prefix=token.prefix,
             created_at=now,
         )
-        allocation.credentials = [credential]
-        self._s.add(allocation)
+        self._s.add(credential)
         await self._s.flush()
+        self._s.add(
+            CredentialAllocation(
+                credential_id=credential.id,
+                allocation_id=allocation.id,
+                resource_model=allocation.resource_model,
+            )
+        )
+        await self._s.flush()
+        # Populate the M:N relationship so callers can serialise `.credentials`
+        # without a lazy load in the sync response path.
+        await self._s.refresh(allocation, attribute_names=["credentials"])
         return AllocationCreated(allocation=allocation, token=token)
 
     async def rotate_token(
@@ -122,16 +136,24 @@ class AllocationService:
         now = datetime.now(UTC)
         cred = next((c for c in allocation.credentials if c.revoked_at is None), None)
         if cred is None:
-            # No active credential left — issue a fresh default one.
+            # No active key scoped to this allocation — issue a fresh default one.
             cred = Credential(
                 id=str(ULID()),
-                allocation_id=allocation.id,
+                member_id=allocation.member_id,
                 name=self.DEFAULT_CREDENTIAL_NAME,
                 token_fingerprint=token.fingerprint,
                 token_prefix=token.prefix,
                 created_at=now,
             )
-            allocation.credentials.append(cred)
+            self._s.add(cred)
+            await self._s.flush()
+            self._s.add(
+                CredentialAllocation(
+                    credential_id=cred.id,
+                    allocation_id=allocation.id,
+                    resource_model=allocation.resource_model,
+                )
+            )
         else:
             cred.token_fingerprint = token.fingerprint
             cred.token_prefix = token.prefix
@@ -274,10 +296,13 @@ class AllocationService:
         await self._s.flush()
         return member
 
-    async def lookup_by_token(self, plaintext: str) -> Allocation | None:
-        """Resolve a token to its allocation. Phase 18: a revoked credential
-        (`revoked_at` set) no longer resolves; the fingerprint is unique so at
-        most one credential matches. Updates `last_used_at` throttled (>5 min)."""
+    # ---- Phase 20: token resolution (model-aware) ----
+
+    async def lookup_credential_by_token(self, plaintext: str) -> Credential | None:
+        """Resolve a token to its application key (credential). Revoked keys
+        (`revoked_at` set) no longer resolve; fingerprint is unique → ≤1 match.
+        Updates `last_used_at` throttled (>5 min). The caller then picks the
+        allocation by request model via `resolve_scope_allocation`."""
         fp = fingerprint_for(plaintext)
         cred = (
             await self._s.execute(
@@ -292,44 +317,179 @@ class AllocationService:
         now = datetime.now(UTC)
         last = cred.last_used_at
         if last is not None and last.tzinfo is None:
-            # SQLite returns naive datetimes for DateTime(timezone=True).
-            last = last.replace(tzinfo=UTC)
+            last = last.replace(tzinfo=UTC)  # SQLite reads naive
         if last is None or (now - last).total_seconds() > 300:
             cred.last_used_at = now
-        allocation = (
-            await self._s.execute(
-                select(Allocation)
-                .where(Allocation.id == cred.allocation_id)
-                .options(selectinload(Allocation.credentials))
-            )
-        ).scalar_one_or_none()
-        return allocation
+        return cred
 
-    # ---- Phase 18: per-device credentials ----
+    async def resolve_scope_allocation(
+        self, credential: Credential, model: str
+    ) -> Allocation | None:
+        """The allocation in this key's scope whose `resource_model == model`, or
+        None if the model is outside the key's scope. `UNIQUE(credential_id,
+        resource_model)` guarantees ≤1 (no billing ambiguity)."""
+        stmt = (
+            select(Allocation)
+            .join(CredentialAllocation, CredentialAllocation.allocation_id == Allocation.id)
+            .where(
+                CredentialAllocation.credential_id == credential.id,
+                CredentialAllocation.resource_model == model,
+            )
+        )
+        return (await self._s.execute(stmt)).scalar_one_or_none()
+
+    async def first_scope_allocation(self, credential: Credential) -> Allocation | None:
+        """A representative allocation in the key's scope (oldest). Used to
+        attribute a model_mismatch reject when the model isn't in scope."""
+        stmt = (
+            select(Allocation)
+            .join(CredentialAllocation, CredentialAllocation.allocation_id == Allocation.id)
+            .where(CredentialAllocation.credential_id == credential.id)
+            .order_by(Allocation.created_at)
+        )
+        return (await self._s.execute(stmt)).scalars().first()
+
+    async def lookup_by_token(self, plaintext: str) -> Allocation | None:
+        """Back-compat / display: resolve a token to a representative allocation in
+        its scope (the first one). Proxy uses the model-aware pair above instead."""
+        cred = await self.lookup_credential_by_token(plaintext)
+        if cred is None:
+            return None
+        stmt = (
+            select(Allocation)
+            .join(CredentialAllocation, CredentialAllocation.allocation_id == Allocation.id)
+            .where(CredentialAllocation.credential_id == cred.id)
+            .options(selectinload(Allocation.credentials))
+            .order_by(Allocation.created_at)
+        )
+        return (await self._s.execute(stmt)).scalars().first()
+
+    # ---- application keys (credentials) ----
 
     async def add_credential(
         self, allocation: Allocation, name: str
     ) -> tuple[Credential, GeneratedToken]:
-        """Issue a new named per-device credential for an allocation. The plaintext
-        token is returned once (show-once); only its fingerprint is stored."""
+        """Back-compat (Phase 18/19): issue a key scoped to a SINGLE allocation
+        (owned by that allocation's member). The general multi-allocation path is
+        `create_member_credential`."""
+        return await self.create_member_credential(
+            allocation.member_id, name, [allocation.id]
+        )
+
+    async def create_member_credential(
+        self, member_id: str, name: str, allocation_ids: Sequence[str]
+    ) -> tuple[Credential, GeneratedToken]:
+        """Create a named application key for a member, scoped to a set of the
+        member's own allocations. Verifies ownership and that the scope's models
+        are distinct. Plaintext token returned once (show-once)."""
+        if not allocation_ids:
+            raise ValueError("a credential needs at least one allocation")
+        allocs = await self._owned_allocations(member_id, allocation_ids)
         token = generate_token()
+        now = datetime.now(UTC)
         credential = Credential(
             id=str(ULID()),
-            allocation_id=allocation.id,
+            member_id=member_id,
             name=name,
             token_fingerprint=token.fingerprint,
             token_prefix=token.prefix,
-            created_at=datetime.now(UTC),
+            created_at=now,
         )
         self._s.add(credential)
         await self._s.flush()
+        for a in allocs:
+            self._s.add(
+                CredentialAllocation(
+                    credential_id=credential.id,
+                    allocation_id=a.id,
+                    resource_model=a.resource_model,
+                )
+            )
+        await self._s.flush()
         return credential, token
 
-    async def list_credentials(self, allocation_id: str) -> Sequence[Credential]:
-        """All credentials of an allocation (incl. revoked), newest first."""
+    async def _owned_allocations(
+        self, member_id: str, allocation_ids: Sequence[str]
+    ) -> Sequence[Allocation]:
+        """Load the allocations, asserting they all belong to the member and have
+        distinct resource_models (no billing ambiguity). Raises PermissionError /
+        ValueError otherwise."""
+        seen_ids: list[str] = list(dict.fromkeys(allocation_ids))  # dedupe, keep order
+        allocs: list[Allocation] = []
+        models: set[str] = set()
+        for aid in seen_ids:
+            a = await self._s.get(Allocation, aid)
+            if a is None or a.member_id != member_id:
+                raise PermissionError(f"allocation {aid} is not the member's")
+            if a.resource_model in models:
+                raise ValueError(f"duplicate model '{a.resource_model}' in scope")
+            models.add(a.resource_model)
+            allocs.append(a)
+        return allocs
+
+    async def patch_credential_scope(
+        self, credential_id: str, add: Sequence[str], remove: Sequence[str]
+    ) -> Credential | None:
+        """Add/remove allocations from a key's scope. Verifies added allocations
+        belong to the key's owner and that the resulting scope has distinct models
+        and ≥1 allocation. Returns None if not found; raises PermissionError /
+        ValueError."""
+        cred = await self._s.get(Credential, credential_id)
+        if cred is None:
+            return None
+        links = list(
+            (
+                await self._s.execute(
+                    select(CredentialAllocation).where(
+                        CredentialAllocation.credential_id == credential_id
+                    )
+                )
+            ).scalars().all()
+        )
+        by_alloc = {ln.allocation_id: ln for ln in links}
+        remove_set = set(remove)
+        add_allocs = await self._owned_allocations(
+            cred.member_id, [a for a in add if a not in by_alloc]
+        )
+        kept = [ln for ln in links if ln.allocation_id not in remove_set]
+        kept_models = {ln.resource_model for ln in kept}
+        for a in add_allocs:
+            if a.resource_model in kept_models:
+                raise ValueError(f"duplicate model '{a.resource_model}' in scope")
+        if not kept and not add_allocs:
+            raise ValueError("a credential needs at least one allocation")
+        for ln in links:
+            if ln.allocation_id in remove_set:
+                await self._s.delete(ln)
+        for a in add_allocs:
+            self._s.add(
+                CredentialAllocation(
+                    credential_id=credential_id,
+                    allocation_id=a.id,
+                    resource_model=a.resource_model,
+                )
+            )
+        await self._s.flush()
+        return cred
+
+    async def list_member_credentials(self, member_id: str) -> Sequence[Credential]:
+        """All of a member's application keys (incl. revoked), with scope loaded."""
         stmt = (
             select(Credential)
-            .where(Credential.allocation_id == allocation_id)
+            .where(Credential.member_id == member_id)
+            .options(selectinload(Credential.allocations))
+            .order_by(Credential.created_at.desc())
+        )
+        result = await self._s.execute(stmt)
+        return cast(list[Credential], list(result.scalars().all()))
+
+    async def list_credentials(self, allocation_id: str) -> Sequence[Credential]:
+        """Back-compat (Phase 18): keys whose scope INCLUDES this allocation."""
+        stmt = (
+            select(Credential)
+            .join(CredentialAllocation, CredentialAllocation.credential_id == Credential.id)
+            .where(CredentialAllocation.allocation_id == allocation_id)
+            .options(selectinload(Credential.allocations))
             .order_by(Credential.created_at.desc())
         )
         result = await self._s.execute(stmt)
@@ -337,6 +497,30 @@ class AllocationService:
 
     async def get_credential(self, credential_id: str) -> Credential | None:
         return await self._s.get(Credential, credential_id)
+
+    async def get_credential_with_scope(self, credential_id: str) -> Credential | None:
+        """A credential with its scope (allocations) eager-loaded for serialisation."""
+        return (
+            await self._s.execute(
+                select(Credential)
+                .where(Credential.id == credential_id)
+                .options(selectinload(Credential.allocations))
+            )
+        ).scalar_one_or_none()
+
+    async def credential_in_allocation_scope(
+        self, credential_id: str, allocation_id: str
+    ) -> bool:
+        """Whether a credential's scope includes the given allocation."""
+        row = (
+            await self._s.execute(
+                select(CredentialAllocation.credential_id).where(
+                    CredentialAllocation.credential_id == credential_id,
+                    CredentialAllocation.allocation_id == allocation_id,
+                )
+            )
+        ).first()
+        return row is not None
 
     async def revoke_credential(self, credential_id: str) -> Credential | None:
         """Soft-revoke a single credential (`revoked_at = now`); idempotent. Other

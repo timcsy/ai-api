@@ -286,7 +286,9 @@ async def admin_revoke_credential(
 
     service = AllocationService(session)
     credential = await service.get_credential(credential_id)
-    if credential is None or credential.allocation_id != allocation_id:
+    if credential is None or not await service.credential_in_allocation_scope(
+        credential_id, allocation_id
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": {"code": "not_found", "message": "credential not found"}},

@@ -97,6 +97,48 @@ class CredentialCreatedOut(BaseModel):
     token_prefix: str
 
 
+# ---- Phase 20: scoped application credentials (M:N) ----
+
+
+class AllocationRef(BaseModel):
+    allocation_id: str
+    resource_model: str
+    display_name: str | None = None
+    status: str
+
+
+class AppCredentialOut(BaseModel):
+    """An application key (member-owned, scoped to a set of allocations); no plaintext."""
+
+    id: str
+    name: str
+    token_prefix: str
+    created_at: datetime
+    last_used_at: datetime | None = None
+    status: str  # active | revoked
+    allocations: list[AllocationRef]
+
+
+class AppCredentialCreatedOut(BaseModel):
+    """Returned once on create/rotate — carries the plaintext token."""
+
+    id: str
+    name: str
+    token: str
+    token_prefix: str
+    allocations: list[AllocationRef]
+
+
+class CreateAppCredentialRequest(BaseModel):
+    name: CredentialNameStr
+    allocation_ids: list[str] = Field(min_length=1)
+
+
+class ScopePatchRequest(BaseModel):
+    add: list[str] = Field(default_factory=list)
+    remove: list[str] = Field(default_factory=list)
+
+
 class CallRecordOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

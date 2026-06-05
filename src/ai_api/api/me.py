@@ -5,11 +5,20 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import current_member, get_db_session, require_csrf
-from ai_api.api.schemas import AddCredentialRequest, CredentialCreatedOut, CredentialOut
+from ai_api.api.schemas import (
+    AddCredentialRequest,
+    AllocationRef,
+    AppCredentialCreatedOut,
+    AppCredentialOut,
+    CreateAppCredentialRequest,
+    CredentialCreatedOut,
+    CredentialOut,
+    ScopePatchRequest,
+)
 from ai_api.auth import local
 from ai_api.config import get_settings
 from ai_api.models import Member, MemberProvider
@@ -589,7 +598,7 @@ async def revoke_my_credential(
     service = AllocationService(db)
     await _own_allocation_or_error(service, allocation_id, member)
     credential = await service.get_credential(credential_id)
-    if credential is None or credential.allocation_id != allocation_id:
+    if credential is None or credential.member_id != member.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": {"code": "not_found", "message": "credential not found"}},
@@ -613,7 +622,7 @@ async def rotate_my_credential(
     service = AllocationService(db)
     await _own_allocation_or_error(service, allocation_id, member)
     credential = await service.get_credential(credential_id)
-    if credential is None or credential.allocation_id != allocation_id:
+    if credential is None or credential.member_id != member.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": {"code": "not_found", "message": "credential not found"}},
@@ -639,7 +648,8 @@ async def rotate_my_credential(
 
 
 class ApproveDeviceRequest(BaseModel):
-    allocation_id: str
+    # Phase 20: a Codex install can be authorised over several allocations/models.
+    allocation_ids: list[str] = Field(min_length=1)
 
 
 @router.get("/me/device/{user_code}")
@@ -682,11 +692,16 @@ async def approve_my_device_request(
     from ai_api.services.device_flow import DeviceAuthError, DeviceFlowService
 
     try:
-        await DeviceFlowService(db).approve(user_code, member, payload.allocation_id)
+        await DeviceFlowService(db).approve(user_code, member, payload.allocation_ids)
     except PermissionError as exc:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"error": {"code": "forbidden", "message": "not your allocation"}},
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": {"code": "invalid_scope", "message": str(exc)}},
         ) from exc
     except DeviceAuthError as exc:
         raise HTTPException(
@@ -714,3 +729,164 @@ async def deny_my_device_request(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": {"code": "not_found", "message": "device request not found or expired"}},
         )
+
+
+# ---- Phase 20: scoped application credentials (member-level) ----
+
+
+def _alloc_refs(c: Any) -> list[AllocationRef]:
+    return [
+        AllocationRef(
+            allocation_id=a.id,
+            resource_model=a.resource_model,
+            display_name=None,
+            status=str(a.status),
+        )
+        for a in c.allocations
+    ]
+
+
+def _app_cred_out(c: Any) -> AppCredentialOut:
+    return AppCredentialOut(
+        id=c.id,
+        name=c.name,
+        token_prefix=c.token_prefix,
+        created_at=c.created_at,
+        last_used_at=c.last_used_at,
+        status="revoked" if c.revoked_at else "active",
+        allocations=_alloc_refs(c),
+    )
+
+
+@router.get("/me/credentials")
+async def list_my_app_credentials(
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[AppCredentialOut]:
+    """List my application keys (member-level, no plaintext)."""
+    creds = await AllocationService(db).list_member_credentials(member.id)
+    return [_app_cred_out(c) for c in creds]
+
+
+@router.post(
+    "/me/credentials",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+async def create_my_app_credential(
+    payload: CreateAppCredentialRequest,
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> AppCredentialCreatedOut:
+    """Create a named application key scoped to a set of my allocations. Returns
+    the plaintext token ONCE."""
+    service = AllocationService(db)
+    try:
+        cred, token = await service.create_member_credential(
+            member.id, payload.name, payload.allocation_ids
+        )
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"error": {"code": "forbidden", "message": "allocation is not yours"}},
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": {"code": "invalid_scope", "message": str(exc)}},
+        ) from exc
+    full = await service.get_credential_with_scope(cred.id)
+    assert full is not None
+    return AppCredentialCreatedOut(
+        id=full.id,
+        name=full.name,
+        token=token.plaintext,
+        token_prefix=token.prefix,
+        allocations=_alloc_refs(full),
+    )
+
+
+async def _own_credential_or_error(service: AllocationService, credential_id: str, member: Member) -> Any:
+    credential = await service.get_credential(credential_id)
+    if credential is None or credential.member_id != member.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "not_found", "message": "credential not found"}},
+        )
+    return credential
+
+
+@router.patch("/me/credentials/{credential_id}", dependencies=[Depends(require_csrf)])
+async def patch_my_app_credential_scope(
+    credential_id: str,
+    payload: ScopePatchRequest,
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> AppCredentialOut:
+    """Add/remove allocations from a key's scope (≥1 must remain; models distinct)."""
+    service = AllocationService(db)
+    await _own_credential_or_error(service, credential_id, member)
+    try:
+        await service.patch_credential_scope(credential_id, payload.add, payload.remove)
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"error": {"code": "forbidden", "message": "allocation is not yours"}},
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": {"code": "invalid_scope", "message": str(exc)}},
+        ) from exc
+    full = await service.get_credential_with_scope(credential_id)
+    assert full is not None
+    return _app_cred_out(full)
+
+
+@router.delete(
+    "/me/credentials/{credential_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_csrf)],
+)
+async def revoke_my_app_credential(
+    credential_id: str,
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> None:
+    """Revoke a whole application key (all its models stop; other keys untouched)."""
+    service = AllocationService(db)
+    await _own_credential_or_error(service, credential_id, member)
+    await service.revoke_credential(credential_id)
+
+
+@router.post(
+    "/me/credentials/{credential_id}/rotate",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_csrf)],
+)
+async def rotate_my_app_credential(
+    credential_id: str,
+    member: Member = Depends(current_member),
+    db: AsyncSession = Depends(get_db_session),
+) -> AppCredentialCreatedOut:
+    """Re-issue this key's token in place (scope unchanged; old token invalid)."""
+    service = AllocationService(db)
+    await _own_credential_or_error(service, credential_id, member)
+    try:
+        result = await service.rotate_credential(credential_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"error": {"code": "cannot_rotate", "message": str(exc)}},
+        ) from exc
+    assert result is not None
+    _cred, token = result
+    full = await service.get_credential_with_scope(credential_id)
+    assert full is not None
+    return AppCredentialCreatedOut(
+        id=full.id,
+        name=full.name,
+        token=token.plaintext,
+        token_prefix=token.prefix,
+        allocations=_alloc_refs(full),
+    )
