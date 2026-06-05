@@ -1,8 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "@/contexts/auth";
 import { DashboardPage } from "@/routes/dashboard";
@@ -14,80 +13,70 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-function renderDashboard(meStatus: number, meBody: unknown, allocations: unknown) {
+const ME = { id: "m", email: "alice@x.com", provider: "local_password" };
+
+function renderDashboard(opts: {
+  allocations?: unknown[];
+  credentials?: unknown[];
+  claimable?: unknown[];
+} = {}) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const fetchMock = vi
-    .spyOn(globalThis, "fetch")
-    .mockImplementation(async (input) => {
-      const url = typeof input === "string" ? input : (input as Request).url;
-      if (url.endsWith("/me")) return jsonResponse(meStatus, meBody);
-      if (url.endsWith("/me/allocations")) {
-        if (Array.isArray(allocations)) return jsonResponse(200, allocations);
-        return jsonResponse(500, { error: { code: "boom", message: "DB exploded" } });
-      }
-      return jsonResponse(404, { error: {} });
-    });
-  return {
-    fetchMock,
-    ...render(
-      <QueryClientProvider client={qc}>
-        <MemoryRouter initialEntries={["/dashboard"]}>
-          <AuthProvider queryClient={qc}>
-            <Routes>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/dashboard/allocations/:id" element={<div>detail</div>} />
-            </Routes>
-          </AuthProvider>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    ),
-  };
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = typeof input === "string" ? input : (input as Request).url;
+    if (url.endsWith("/me")) return jsonResponse(200, ME);
+    if (url.endsWith("/me/allocations")) return jsonResponse(200, opts.allocations ?? []);
+    if (url.endsWith("/me/credentials")) return jsonResponse(200, opts.credentials ?? []);
+    if (url.endsWith("/me/claimable-models")) return jsonResponse(200, opts.claimable ?? []);
+    return jsonResponse(404, { error: {} }); // /me/usage* → UsageSummary degrades quietly
+  });
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={["/dashboard"]}>
+        <AuthProvider queryClient={qc}>
+          <Routes>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/keys" element={<div data-testid="keys">keys</div>} />
+            <Route path="/allocations" element={<div data-testid="allocations">allocs</div>} />
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
 }
 
-describe("<DashboardPage />", () => {
-  it("renders empty state when there are no allocations", async () => {
-    renderDashboard(200, { id: "m", email: "alice@x.com", provider: "local_password" }, []);
-    await waitFor(() => expect(screen.getByText(/尚未獲得任何分配/)).toBeInTheDocument());
-  });
+afterEach(() => vi.restoreAllMocks());
 
-  it("renders allocation cards and hides revoked by default", async () => {
-    renderDashboard(
-      200,
-      { id: "m", email: "alice@x.com", provider: "local_password" },
-      [
-        {
-          id: "a1",
-          member_id: "m",
-          subject_snapshot: "alice@x.com",
-          resource_model: "gpt-4o-mini",
-          status: "active",
-          created_at: "2026-05-24T00:00:00+00:00",
-          revoked_at: null,
-          token_prefix: "aiapi_xx",
-        },
-        {
-          id: "a2",
-          member_id: "m",
-          subject_snapshot: "alice@x.com",
-          resource_model: "dall-e-3",
-          status: "revoked",
-          created_at: "2026-04-01T00:00:00+00:00",
-          revoked_at: "2026-05-01T00:00:00+00:00",
-          token_prefix: "aiapi_yy",
-        },
+describe("<DashboardPage /> slim overview (Phase 22 US2)", () => {
+  it("shows active key and allocation counts, not full management widgets", async () => {
+    renderDashboard({
+      allocations: [
+        { id: "a1", status: "active" },
+        { id: "a2", status: "revoked" },
       ],
-    );
-    await waitFor(() => expect(screen.getAllByText("gpt-4o-mini").length).toBeGreaterThan(0));
-    expect(screen.queryByText("dall-e-3")).not.toBeInTheDocument();
-
-    // toggle includeRevoked → revoked shows
-    await userEvent.click(screen.getByRole("switch", { name: /含已撤回/ }));
-    await waitFor(() => expect(screen.getAllByText("dall-e-3").length).toBeGreaterThan(0));
+      credentials: [{ id: "c1", status: "active" }],
+    });
+    await waitFor(() => expect(screen.getByText("活躍金鑰")).toBeInTheDocument());
+    expect(screen.getByText("活躍分配")).toBeInTheDocument();
+    // counts: 1 active key, 1 active allocation
+    expect(screen.getAllByText("1").length).toBeGreaterThanOrEqual(2);
+    // management widgets are NOT on the overview
+    expect(screen.queryByText("可用 model")).not.toBeInTheDocument(); // credentials table header
+    expect(screen.queryByText("用量圖表")).not.toBeInTheDocument(); // usage charts heading
+    expect(screen.queryByText("我的分配")).not.toBeInTheDocument(); // allocation list heading
   });
 
-  it("shows error block with retry on /me/allocations 500", async () => {
-    renderDashboard(200, { id: "m", email: "alice@x.com" }, null);
-    await waitFor(() => expect(screen.getByText(/無法載入分配/)).toBeInTheDocument());
-    expect(screen.getByRole("button", { name: "重試" })).toBeInTheDocument();
+  it("nudges to create a key when the member has none, linking to /keys", async () => {
+    renderDashboard({ credentials: [] });
+    const link = await screen.findByRole("link", { name: /去建立金鑰/ });
+    expect(link).toHaveAttribute("href", "/keys");
+  });
+
+  it("nudges to claim when claimable models exist, linking to /allocations", async () => {
+    renderDashboard({
+      credentials: [{ id: "c1", status: "active" }],
+      claimable: [{ state: "claimable" }],
+    });
+    const link = await screen.findByRole("link", { name: /去領取/ });
+    expect(link).toHaveAttribute("href", "/allocations");
   });
 });

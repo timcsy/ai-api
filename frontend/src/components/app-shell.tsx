@@ -44,6 +44,9 @@ const ADMIN_SUBNAV = [
 
 const MAIN_NAV = [
   { to: "/dashboard", label: "我的儀表板", adminOnly: false },
+  { to: "/keys", label: "金鑰", adminOnly: false },
+  { to: "/allocations", label: "分配", adminOnly: false },
+  { to: "/usage", label: "用量", adminOnly: false },
   { to: "/catalog", label: "模型目錄", adminOnly: false },
   { to: "/admin", label: "管理員", adminOnly: true },
 ];

@@ -88,13 +88,29 @@ describe("<AppCredentialsCard />", () => {
     await waitFor(() => expect(screen.getByText("aiapi_secretsecret")).toBeInTheDocument());
   });
 
-  it("renames a key via PATCH name (label only)", async () => {
-    const calls: { url: string; method: string }[] = [];
+  it("has a single 編輯 action (no separate 改名 / 編輯 model)", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = typeof input === "string" ? input : (input as Request).url;
+      if (url.endsWith("/me/credentials")) return jsonResponse(200, CREDS);
+      if (url.endsWith("/me/allocations")) return jsonResponse(200, ALLOCS);
+      return jsonResponse(404, { error: {} });
+    });
+    renderCard();
+    await waitFor(() => expect(screen.getByText("我的筆電")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "編輯" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "改名" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "編輯 model" })).not.toBeInTheDocument();
+  });
+
+  it("edits name + model in one dialog, sending a single PATCH with both", async () => {
+    let patchBody: Record<string, unknown> | null = null;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = typeof input === "string" ? input : (input as Request).url;
       const method = (init?.method ?? "GET").toUpperCase();
-      calls.push({ url, method });
-      if (url.endsWith("/me/credentials/c1") && method === "PATCH") return jsonResponse(200, { ...CREDS[0], name: "改好的名" });
+      if (url.endsWith("/me/credentials/c1") && method === "PATCH") {
+        patchBody = JSON.parse(String(init?.body ?? "{}"));
+        return jsonResponse(200, { ...CREDS[0], name: "改好的名" });
+      }
       if (url.endsWith("/me/credentials")) return jsonResponse(200, CREDS);
       if (url.endsWith("/me/allocations")) return jsonResponse(200, ALLOCS);
       return jsonResponse(404, { error: {} });
@@ -103,14 +119,16 @@ describe("<AppCredentialsCard />", () => {
     renderCard();
     await waitFor(() => expect(screen.getByText("我的筆電")).toBeInTheDocument());
 
-    await user.click(screen.getByRole("button", { name: "改名" }));
+    await user.click(screen.getByRole("button", { name: "編輯" }));
     const input = screen.getByLabelText("名稱");
     await user.clear(input);
     await user.type(input, "改好的名");
+    // untick the second model (a2 → remove)
+    const boxes = screen.getAllByRole("checkbox");
+    await user.click(boxes[1]!);
     await user.click(screen.getByRole("button", { name: "儲存" }));
 
-    await waitFor(() =>
-      expect(calls.some((c) => c.url.endsWith("/me/credentials/c1") && c.method === "PATCH")).toBe(true),
-    );
+    await waitFor(() => expect(patchBody).not.toBeNull());
+    expect(patchBody).toMatchObject({ name: "改好的名", remove: ["a2"] });
   });
 });

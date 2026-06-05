@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "@/contexts/auth";
-import { DashboardPage } from "@/routes/dashboard";
+import { AllocationsPage } from "@/routes/allocations";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -45,10 +45,10 @@ function renderDashboard() {
   });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/dashboard"]}>
+      <MemoryRouter initialEntries={["/allocations"]}>
         <AuthProvider queryClient={qc}>
           <Routes>
-            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/allocations" element={<AllocationsPage />} />
             <Route path="/dashboard/allocations/:id" element={<div>detail</div>} />
           </Routes>
         </AuthProvider>

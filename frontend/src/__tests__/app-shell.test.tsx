@@ -25,6 +25,9 @@ function renderShell(initialEntry: string) {
             <Routes>
               <Route element={<AppShell />}>
                 <Route path="/dashboard" element={<div data-testid="dash">dash</div>} />
+                <Route path="/keys" element={<div data-testid="keys">keys</div>} />
+                <Route path="/allocations" element={<div data-testid="allocs">allocs</div>} />
+                <Route path="/usage" element={<div data-testid="usage">usage</div>} />
                 <Route path="/catalog" element={<div data-testid="cat">cat</div>} />
               </Route>
               <Route path="/login" element={<div data-testid="login">login</div>} />
@@ -56,6 +59,22 @@ describe("<AppShell />", () => {
 
     await user.click(screen.getByText("模型目錄"));
     expect(screen.getByTestId("cat")).toBeInTheDocument();
+  });
+
+  it("exposes 金鑰 / 分配 / 用量 member pages and routes to them", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse(200, { id: "m1", email: "alice@x.com" }),
+    );
+    renderShell("/dashboard");
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByTestId("dash")).toBeInTheDocument());
+
+    await user.click(screen.getByText("金鑰"));
+    expect(screen.getByTestId("keys")).toBeInTheDocument();
+    await user.click(screen.getByText("分配"));
+    expect(screen.getByTestId("allocs")).toBeInTheDocument();
+    await user.click(screen.getByText("用量"));
+    expect(screen.getByTestId("usage")).toBeInTheDocument();
   });
 
   it("logout clears queryClient cache and tracks unauthenticated state", async () => {

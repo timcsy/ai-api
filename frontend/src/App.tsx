@@ -30,10 +30,13 @@ import {
 } from "@/routes/admin/rebalance-log";
 import { AdminUsagePage } from "@/routes/admin/usage";
 import { AllocationDetailPage } from "@/routes/allocation-detail";
+import { AllocationsPage } from "@/routes/allocations";
 import { CatalogPage } from "@/routes/catalog";
 import { DeviceAuthorizePage } from "@/routes/device-authorize";
 import { CatalogDetailPage } from "@/routes/catalog-detail";
 import { DashboardPage } from "@/routes/dashboard";
+import { KeysPage } from "@/routes/keys";
+import { UsagePage } from "@/routes/usage";
 import { LoginPage } from "@/routes/login";
 import { NotFoundPage } from "@/routes/not-found";
 
@@ -63,6 +66,9 @@ export function App() {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/dashboard/allocations/:id" element={<AllocationDetailPage />} />
+              <Route path="/keys" element={<KeysPage />} />
+              <Route path="/allocations" element={<AllocationsPage />} />
+              <Route path="/usage" element={<UsagePage />} />
               <Route path="/device" element={<DeviceAuthorizePage />} />
               <Route path="/catalog" element={<CatalogPage />} />
               <Route path="/catalog/*" element={<CatalogDetailPage />} />

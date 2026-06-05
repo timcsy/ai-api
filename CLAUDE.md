@@ -45,6 +45,7 @@ Auto-generated from all feature plans. Last updated: 2026-06-05
 - PostgreSQL（生產）/ SQLite（dev、CI）；**schema 重構 + migration `0017`**（改 `credentials` + 新 `credential_allocations`） (030-scoped-app-credentials)
 - TypeScript strict + React 19 + Vite 6（前端為主）/ Python 3.11+（後端僅 1 個改名端點擴充） + TanStack Query、shadcn/ui、Tailwind（前端）；FastAPI、SQLAlchemy 2.x async、Pydantic v2（後端，**皆既有，不新增套件**） (031-credential-ui-consolidation)
 - PostgreSQL / SQLite；**不新增表、不新增 migration**（`Credential.name` 已存在，僅允許更新） (031-credential-ui-consolidation)
+- TypeScript strict（前端為主）；Python 3.11+（後端**完全不動**） + React 19 + Vite 6 + react-router-dom + TanStack Query + shadcn/ui + Tailwind（皆既有，不新增） (032-member-ui-tabs)
 
 - Python 3.11+ + LiteLLM（proxy core）、FastAPI（admin API）、 (001-gateway-core)
 
@@ -65,9 +66,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 032-member-ui-tabs: Added TypeScript strict（前端為主）；Python 3.11+（後端**完全不動**） + React 19 + Vite 6 + react-router-dom + TanStack Query + shadcn/ui + Tailwind（皆既有，不新增）
 - 031-credential-ui-consolidation: Added TypeScript strict + React 19 + Vite 6（前端為主）/ Python 3.11+（後端僅 1 個改名端點擴充） + TanStack Query、shadcn/ui、Tailwind（前端）；FastAPI、SQLAlchemy 2.x async、Pydantic v2（後端，**皆既有，不新增套件**）
 - 030-scoped-app-credentials: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2、TanStack Query、shadcn/ui（**皆既有，不新增套件**）
-- 029-codex-easy-install: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端）/ POSIX `sh` + Windows PowerShell（安裝腳本） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2、`cryptography`（Fernet，既有）、TanStack Query、shadcn/ui（**皆既有，不新增套件**）；安裝腳本下載 OpenAI Codex CLI 獨立 binary（GitHub Releases，client-side）
 
 
 <!-- MANUAL ADDITIONS START -->

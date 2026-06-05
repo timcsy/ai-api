@@ -71,6 +71,9 @@ describe("mobile navigation (Phase 16 US1)", () => {
     const dialog = await screen.findByRole("dialog");
     const drawer = within(dialog);
     expect(drawer.getByText("我的儀表板")).toBeInTheDocument();
+    expect(drawer.getByText("金鑰")).toBeInTheDocument();
+    expect(drawer.getByText("分配")).toBeInTheDocument();
+    expect(drawer.getByText("用量")).toBeInTheDocument();
     expect(drawer.getByText("模型目錄")).toBeInTheDocument();
     expect(drawer.getByText("管理員")).toBeInTheDocument();
     for (const label of SUBNAV) {
