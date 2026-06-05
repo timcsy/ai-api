@@ -148,9 +148,9 @@ description: "Tasks for 階段 20 — scoped application credentials（憑證綁
 - [X] T041 跑 `uv run pytest tests/` 全套零回歸（M:N + 既有 token/proxy/計費/配額/device-flow，SC-004/007）；`ruff check . && mypy src/` 零警告。
 - [X] T042 前端：`allocation-detail.tsx` 原 per-allocation 憑證卡改唯讀「哪些 app key 含此分配」+「用此分配建 app key」捷徑；`npm --prefix frontend run test && lint && typecheck && build` 綠；清單/建立面板 **360px** 不溢出（沿用階段 16 RWD）。
 - [X] T043 [P] 更新 `knowledge/vision.md` 階段 20 → ✅（完成日、實際交付、連結 history）；`knowledge/history/completed-phases-detail.md` 追加「## 階段 20」（M:N、migration 0017、proxy 解析、收尾 A）；若有新教訓補 `knowledge/experience.md`。
-- [ ] T044 commit + push + 開 PR；push 前 `ruff check .` + 前端 build；**特別檢視 migration 0017（in-place + device_authorizations FK 並存）與 proxy 熱路徑**；等 CI 全綠後 squash merge 到 main。
-- [ ] T045 main image build 綠後 `helm upgrade`（同既有指令 + `--set migrationJob.enabled=true` 套 0017 + 新 sha）；live 驗：**既有舊 token 仍可呼叫**、建一把多 model key 打多 model、撤一把不連坐。
-- [ ] T046 收尾：vision 階段 20 改 ✅、history 補上、roadmap 一致；標記 tasks 全完成。
+- [X] T044 commit + push + 開 PR；push 前 `ruff check .` + 前端 build；**特別檢視 migration 0017（in-place + device_authorizations FK 並存）與 proxy 熱路徑**；等 CI 全綠後 squash merge 到 main。
+- [X] T045 main image build 綠後 `helm upgrade`（同既有指令 + `--set migrationJob.enabled=true` 套 0017 + 新 sha）；live 驗：**既有舊 token 仍可呼叫**、建一把多 model key 打多 model、撤一把不連坐。
+- [X] T046 收尾：vision 階段 20 改 ✅、history 補上、roadmap 一致；標記 tasks 全完成。
 
 ---
 
