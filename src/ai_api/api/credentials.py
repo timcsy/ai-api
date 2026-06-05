@@ -87,6 +87,12 @@ async def admin_patch_credential_scope(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": {"code": "not_found", "message": "credential not found"}},
         )
+    if payload.name is not None:
+        await service.rename_credential(credential_id, payload.name)
+        await audit.record(
+            session, event_type=AuditEventType.credential_renamed,
+            actor_type=ActorType.admin, target_type="credential", target_id=credential_id,
+        )
     try:
         await service.patch_credential_scope(credential_id, payload.add, payload.remove)
     except PermissionError as exc:

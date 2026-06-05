@@ -97,6 +97,8 @@ export function AppCredentialsCard() {
   const [revokeTarget, setRevokeTarget] = React.useState<AppCredential | null>(null);
   const [editTarget, setEditTarget] = React.useState<AppCredential | null>(null);
   const [editPick, setEditPick] = React.useState<Set<string>>(new Set());
+  const [renameTarget, setRenameTarget] = React.useState<AppCredential | null>(null);
+  const [renameName, setRenameName] = React.useState("");
 
   const invalidate = () => qc.invalidateQueries({ queryKey: key });
 
@@ -146,6 +148,17 @@ export function AppCredentialsCard() {
       toast({ title: "已更新可用 model" });
     },
     onError: (e: ApiError) => toast({ title: "更新失敗", description: e.message, variant: "destructive" }),
+  });
+
+  const renameMut = useMutation({
+    mutationFn: (v: { id: string; name: string }) =>
+      api(`/me/credentials/${v.id}`, { method: "PATCH", body: JSON.stringify({ name: v.name }) }),
+    onSuccess: () => {
+      setRenameTarget(null);
+      invalidate();
+      toast({ title: "已改名" });
+    },
+    onError: (e: ApiError) => toast({ title: "改名失敗", description: e.message, variant: "destructive" }),
   });
 
   function openEdit(c: AppCredential) {
@@ -217,6 +230,7 @@ export function AppCredentialsCard() {
                   <TableCell className="text-right" data-label="操作">
                     {c.status === "active" ? (
                       <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => { setRenameTarget(c); setRenameName(c.name); }}>改名</Button>
                         <Button variant="ghost" size="sm" onClick={() => openEdit(c)}>編輯 model</Button>
                         <Button variant="ghost" size="sm" disabled={rotateMut.isPending} onClick={() => rotateMut.mutate(c.id)}>重新產生</Button>
                         <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setRevokeTarget(c)}>撤回</Button>
@@ -307,6 +321,38 @@ export function AppCredentialsCard() {
         </DialogContent>
       </Dialog>
 
+      {/* Rename */}
+      <Dialog open={!!renameTarget} onOpenChange={(o) => !o && setRenameTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>金鑰改名</DialogTitle>
+            <DialogDescription>只是改個好記的名字，不影響 token 或可用 model。</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="rename-input">名稱</Label>
+            <Input
+              id="rename-input"
+              value={renameName}
+              maxLength={64}
+              onChange={(e) => setRenameName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && renameName.trim() && renameTarget)
+                  renameMut.mutate({ id: renameTarget.id, name: renameName.trim() });
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameTarget(null)}>取消</Button>
+            <Button
+              disabled={!renameName.trim() || renameMut.isPending}
+              onClick={() => renameTarget && renameMut.mutate({ id: renameTarget.id, name: renameName.trim() })}
+            >
+              {renameMut.isPending ? "儲存中…" : "儲存"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Reveal-once token */}
       <Dialog open={!!fresh} onOpenChange={(o) => !o && setFresh(null)}>
         <DialogContent>
@@ -328,7 +374,12 @@ export function AppCredentialsCard() {
           <AlertDialogHeader>
             <AlertDialogTitle>撤回「{revokeTarget?.name}」？</AlertDialogTitle>
             <AlertDialogDescription>
-              這把金鑰涵蓋的<strong>所有 model 立即失效</strong>、無法復原。其他金鑰不受影響。
+              這把金鑰涵蓋的{" "}
+              <strong>
+                {revokeTarget?.allocations.length ?? 0} 個 model（
+                {revokeTarget?.allocations.map((a) => a.display_name ?? a.resource_model).join("、")}）會一起立即失效
+              </strong>
+              、無法復原。其他金鑰不受影響。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

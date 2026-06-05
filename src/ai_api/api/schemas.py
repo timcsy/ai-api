@@ -135,6 +135,9 @@ class CreateAppCredentialRequest(BaseModel):
 
 
 class ScopePatchRequest(BaseModel):
+    # Phase 21: optionally rename the key in the same "edit" call (label only —
+    # does not affect token or scope). Empty string is rejected (min_length 1).
+    name: CredentialNameStr | None = None
     add: list[str] = Field(default_factory=list)
     remove: list[str] = Field(default_factory=list)
 

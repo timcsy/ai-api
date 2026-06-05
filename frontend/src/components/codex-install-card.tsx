@@ -32,6 +32,7 @@ export function CodexInstallCard({ baseUrl }: { baseUrl: string }) {
         <CardTitle className="text-base">安裝 Codex（一行指令）</CardTitle>
         <CardDescription>
           複製到終端機執行，依指示在瀏覽器授權一次即可——不需貼 token、不需設環境變數。
+          授權後會在你的「我的應用金鑰」新增一把金鑰給這台裝置。
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">

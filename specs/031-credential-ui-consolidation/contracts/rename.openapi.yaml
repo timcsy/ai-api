@@ -1,0 +1,57 @@
+openapi: 3.0.3
+info:
+  title: Application credential rename (Phase 21)
+  version: 0.1.0
+  description: |
+    把「改名」併進既有「調整金鑰」端點：PATCH /me/credentials/{id} 與
+    /admin/credentials/{id} 多收選填 `name`。改名只改標籤——不影響 token、可用
+    model（scope）、狀態、歸戶。其餘 UI 收斂不涉及新 API。
+    Spec: specs/031-credential-ui-consolidation/spec.md。
+
+servers: [{ url: / }]
+
+components:
+  securitySchemes:
+    MemberSession: { type: apiKey, in: cookie, name: session }
+    AdminToken: { type: apiKey, in: header, name: X-Admin-Token }
+  schemas:
+    ScopePatch:
+      type: object
+      description: 同一端點可同時改 scope 與名稱；皆選填
+      properties:
+        name: { type: string, description: 新名稱（選填；改名不影響 token/scope） }
+        add: { type: array, items: { type: string } }
+        remove: { type: array, items: { type: string } }
+
+paths:
+  /me/credentials/{credential_id}:
+    patch:
+      summary: （member）調整金鑰——可改名稱與/或可用 model（擁有者）
+      operationId: patchMyCredential
+      security: [{ MemberSession: [] }]
+      parameters: [{ name: credential_id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ScopePatch' } } } }
+      responses:
+        '200': { description: 更新後的金鑰（含 allocations）, content: { application/json: { schema: { type: object } } } }
+        '403': { description: 非本人 / 加他人分配 }
+        '404': { description: 不存在 }
+        '409': { description: model 重複 / 移除至 0 }
+
+  /admin/credentials/{credential_id}:
+    patch:
+      summary: （admin）調整任一成員金鑰——可改名稱與/或 scope（留稽核）
+      operationId: adminPatchCredential
+      security: [{ AdminToken: [] }]
+      parameters: [{ name: credential_id, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ScopePatch' } } } }
+      responses:
+        '200': { description: 更新後的金鑰 }
+        '401': { description: 未認證 }
+        '404': { description: 不存在 }
+        '409': { description: model 重複 / 移除至 0 }
+
+# ---- 契約測試應斷言 ----
+# 1. PATCH name → 名稱改變；token 仍可呼叫、可用 model 不變（改名不影響功能）。
+# 2. 成員改他人金鑰名稱 → 404/403；admin 改任一成員 → 200 + 留稽核 credential_renamed。
+# 3. 空 / 超長名 → 422/400（沿用名稱長度上限）。
+# 4. name 與 add/remove 同時送 → 兩者皆生效。
