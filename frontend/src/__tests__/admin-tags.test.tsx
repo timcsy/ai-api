@@ -26,7 +26,7 @@ describe("<AdminTagsPage />", () => {
       </QueryClientProvider>,
     );
     await waitFor(() =>
-      expect(screen.getByText(/目前沒有任何 tag/)).toBeInTheDocument(),
+      expect(screen.getByText(/目前沒有任何標籤/)).toBeInTheDocument(),
     );
   });
 

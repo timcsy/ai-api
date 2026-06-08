@@ -50,7 +50,7 @@ function renderShell(isAdmin: boolean) {
   );
 }
 
-const SUBNAV = ["首頁", "Model", "成員", "Tag", "Provider 憑證", "存取", "通知", "觀測"];
+const SUBNAV = ["首頁", "模型", "成員", "標籤", "供應商憑證", "存取", "通知", "觀測"];
 
 afterEach(() => {
   vi.restoreAllMocks();

@@ -58,13 +58,13 @@ describe("<DashboardPage /> self-service claim", () => {
     expect(screen.getByText("aiapi_SECRET_TOKEN_123")).toBeInTheDocument();
   });
 
-  it("shows 已領取 / 需 admin 解鎖 states without a claim button", async () => {
+  it("shows 已領取 / 需管理員解鎖 states without a claim button", async () => {
     mountWithClaimable([
       { slug: "azure/a", display_name: "A", provider: "azure", default_quota: 100, state: "already_claimed" },
       { slug: "azure/b", display_name: "B", provider: "azure", default_quota: 100, state: "reclaim_locked" },
     ]);
     await waitFor(() => expect(screen.getByText("已領取")).toBeInTheDocument());
-    expect(screen.getByText("需 admin 解鎖")).toBeInTheDocument();
+    expect(screen.getByText("需管理員解鎖")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "領取憑證" })).not.toBeInTheDocument();
   });
 

@@ -47,7 +47,7 @@ describe("MemberUsageCharts (Phase 17)", () => {
       expect(charts.length).toBe(2); // daily bar + donut
     });
     expect(screen.getByText("我的每日用量")).toBeInTheDocument();
-    expect(screen.getByText("我的各 Model 花費")).toBeInTheDocument();
+    expect(screen.getByText("我的各模型花費")).toBeInTheDocument();
   });
 
   it("shows empty states for a member with no usage", async () => {

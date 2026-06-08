@@ -54,7 +54,7 @@ describe("<AdminProvidersPage />", () => {
   it("shows empty state when no credentials", async () => {
     setup([]);
     await waitFor(() =>
-      expect(screen.getByText(/尚未加入任何 provider 憑證/)).toBeInTheDocument(),
+      expect(screen.getByText(/尚未加入任何供應商憑證/)).toBeInTheDocument(),
     );
   });
 

@@ -34,8 +34,8 @@ describe("<AdminModelAccessPage />", () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    expect(screen.getByText("Model 存取規則")).toBeInTheDocument();
-    expect(screen.getByText("選擇 Model")).toBeInTheDocument();
+    expect(screen.getByText("模型存取規則")).toBeInTheDocument();
+    expect(screen.getByText("選擇模型")).toBeInTheDocument();
     // Policy form not visible until selection
     expect(screen.queryByText("存取政策")).not.toBeInTheDocument();
   });
