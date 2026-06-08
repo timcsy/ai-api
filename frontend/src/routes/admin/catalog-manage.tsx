@@ -338,12 +338,11 @@ export function AdminCatalogManagePage() {
 
       {/* Create dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>加入 Model 到 Catalog</DialogTitle>
             <DialogDescription>
-              對 Azure：Model 名稱填你的 <strong>deployment 名稱</strong>（不是 OpenAI 公版的名稱）。
-              對 OpenAI / Anthropic / Gemini：填官方 model id（例：claude-3-5-sonnet-20241022）。
+              先用「從 LiteLLM 帶入」搜尋帶入，或手動填寫。
             </DialogDescription>
           </DialogHeader>
           <LiteLLMModelPicker
@@ -401,10 +400,7 @@ export function AdminCatalogManagePage() {
                       <Input placeholder="例：gpt-5.4-mini" {...field} />
                     </FormControl>
                     <p className="text-xs text-muted-foreground mt-1">
-                      <strong>Azure</strong>：填你的 deployment 名稱（不是 OpenAI 公版名稱；每個訂閱不同）。<br />
-                      <strong>OpenAI / Anthropic / Gemini</strong>：填官方 model id（例：
-                      <code>claude-3-5-sonnet-20241022</code>、<code>gpt-4o-mini</code>、
-                      <code>gemini-1.5-flash</code>）。
+                      Azure 填你的 deployment 名稱；其他 provider 填官方 model id。
                     </p>
                     <FormMessage />
                   </FormItem>
