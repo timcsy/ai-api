@@ -48,7 +48,7 @@
 `history/completed-phases-detail.md`。本檔〈核心想法〉與〈架構〉段反映平台現行設計；
 本段只記「跑在哪、目前未完成的是什麼」。
 
-階段 1–24 均已上線（最新 rev 66）。憑證模型一路演進：階段 18（每分配多 per-device 憑證）→ 19（一鍵安裝 Codex + device-flow）→ 20（scoped application credentials，credential↔allocation M:N）→ 21（憑證 UI 術語與層級收斂：統一「應用金鑰」、單一管理處、可改名）→ 22（會員介面分頁化：頂部導覽拆 金鑰/分配/用量 + 精簡儀表板 + 一句解釋）。**階段 19 三平台真機（Windows/macOS/Linux）已驗收完成（2026-06-08）**；驗收暴露並修掉三個 Codex 安裝坑（預設模型 pin、選錯模型可操作錯誤、bare-slug alias 讓 /model 看得到成員模型；rev 60→62）。無已知待辦。
+階段 1–25 均已上線（最新 rev 73）。憑證模型一路演進：階段 18（每分配多 per-device 憑證）→ 19（一鍵安裝 Codex + device-flow）→ 20（scoped application credentials，credential↔allocation M:N）→ 21（憑證 UI 術語與層級收斂：統一「應用金鑰」、單一管理處、可改名）→ 22（會員介面分頁化：頂部導覽拆 金鑰/分配/用量 + 精簡儀表板 + 一句解釋）→ 23/24（模型目錄 ↔ LiteLLM 對接 + admin 體驗整合）→ 25（responses 支援雙來源判定：實測 + 手動，三軸解耦）。**階段 19 三平台真機（Windows/macOS/Linux）已驗收完成（2026-06-08）**；驗收暴露並修掉三個 Codex 安裝坑（預設模型 pin、選錯模型可操作錯誤、bare-slug alias 讓 /model 看得到成員模型；rev 60→62）。**階段 25 後另有一輪 UI 用語一致性 polish（rev 71→73）**：中英混雜統一成繁中、後端列舉/狀態值一律過 label 函式（`status-label.ts`/`facetLabel`）中文化、facet 加白話 hover 說明、金鑰清單含已撤回開關（對應原則 6 可達性）。無已知待辦。
 
 ## 架構
 
@@ -106,7 +106,7 @@
 
 > 已完成階段只列標題、完成標記與「交付」一句；**細部成功標準 / 核心原則 /
 > 明確排除已封存於 [`knowledge/history/completed-phases-detail.md`](history/completed-phases-detail.md)**。
-> 階段 1–24 皆已上線（最新 rev 66）；階段 19 三平台真機驗收已完成（2026-06-08）。
+> 階段 1–25 皆已上線（最新 rev 73）；階段 19 三平台真機驗收已完成（2026-06-08）。
 
 ### 階段 1：分流核心可運作 ✅
 - [x] 完成（2026-05-21；本機 + k3s-tew 叢集全 SC 達標）— 自製 gateway 可代理 Azure OpenAI、可發行可撤回的憑證。

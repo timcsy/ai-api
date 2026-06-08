@@ -485,3 +485,25 @@
   另記：client 端的本機切換（`/model`）伺服器管不到，凡「選的當下無法擋」的互動，退而求其次給清楚錯誤訊息。
 - **來源**：`src/ai_api/proxy/preflight.py`（canonical_model 對齊）、`services/allocations.py` `resolve_scope_allocation`（alias）、
   `services/device_flow.py`（pin bare slug）、`src/ai_api/install/codex.{sh,ps1}.tmpl`；階段 19 收尾（Windows 真機暴露）
+
+### UI 文案一致性：grep 抓不到獨立標籤、列舉值要過 label()、改字串要同步測試
+
+- **理論說**：要把中英混雜的 UI 統一成繁中，grep 出夾雜英文的字串、逐一翻掉就好。
+- **實際發生**（rev 71→73 用語一致性梳理）：分三輪才掃乾淨，每輪使用者都再截圖出漏網的。三個根因：
+  ①**用「中文相鄰」當 grep 條件會漏掉沒有中文緊鄰的獨立英文標籤**——導覽列 `label: "Model"`、表頭 `<span>Model</span>`、
+  頁面標題 `Catalog 管理`、`<Badge>active</Badge>`，這些前後沒中文，grep 一律抓不到。②**後端列舉/資料原始值直接 render**
+  （`{m.cost_tier}`→medium、`{m.default_access}`→open、`{r.event_type}`→anomaly_detector_run、`{m.family}`→general）
+  在畫面上就是裸英文，但在程式裡看不出來是「顯示字」。③改完 UI 字串後 **`frontend/src/__tests__` 仍斷言舊英文**
+  （mobile-nav 的 SUBNAV、各空狀態文案），導致 **Frontend CI 紅**——而 Image build 是獨立 workflow、照樣綠照樣能 deploy，
+  所以「畫面上線了但 CI 沒綠」很容易被忽略。
+- **解決方式**：(a) 不靠「中文相鄰」grep，改**逐檔讀 JSX**（必要時派 subagent 逐檔掃）才抓得到獨立標籤；
+  (b) **所有列舉/狀態值顯示一律過 label 函式**——集中一個 `frontend/src/lib/status-label.ts`（statusLabel/actorLabel/accessLabel/
+  familyLabel/eventLabel）+ 既有 `catalog-labels.ts` 的 `facetLabel`/`facetHint`，未知值原樣回傳、原始值放 `title=` 備查；
+  (c) 改顯示字串的同一個 PR 就更新對應測試斷言。
+- **教訓**：i18n/文案一致性的盲點不是「夾在中文裡的英文」（那種好抓），而是**獨立英文標籤**與**後端列舉直出**——
+  根治法是「**所有對人顯示的列舉/狀態都強制走 label()**」，把英文外洩變成「忘了加 label」這種編譯期就近可查的問題，
+  而非散落各處的字串。呼應「加欄位要追到所有 sink」「backend 有 API 沒 UI = 未完成」（原則 6 可達性）：顯示層的
+  source→sink 一樣要追全。附帶 CI 陷阱：**前端顯示字串改名要連帶改測試**，否則 Frontend CI 紅但 Image build 綠，
+  紅燈會被「還是能 deploy」掩蓋。
+- **來源**：`frontend/src/lib/status-label.ts`、`catalog-labels.ts`、`components/app-shell.tsx`、`src/__tests__/mobile-nav.test.tsx`
+  等 ~27 檔；rev 71→73（2026-06-08，使用者逐輪截圖才掃乾淨）
