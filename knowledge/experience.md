@@ -507,3 +507,20 @@
   紅燈會被「還是能 deploy」掩蓋。
 - **來源**：`frontend/src/lib/status-label.ts`、`catalog-labels.ts`、`components/app-shell.tsx`、`src/__tests__/mobile-nav.test.tsx`
   等 ~27 檔；rev 71→73（2026-06-08，使用者逐輪截圖才掃乾淨）
+
+### 健康探測對推理模型不能用極小 max_tokens——推理 token 會吃掉 completion 預算
+
+- **理論說**：連通性／健康測試只要打一個極小回覆即可，`max_tokens=1`（或 16）省錢又快。
+- **實際發生**（階段 26 真機）：admin 對 `azure/gpt-5.4` 按「測試模型」回紅字
+  `litellm.BadRequestError: ... Could not finish the message because max_tokens or model output limit
+  was reached. Please try again with higher max_tokens.`——模型其實**完全是通的**（auth/路由/deployment 全對），
+  只是 gpt-5/o-series 是**推理模型**：推理 token 計入 completion 預算，極小的 cap 全被推理吃光、產不出任何輸出就撞上限，
+  Azure 直接回 BadRequest。既有「測試連線」用 `max_tokens=16` 有**同一個 latent bug**（只是還沒人拿 gpt-5 測到）。
+- **解決方式**：兩個健康探測的 cap 都調到 **2048**。一般（非推理）模型回「ping」很短就因 EOS 停下、**不會**真的吐 2048
+  token，所以實際成本仍極小；推理模型有足夠空間跑完推理 + 短答。
+- **教訓**：對「會推理」的模型（gpt-5、o1/o3/o4…）做任何**最小呼叫**（health probe、連通測試、warm-up）時，
+  `max_tokens` 不能設成「我只要一點輸出」的小值——它是 **completion（含 reasoning）總預算**，太小會讓可用的模型
+  誤報失敗。給一個「夠推理跑完」的寬上限（非推理模型不會真用到、成本不變），或別設 cap。判準：**這個 cap 是否
+  含 reasoning？** 含 → 不能用「期望輸出長度」當值。附帶：BadRequest 說「raise max_tokens」其實證明模型可達，
+  是「探測設定」而非「模型壞」。
+- **來源**：`src/ai_api/api/admin_catalog.py`（model test）、`admin_providers.py`（test-connection）；階段 26（gpt-5.4 真機暴露）
