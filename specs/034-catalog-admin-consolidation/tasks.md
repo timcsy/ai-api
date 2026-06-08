@@ -126,8 +126,8 @@
 - [X] T025 後端全套 `uv run pytest tests/` 零回歸（adapter 擴充 + 既有目錄/價目/計費/proxy/成員端 facet）；`ruff` + `mypy` 零警告。
 - [X] T026 前端全綠：`npm --prefix frontend run test && lint && typecheck && build`；詳情頁 + 價格畫面 360px RWD 不溢出。
 - [X] T027 [P] 知識/文件：`knowledge/vision.md` 階段 24 → ✅；若有新教訓（能力 sink 擴充、UI 中樞收斂）補 `knowledge/experience.md`。
-- [ ] T028 commit + push + 開 PR；push 前 ruff + 前端 build；**特別檢視 0 migration/0 端點、能力 sink 零回歸、退役範本無殘留**；CI 全綠後 squash merge 到 main。
-- [ ] T029 main image build 綠後 `helm upgrade`（backend + frontend 新 sha；**無 migration → 不加 migrationJob.enabled**）；部署後驗：詳情頁徽章/檢查更新/唯讀面板可用、價格 LiteLLM 帶入可用、壞 token → 401 零回歸。
+- [X] T028 commit + push + 開 PR；push 前 ruff + 前端 build；**特別檢視 0 migration/0 端點、能力 sink 零回歸、退役範本無殘留**；CI 全綠後 squash merge 到 main。
+- [X] T029 main image build 綠後 `helm upgrade`（backend + frontend 新 sha；**無 migration → 不加 migrationJob.enabled**）；部署後驗：詳情頁徽章/檢查更新/唯讀面板可用、價格 LiteLLM 帶入可用、壞 token → 401 零回歸。
 
 ---
 
