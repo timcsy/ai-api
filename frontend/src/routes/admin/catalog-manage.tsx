@@ -38,6 +38,8 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
+import { LiteLLMModelPicker, type LitellmDraft } from "@/components/litellm-model-picker";
+import { LiteLLMUpdateDiff } from "@/components/litellm-update-diff";
 import { ApiError, api } from "@/lib/api-client";
 
 interface CatalogModel {
@@ -149,6 +151,10 @@ export function AdminCatalogManagePage() {
   const { toast } = useToast();
   const [createOpen, setCreateOpen] = React.useState(false);
   const [deleteConfirm, setDeleteConfirm] = React.useState<CatalogModel | null>(null);
+  // Phase 23: when a LiteLLM model is picked, its metadata + suggested price ride
+  // along to the create POST so the backend records provenance + seeds the price.
+  const [litellmDraft, setLitellmDraft] = React.useState<LitellmDraft | null>(null);
+  const [checkSlug, setCheckSlug] = React.useState<string | null>(null);
 
   const query = useQuery<CatalogModel[], ApiError>({
     queryKey: ["admin", "catalog-models-admin"],
@@ -179,12 +185,23 @@ export function AdminCatalogManagePage() {
           description: data.description || "",
           context_window: data.context_window,
           cost_tier: data.cost_tier,
+          // Phase 23: align with the picked LiteLLM model (provenance + metadata + price).
+          ...(litellmDraft
+            ? {
+                base_model_key: litellmDraft.key,
+                modality_input: litellmDraft.metadata.modality_input,
+                modality_output: litellmDraft.metadata.modality_output,
+                capabilities: litellmDraft.metadata.capabilities,
+                suggested_price: litellmDraft.suggested_price,
+              }
+            : {}),
         }),
       });
     },
     onSuccess: () => {
       setCreateOpen(false);
       createForm.reset();
+      setLitellmDraft(null);
       toast({ title: "已加入 catalog" });
       queryClient.invalidateQueries({ queryKey: ["admin", "catalog-models-admin"] });
     },
@@ -296,18 +313,28 @@ export function AdminCatalogManagePage() {
                 )}
               </TableCell>
               <TableCell className="text-right" data-label="動作">
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => setDeleteConfirm(m)}
-                >
-                  移除
-                </Button>
+                <div className="flex justify-end gap-1">
+                  <Button size="sm" variant="outline" onClick={() => setCheckSlug(m.slug)}>
+                    檢查更新
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => setDeleteConfirm(m)}>
+                    移除
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           );})}
         </TableBody>
       </Table>
+
+      {checkSlug && (
+        <LiteLLMUpdateDiff
+          slug={checkSlug}
+          open={checkSlug !== null}
+          onOpenChange={(v) => !v && setCheckSlug(null)}
+          onApplied={() => queryClient.invalidateQueries({ queryKey: ["admin", "catalog-models-admin"] })}
+        />
+      )}
 
       {/* Create dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -319,6 +346,26 @@ export function AdminCatalogManagePage() {
               對 OpenAI / Anthropic / Gemini：填官方 model id（例：claude-3-5-sonnet-20241022）。
             </DialogDescription>
           </DialogHeader>
+          <LiteLLMModelPicker
+            onPick={(draft) => {
+              setLitellmDraft(draft);
+              const [, ...rest] = draft.key.split("/");
+              createForm.setValue("model_name", rest.join("/") || draft.key);
+              createForm.setValue("context_window", draft.metadata.context_window);
+              const prov = draft.key.split("/")[0];
+              if (prov && (PROVIDERS as readonly string[]).includes(prov)) {
+                createForm.setValue("provider", prov as CreateForm["provider"]);
+              }
+            }}
+          />
+          {litellmDraft && (
+            <p className="text-xs text-muted-foreground">
+              已帶入 <span className="font-mono">{litellmDraft.key}</span>
+              （context {litellmDraft.metadata.context_window.toLocaleString()}
+              {litellmDraft.suggested_price ? ` · 建議價 $${litellmDraft.suggested_price.input_per_1k}/1k` : ""}）。
+              可改 Model 名稱做自訂 deployment。
+            </p>
+          )}
           <Form {...createForm}>
             <form
               onSubmit={createForm.handleSubmit((d) => createMut.mutate(d))}
