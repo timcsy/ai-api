@@ -92,4 +92,15 @@ async def test_one_key_two_models_meter_to_their_allocations(app_client: AsyncCl
 async def test_model_outside_scope_is_refused(app_client: AsyncClient) -> None:
     _m, _a, _b, token = await _member_two_allocations()
     # gpt-4o-mini and gpt-4o are in scope; a third model is not.
-    assert await _call(app_client, token, "gpt-4-turbo") == 403
+    r = await app_client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"model": "gpt-4-turbo", "messages": [{"role": "user", "content": "hi"}]},
+    )
+    assert r.status_code == 403
+    err = r.json()["error"]
+    assert err["code"] == "model_mismatch"
+    # The message is actionable: it names the in-scope models and points at /model
+    # so a stray Codex /model pick gives "switch to X", not a cryptic failure.
+    assert "gpt-4o-mini" in err["message"] and "gpt-4o" in err["message"]
+    assert "/model" in err["message"]

@@ -349,6 +349,18 @@ class AllocationService:
         )
         return (await self._s.execute(stmt)).scalars().first()
 
+    async def scope_models(self, credential: Credential) -> Sequence[str]:
+        """The resource_models this key can call, sorted. Used to make an
+        out-of-scope reject actionable (tell the caller what IS allowed).
+        Returns Sequence (not list[...]) — this class has a `list` method that
+        shadows builtin `list` in class-scope annotations."""
+        stmt = (
+            select(CredentialAllocation.resource_model)
+            .where(CredentialAllocation.credential_id == credential.id)
+            .order_by(CredentialAllocation.resource_model)
+        )
+        return list((await self._s.execute(stmt)).scalars().all())
+
     async def lookup_by_token(self, plaintext: str) -> Allocation | None:
         """Back-compat / display: resolve a token to a representative allocation in
         its scope (the first one). Proxy uses the model-aware pair above instead."""

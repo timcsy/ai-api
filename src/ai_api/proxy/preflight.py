@@ -91,12 +91,19 @@ async def run_preflight(
         # Attribute the reject to a representative allocation in the key's scope
         # (the only one, in the single-allocation case) so it shows in its calls.
         repr_alloc = await alloc_service.first_scope_allocation(credential)
-        return PreflightRejection(
-            "model_mismatch",
-            f"model '{requested_model}' is not in this credential's scope",
-            403,
-            repr_alloc,
-        )
+        # Make it actionable: name the model(s) this key CAN call, so a stray
+        # Codex /model pick gives a "switch to X" message instead of a cryptic
+        # failure. (Codex's picker can list models outside this key's scope.)
+        allowed = await alloc_service.scope_models(credential)
+        if allowed:
+            hint = "、".join(allowed)
+            msg = (
+                f"模型 '{requested_model}' 不在這把金鑰的範圍。"
+                f"可用的模型有 {hint}。在 Codex 用 /model 選其中之一。"
+            )
+        else:
+            msg = f"model '{requested_model}' is not in this credential's scope"
+        return PreflightRejection("model_mismatch", msg, 403, repr_alloc)
 
     if allocation.status.value == "revoked":
         return PreflightRejection(
