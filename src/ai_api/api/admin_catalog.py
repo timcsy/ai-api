@@ -18,6 +18,7 @@ from ai_api.auth.audit import record as audit_record
 from ai_api.config import get_settings
 from ai_api.models import ActorType, AuditEventType, DefaultAccess, ModelCatalog
 from ai_api.services import litellm_registry, pricing, responses_support
+from ai_api.services import model_kind as _mk
 
 router = APIRouter(dependencies=[Depends(require_admin_token)])
 
@@ -112,6 +113,10 @@ def _to_dict(m: ModelCatalog, price: dict[str, str] | None = None) -> dict[str, 
         "capabilities": list(m.capabilities),
         # Phase 25: derived responses support (axis ③) for the admin panel.
         "responses_support": responses_support.get_support(m.capabilities),
+        # Phase 26: derived test kind for the "test model" button.
+        "test_kind": _mk.model_kind(m),
+        "test_billable": _mk.is_billable(_mk.model_kind(m)),
+        "test_supported": _mk.is_supported(_mk.model_kind(m)),
         "context_window": m.context_window,
         "cost_tier": m.cost_tier,
         "recommended_for": list(m.recommended_for),
@@ -697,3 +702,99 @@ async def admin_set_responses_support(
         details={"available": payload.available},
     )
     return {"slug": slug, "support": responses_support.get_support(m.capabilities)}
+
+
+class ModelTestRequest(BaseModel):
+    acknowledge_billable: bool = False
+
+
+@router.post("/catalog/models/{slug:path}/test")
+async def admin_test_model(
+    slug: str,
+    payload: ModelTestRequest = Body(default_factory=ModelTestRequest),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Phase 26: issue a minimal real call matched to the model's KIND (chat /
+    embedding / tts / image) to verify it works. Result IS the response — NEVER
+    raise 5xx for upstream errors (mirrors test-responses / test-connection).
+    Billable kinds (image, tts) require acknowledge_billable before any upstream
+    call. Unsupported kinds (stt, unknown) return a clear note, no call. Audited
+    (model_tested), not recorded as a member CallRecord."""
+    import time
+
+    from ai_api.proxy import upstream
+    from ai_api.proxy.allowlist import parse_provider
+    from ai_api.proxy.preflight import _resolve_credential
+    from ai_api.services.model_kind import is_billable, is_supported, model_kind
+    from ai_api.services.provider_credentials import (
+        ProviderCredentialService,
+        ProviderUnavailableError,
+    )
+
+    m = await session.get(ModelCatalog, slug)
+    if m is None:
+        raise HTTPException(status_code=404, detail=_err("not_found", "model not found"))
+
+    kind = model_kind(m)
+
+    async def _audit(ok: bool, **extra: Any) -> None:
+        await audit_record(
+            session,
+            event_type=AuditEventType.model_tested,
+            actor_type=ActorType.admin,
+            target_type="model_catalog",
+            target_id=slug,
+            details={"kind": kind, "ok": ok, **extra},
+        )
+
+    # Unsupported kinds: explain, don't call.
+    if not is_supported(kind):
+        label = "語音轉文字" if kind == "stt" else "此"
+        await _audit(False, reason="unsupported")
+        return {
+            "ok": False, "slug": slug, "kind": kind, "supported": False,
+            "message": f"{label}類型尚不支援自動測試",
+        }
+
+    # Billable kinds require explicit acknowledgement before any upstream call.
+    if is_billable(kind) and not payload.acknowledge_billable:
+        return {"ok": False, "slug": slug, "kind": kind, "needs_confirmation": True, "billable": True}
+
+    provider, _ = parse_provider(slug)
+    try:
+        resolved = await _resolve_credential(ProviderCredentialService(session), provider, get_settings())
+    except ProviderUnavailableError:
+        await _audit(False, error_type="provider_unavailable")
+        return {
+            "ok": False, "slug": slug, "kind": kind,
+            "error_type": "provider_unavailable",
+            "message": f"no active credential for provider '{provider}'",
+        }
+
+    upstream_model = slug if "/" in slug else f"{provider}/{slug}"
+    extra = resolved.extra_config or {}
+    common: dict[str, Any] = {
+        "model": upstream_model,
+        "api_key": resolved.api_key,
+        "api_base": resolved.base_url,
+        "api_version": extra.get("api_version"),
+    }
+    started = time.perf_counter()
+    try:
+        if kind == "chat":
+            await upstream.acompletion(messages=[{"role": "user", "content": "ping"}], max_tokens=1, **common)
+        elif kind == "embedding":
+            await upstream.aembedding(input="ping", **common)
+        elif kind == "tts":
+            await upstream.aspeech(input="hi", voice="alloy", **common)
+        elif kind == "image":
+            await upstream.aimage_generation(prompt="a red dot", size="256x256", n=1, **common)
+    except Exception as e:  # test result IS the response — never 5xx
+        await _audit(False, error_type="upstream_error")
+        return {
+            "ok": False, "slug": slug, "kind": kind,
+            "error_type": "upstream_error", "message": str(e)[:500],
+        }
+    latency_ms = int((time.perf_counter() - started) * 1000)
+    await _audit(True, latency_ms=latency_ms)
+    return {"ok": True, "slug": slug, "kind": kind, "latency_ms": latency_ms}

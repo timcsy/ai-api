@@ -57,3 +57,57 @@ async def aresponses(
         extra["api_version"] = api_version
     extra.update({k: v for k, v in kwargs.items() if v is not None})
     return await litellm.aresponses(model=model, input=input, **extra)
+
+
+def _extra(api_key: str, api_base: str | None, api_version: str | None, kwargs: dict[str, Any]) -> dict[str, Any]:
+    extra: dict[str, Any] = {"api_key": api_key}
+    if api_base:
+        extra["api_base"] = api_base
+    if api_version:
+        extra["api_version"] = api_version
+    extra.update({k: v for k, v in kwargs.items() if v is not None})
+    return extra
+
+
+async def aembedding(
+    *,
+    model: str,
+    input: Any,
+    api_key: str,
+    api_base: str | None = None,
+    api_version: str | None = None,
+    **kwargs: Any,
+) -> Any:
+    """Call upstream embeddings via litellm (Phase 26: admin model test)."""
+    return await litellm.aembedding(model=model, input=input, **_extra(api_key, api_base, api_version, kwargs))
+
+
+async def aspeech(
+    *,
+    model: str,
+    input: str,
+    voice: str,
+    api_key: str,
+    api_base: str | None = None,
+    api_version: str | None = None,
+    **kwargs: Any,
+) -> Any:
+    """Call upstream text-to-speech via litellm (Phase 26: admin model test)."""
+    return await litellm.aspeech(
+        model=model, input=input, voice=voice, **_extra(api_key, api_base, api_version, kwargs)
+    )
+
+
+async def aimage_generation(
+    *,
+    model: str,
+    prompt: str,
+    api_key: str,
+    api_base: str | None = None,
+    api_version: str | None = None,
+    **kwargs: Any,
+) -> Any:
+    """Call upstream image generation via litellm (Phase 26: admin model test)."""
+    return await litellm.aimage_generation(
+        model=model, prompt=prompt, **_extra(api_key, api_base, api_version, kwargs)
+    )

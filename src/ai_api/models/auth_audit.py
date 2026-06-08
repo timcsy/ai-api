@@ -75,6 +75,8 @@ class AuditEventType(enum.StrEnum):
     # Phase 25: responses support (axis ③) — tested / manual override
     responses_tested = "responses_tested"
     responses_support_overridden = "responses_support_overridden"
+    # Phase 26: admin "test model" (by kind)
+    model_tested = "model_tested"
 
 
 class ActorType(enum.StrEnum):
