@@ -65,13 +65,19 @@ def _modality(entry: dict[str, Any]) -> tuple[list[str], list[str]]:
 
 def _capabilities(entry: dict[str, Any]) -> list[str]:
     """Map litellm flags to the decision-relevant capabilities (Phase 24: 2 → ~10).
-    Only flags that answer 'can this model do X' — not internal protocol details."""
+    Only flags that answer 'can this model do X' — not internal protocol details.
+    Vocabulary is hyphenated to match the existing catalog/facet labels.
+
+    `responses` is a GATEWAY capability, not a litellm one: we bridge chat-style
+    models to /v1/responses (litellm aresponses), and the proxy gates that endpoint
+    on this capability — so derive it from mode rather than dropping it."""
     caps: list[str] = []
     mode = entry.get("mode") or "chat"
     if mode in ("chat", "completion", "responses"):
         caps.append("chat")
+        caps.append("responses")  # our gateway exposes /v1/responses for chat-style models
     if entry.get("supports_function_calling"):
-        caps.append("function_calling")
+        caps.append("function-calling")
     if entry.get("supports_vision"):
         caps.append("vision")
     if entry.get("supports_reasoning"):
@@ -79,17 +85,17 @@ def _capabilities(entry: dict[str, Any]) -> list[str]:
     if entry.get("supports_pdf_input"):
         caps.append("pdf")
     if entry.get("supports_prompt_caching"):
-        caps.append("prompt_caching")
+        caps.append("prompt-caching")
     if entry.get("supports_web_search"):
-        caps.append("web_search")
+        caps.append("web-search")
     if entry.get("supports_audio_input") or entry.get("supports_audio_output"):
         caps.append("audio")
     if entry.get("supports_video_input"):
         caps.append("video")
     if entry.get("supports_native_structured_output"):
-        caps.append("structured_output")
+        caps.append("structured-output")
     if entry.get("supports_computer_use"):
-        caps.append("computer_use")
+        caps.append("computer-use")
     return caps or ["chat"]
 
 

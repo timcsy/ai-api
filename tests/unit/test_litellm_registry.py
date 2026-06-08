@@ -12,7 +12,9 @@ def test_lookup_maps_metadata() -> None:
     assert meta is not None
     assert meta["context_window"] == 128000
     assert "text" in meta["modality_input"] and "image" in meta["modality_input"]  # vision
-    assert "function_calling" in meta["capabilities"]
+    assert "function-calling" in meta["capabilities"]
+    # `responses` is gateway-derived (we bridge chat models to /v1/responses).
+    assert "responses" in meta["capabilities"]
 
 
 def test_suggest_price_converts_per_token_to_per_1k() -> None:
@@ -63,10 +65,11 @@ def test_capabilities_expanded_decision_flags() -> None:
             "supports_computer_use": True,
         }
     )["capabilities"]
-    for c in ["chat", "function_calling", "vision", "reasoning", "pdf",
-              "prompt_caching", "web_search", "audio", "video", "structured_output", "computer_use"]:
+    for c in ["chat", "responses", "function-calling", "vision", "reasoning", "pdf",
+              "prompt-caching", "web-search", "audio", "video", "structured-output", "computer-use"]:
         assert c in caps, c
 
 
-def test_capabilities_empty_defaults_to_chat() -> None:
-    assert reg.metadata_from_entry({"mode": "chat"})["capabilities"] == ["chat"]
+def test_chat_mode_yields_chat_and_responses() -> None:
+    # A plain chat model is callable via both /v1/chat/completions and /v1/responses.
+    assert reg.metadata_from_entry({"mode": "chat"})["capabilities"] == ["chat", "responses"]
