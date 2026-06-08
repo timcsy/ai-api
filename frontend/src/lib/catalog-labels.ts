@@ -45,5 +45,9 @@ export const FACET_LABELS: Record<string, string> = {
 };
 
 export function facetLabel(value: string): string {
-  return FACET_LABELS[value] ?? value;
+  // Catalog data may carry either hyphenated (function-calling, prompt-caching)
+  // or underscored (function_calling, prompt_caching) capability vocab depending
+  // on how the row was created. Labels are keyed by the hyphenated form, so
+  // normalize underscores → hyphens before lookup. Display-only; data untouched.
+  return FACET_LABELS[value] ?? FACET_LABELS[value.replace(/_/g, "-")] ?? value;
 }
