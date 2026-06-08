@@ -43,6 +43,8 @@ def _build_litellm_sync(payload: ModelCatalogCreate) -> dict[str, Any] | None:
         "imported_version": litellm_registry.current_version(),
         "field_sources": field_sources,
         "snapshot": meta,
+        # Phase 24: full LiteLLM entry for the read-only "原始資訊" panel (~14 fields, <1KB).
+        "raw": litellm_registry.bundled().get(key),
     }
 
 
@@ -528,6 +530,7 @@ async def admin_litellm_apply(
             fs[field], snap[field] = "litellm", latest_meta[field]
         sync["field_sources"], sync["snapshot"] = fs, snap
         sync["imported_version"] = litellm_registry.current_version()
+        sync["raw"] = entry  # Phase 24: keep the raw panel in sync with the latest entry
         m.litellm_sync = sync
     if want_price:
         lp = litellm_registry.price_from_entry(entry) or {}

@@ -44,3 +44,29 @@ def test_metadata_from_entry_image_generation() -> None:
 
 def test_current_version_nonempty() -> None:
     assert reg.current_version()  # truthy package version string
+
+
+def test_capabilities_expanded_decision_flags() -> None:
+    # Phase 24: map the decision-relevant capability flags, not just 2.
+    caps = reg.metadata_from_entry(
+        {
+            "mode": "chat",
+            "supports_function_calling": True,
+            "supports_vision": True,
+            "supports_reasoning": True,
+            "supports_pdf_input": True,
+            "supports_prompt_caching": True,
+            "supports_web_search": True,
+            "supports_audio_input": True,
+            "supports_video_input": True,
+            "supports_native_structured_output": True,
+            "supports_computer_use": True,
+        }
+    )["capabilities"]
+    for c in ["chat", "function_calling", "vision", "reasoning", "pdf",
+              "prompt_caching", "web_search", "audio", "video", "structured_output", "computer_use"]:
+        assert c in caps, c
+
+
+def test_capabilities_empty_defaults_to_chat() -> None:
+    assert reg.metadata_from_entry({"mode": "chat"})["capabilities"] == ["chat"]

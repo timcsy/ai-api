@@ -42,6 +42,11 @@ async def test_create_with_litellm_bring_in(app_client: AsyncClient, admin_heade
         assert len(rows) == 1
         assert rows[0].source_note.startswith("litellm@")
         assert Decimal(str(rows[0].input_per_1k_tokens_usd)) == Decimal("0.0025")
+    # Phase 24: the full LiteLLM entry is stored in litellm_sync.raw for the
+    # read-only "LiteLLM 原始資訊" panel.
+    raw = sync["raw"]
+    assert raw["mode"] == "chat"
+    assert raw["max_output_tokens"] == 16384
 
 
 @pytest.mark.asyncio

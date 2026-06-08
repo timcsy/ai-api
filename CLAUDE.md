@@ -48,6 +48,8 @@ Auto-generated from all feature plans. Last updated: 2026-06-08
 - TypeScript strict（前端為主）；Python 3.11+（後端**完全不動**） + React 19 + Vite 6 + react-router-dom + TanStack Query + shadcn/ui + Tailwind（皆既有，不新增） (032-member-ui-tabs)
 - Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2、**`litellm`（既有，library form——讀其內建 `model_cost` + `get_model_cost_map` 線上抓）**、TanStack Query、shadcn/ui。**不新增套件。** (033-litellm-catalog-sync)
 - PostgreSQL（生產）/ SQLite（dev、CI）；**新 migration `0018`**——`model_catalog` 加一個 nullable JSON 欄 `litellm_sync`（來源標記 + 匯入快照 + 對照基礎模型 key）。價格沿用既有 `price_list`（append-only），不改 schema。 (033-litellm-catalog-sync)
+- TypeScript strict + React 19 + Vite 6（前端為主）/ Python 3.11+（後端少量擴充） + FastAPI、SQLAlchemy 2.x async、Pydantic v2、`litellm`（既有）、TanStack Query、shadcn/ui。**不新增套件。** (034-catalog-admin-consolidation)
+- PostgreSQL（生產）/ SQLite（dev、CI）；**無新 migration**——沿用階段 23 `model_catalog.litellm_sync`（JSON 欄）多存 `raw`；價格沿用 `price_list`。 (034-catalog-admin-consolidation)
 
 - Python 3.11+ + LiteLLM（proxy core）、FastAPI（admin API）、 (001-gateway-core)
 
@@ -68,9 +70,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 034-catalog-admin-consolidation: Added TypeScript strict + React 19 + Vite 6（前端為主）/ Python 3.11+（後端少量擴充） + FastAPI、SQLAlchemy 2.x async、Pydantic v2、`litellm`（既有）、TanStack Query、shadcn/ui。**不新增套件。**
 - 033-litellm-catalog-sync: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2、**`litellm`（既有，library form——讀其內建 `model_cost` + `get_model_cost_map` 線上抓）**、TanStack Query、shadcn/ui。**不新增套件。**
 - 032-member-ui-tabs: Added TypeScript strict（前端為主）；Python 3.11+（後端**完全不動**） + React 19 + Vite 6 + react-router-dom + TanStack Query + shadcn/ui + Tailwind（皆既有，不新增）
-- 031-credential-ui-consolidation: Added TypeScript strict + React 19 + Vite 6（前端為主）/ Python 3.11+（後端僅 1 個改名端點擴充） + TanStack Query、shadcn/ui、Tailwind（前端）；FastAPI、SQLAlchemy 2.x async、Pydantic v2（後端，**皆既有，不新增套件**）
 
 
 <!-- MANUAL ADDITIONS START -->

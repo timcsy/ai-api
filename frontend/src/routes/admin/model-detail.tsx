@@ -30,6 +30,9 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { VisibilityDiagnose } from "@/components/visibility-diagnose";
+import { FieldSourceBadge, type FieldSource } from "@/components/field-source-badge";
+import { LiteLLMRawPanel } from "@/components/litellm-raw-panel";
+import { LiteLLMUpdateDiff } from "@/components/litellm-update-diff";
 import { per1kToPer1m } from "@/lib/price-format";
 import { ApiError, api } from "@/lib/api-client";
 
@@ -61,6 +64,13 @@ interface CatalogModel {
   self_service_default_quota: number | null;
   price: { input_per_1k: string; output_per_1k: string; cached_input_per_1k?: string } | null;
   visibility?: Visibility;
+  litellm_sync?: {
+    base_model_key: string;
+    imported_version: string;
+    field_sources: Record<string, FieldSource>;
+    snapshot: Record<string, unknown>;
+    raw: Record<string, unknown> | null;
+  } | null;
 }
 
 export function AdminModelDetailPage() {
@@ -129,6 +139,7 @@ export function AdminModelDetailPage() {
   });
 
   const [editBasicsOpen, setEditBasicsOpen] = React.useState(false);
+  const [checkOpen, setCheckOpen] = React.useState(false);
 
   const addTag = (
     list: string[],
@@ -174,16 +185,35 @@ export function AdminModelDetailPage() {
               <CardTitle className="text-xl">{model.display_name}</CardTitle>
               <CardDescription className="font-mono text-xs">{model.slug}</CardDescription>
             </div>
-            <Button variant="outline" size="sm" className="shrink-0" onClick={() => setEditBasicsOpen(true)}>
-              編輯
-            </Button>
+            <div className="flex shrink-0 gap-1">
+              <Button variant="outline" size="sm" onClick={() => setCheckOpen(true)}>
+                檢查 LiteLLM 更新
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setEditBasicsOpen(true)}>
+                編輯
+              </Button>
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
             <div><span className="text-muted-foreground">Provider：</span>{model.provider}</div>
             <div><span className="text-muted-foreground">Cost tier：</span>{model.cost_tier}</div>
-            <div><span className="text-muted-foreground">Context window：</span>{model.context_window.toLocaleString()}</div>
+            <div>
+              <span className="text-muted-foreground">Context window：</span>
+              {model.context_window.toLocaleString()}
+              <FieldSourceBadge source={model.litellm_sync?.field_sources?.context_window} />
+            </div>
+            <div>
+              <span className="text-muted-foreground">輸入/輸出模態：</span>
+              {model.modality_input.join(", ")} / {model.modality_output.join(", ")}
+              <FieldSourceBadge source={model.litellm_sync?.field_sources?.modality_input} />
+            </div>
+            <div className="sm:col-span-2">
+              <span className="text-muted-foreground">能力：</span>
+              {model.capabilities.join(", ") || "—"}
+              <FieldSourceBadge source={model.litellm_sync?.field_sources?.capabilities} />
+            </div>
             <div className="col-span-3">
               <span className="text-muted-foreground">價格（每 1M）：</span>
               {model.price
@@ -193,8 +223,18 @@ export function AdminModelDetailPage() {
             </div>
             <div className="col-span-3"><span className="text-muted-foreground">說明：</span>{model.description || "—"}</div>
           </div>
+          <LiteLLMRawPanel raw={model.litellm_sync?.raw} />
         </CardContent>
       </Card>
+
+      {checkOpen && (
+        <LiteLLMUpdateDiff
+          slug={model.slug}
+          open={checkOpen}
+          onOpenChange={setCheckOpen}
+          onApplied={() => queryClient.invalidateQueries({ queryKey: ["admin", "catalog-models-admin"] })}
+        />
+      )}
 
       {/* 2. 存取規則 */}
       <Card>
