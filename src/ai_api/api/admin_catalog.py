@@ -512,7 +512,6 @@ async def admin_litellm_apply(
             detail=_err("litellm_model_not_found", f"LiteLLM has no model {key!r}"),
         )
     latest_meta = litellm_registry.metadata_from_entry(entry)
-    sources = (m.litellm_sync or {}).get("field_sources", {})
     applied_meta: list[str] = []
     want_price = False
     for field in payload.fields:
