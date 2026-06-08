@@ -75,4 +75,27 @@ describe("<AdminPricesPage />", () => {
     expect(posted.provider).toBe("azure");
     expect(posted.model).toBe("gpt-5.4-mini");
   });
+
+  it("brings in LiteLLM suggested price (replaces the old hardcoded templates)", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, ROWS)); // list
+    fetchMock.mockImplementationOnce(async (input) => {
+      const url = typeof input === "string" ? input : (input as Request).url;
+      expect(url).toContain("/admin/catalog/litellm/suggest/azure/gpt-5.4-mini");
+      return jsonResponse(200, {
+        suggested_price: { input_per_1k: "0.0025", output_per_1k: "0.01", cached_input_per_1k: "0.00125" },
+      });
+    });
+    renderPage();
+    await screen.findByText("azure/gpt-5.4-mini");
+    fireEvent.click(screen.getByText("設定價格"));
+
+    // old template UI is gone; LiteLLM bring-in is present
+    expect(screen.queryByText(/常見範本/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("從 LiteLLM 帶入建議價"));
+
+    // per-1K 0.0025 → per-1M 2.5 filled into the input field
+    await waitFor(() => expect((screen.getByPlaceholderText("0.15") as HTMLInputElement).value).toBe("2.5"));
+    expect((screen.getByPlaceholderText("0.60") as HTMLInputElement).value).toBe("10");
+  });
 });

@@ -39,7 +39,6 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { LiteLLMModelPicker, type LitellmDraft } from "@/components/litellm-model-picker";
-import { LiteLLMUpdateDiff } from "@/components/litellm-update-diff";
 import { ApiError, api } from "@/lib/api-client";
 
 interface CatalogModel {
@@ -154,7 +153,6 @@ export function AdminCatalogManagePage() {
   // Phase 23: when a LiteLLM model is picked, its metadata + suggested price ride
   // along to the create POST so the backend records provenance + seeds the price.
   const [litellmDraft, setLitellmDraft] = React.useState<LitellmDraft | null>(null);
-  const [checkSlug, setCheckSlug] = React.useState<string | null>(null);
 
   const query = useQuery<CatalogModel[], ApiError>({
     queryKey: ["admin", "catalog-models-admin"],
@@ -313,28 +311,14 @@ export function AdminCatalogManagePage() {
                 )}
               </TableCell>
               <TableCell className="text-right" data-label="動作">
-                <div className="flex justify-end gap-1">
-                  <Button size="sm" variant="outline" onClick={() => setCheckSlug(m.slug)}>
-                    檢查更新
-                  </Button>
-                  <Button size="sm" variant="destructive" onClick={() => setDeleteConfirm(m)}>
-                    移除
-                  </Button>
-                </div>
+                <Button size="sm" variant="destructive" onClick={() => setDeleteConfirm(m)}>
+                  移除
+                </Button>
               </TableCell>
             </TableRow>
           );})}
         </TableBody>
       </Table>
-
-      {checkSlug && (
-        <LiteLLMUpdateDiff
-          slug={checkSlug}
-          open={checkSlug !== null}
-          onOpenChange={(v) => !v && setCheckSlug(null)}
-          onApplied={() => queryClient.invalidateQueries({ queryKey: ["admin", "catalog-models-admin"] })}
-        />
-      )}
 
       {/* Create dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

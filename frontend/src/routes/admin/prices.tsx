@@ -69,16 +69,6 @@ interface PriceVersion {
 
 type Unit = PriceUnit;
 
-// 常見供應商價格範本（USD / 1M tokens，**僅為預設，請核對供應商最新公告**）
-const TEMPLATES: { label: string; provider: string; model: string; in1m: string; out1m: string }[] = [
-  { label: "Azure / OpenAI — gpt-4o", provider: "azure", model: "gpt-4o", in1m: "2.50", out1m: "10.00" },
-  { label: "Azure / OpenAI — gpt-4o-mini", provider: "azure", model: "gpt-4o-mini", in1m: "0.15", out1m: "0.60" },
-  { label: "OpenAI — gpt-4o", provider: "openai", model: "gpt-4o", in1m: "2.50", out1m: "10.00" },
-  { label: "Anthropic — claude-3-5-sonnet", provider: "anthropic", model: "claude-3-5-sonnet", in1m: "3.00", out1m: "15.00" },
-  { label: "Anthropic — claude-3-5-haiku", provider: "anthropic", model: "claude-3-5-haiku", in1m: "0.80", out1m: "4.00" },
-  { label: "Gemini — 1.5-pro", provider: "gemini", model: "gemini-1.5-pro", in1m: "1.25", out1m: "5.00" },
-];
-
 const fmtDate = (iso: string) => new Date(iso).toLocaleString("zh-TW");
 
 /** Local "now" formatted for a <input type="datetime-local"> (YYYY-MM-DDTHH:mm). */
@@ -300,14 +290,34 @@ function AddPriceDialog({
 
   const isEdit = !!(state?.currentIn || state?.currentOut);
 
-  const applyTemplate = (label: string) => {
-    const t = TEMPLATES.find((x) => x.label === label);
-    if (!t) return;
-    setProvider(t.provider);
-    setModel(t.model);
-    setUnit("per_1m");
-    setInput(t.in1m);
-    setOutput(t.out1m);
+  const [litellmBusy, setLitellmBusy] = React.useState(false);
+  // Phase 24: bring in the suggested price from LiteLLM (replaces the old hardcoded
+  // templates) using the current provider + model as the registry key.
+  const bringInLitellm = async () => {
+    const p = provider.trim();
+    const m = model.trim();
+    if (!p || !m) {
+      toast({ title: "請先填 Provider 與 Model" });
+      return;
+    }
+    setLitellmBusy(true);
+    try {
+      const s = await api<{
+        suggested_price: { input_per_1k: string; output_per_1k: string; cached_input_per_1k: string | null } | null;
+      }>(`/admin/catalog/litellm/suggest/${p}/${m}`);
+      if (!s.suggested_price) {
+        toast({ title: "LiteLLM 無此模型的建議價，請手填" });
+        return;
+      }
+      setUnit("per_1m");
+      setInput(per1kToPer1m(s.suggested_price.input_per_1k));
+      setOutput(per1kToPer1m(s.suggested_price.output_per_1k));
+      if (s.suggested_price.cached_input_per_1k) setCached(per1kToPer1m(s.suggested_price.cached_input_per_1k));
+    } catch {
+      toast({ title: "LiteLLM 無此模型的建議價，請手填" });
+    } finally {
+      setLitellmBusy(false);
+    }
   };
 
   const mut = useMutation<unknown, ApiError, void>({
@@ -345,16 +355,12 @@ function AddPriceDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label>從常見範本帶入（可選）</Label>
-            <Select onValueChange={applyTemplate}>
-              <SelectTrigger className="mt-1"><SelectValue placeholder="選一個範本自動填入…" /></SelectTrigger>
-              <SelectContent>
-                {TEMPLATES.map((t) => (
-                  <SelectItem key={t.label} value={t.label}>{t.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground mt-1">範本為預設值，請核對供應商最新價格。</p>
+            <Button type="button" variant="outline" size="sm" onClick={() => void bringInLitellm()} disabled={litellmBusy}>
+              {litellmBusy ? "查詢中…" : "從 LiteLLM 帶入建議價"}
+            </Button>
+            <p className="text-xs text-muted-foreground mt-1">
+              依 Provider + Model 取 LiteLLM 公開牌價填入（可再手改）；查無則請手填。
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

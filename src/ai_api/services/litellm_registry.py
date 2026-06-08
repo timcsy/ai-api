@@ -64,6 +64,8 @@ def _modality(entry: dict[str, Any]) -> tuple[list[str], list[str]]:
 
 
 def _capabilities(entry: dict[str, Any]) -> list[str]:
+    """Map litellm flags to the decision-relevant capabilities (Phase 24: 2 → ~10).
+    Only flags that answer 'can this model do X' — not internal protocol details."""
     caps: list[str] = []
     mode = entry.get("mode") or "chat"
     if mode in ("chat", "completion", "responses"):
@@ -74,6 +76,20 @@ def _capabilities(entry: dict[str, Any]) -> list[str]:
         caps.append("vision")
     if entry.get("supports_reasoning"):
         caps.append("reasoning")
+    if entry.get("supports_pdf_input"):
+        caps.append("pdf")
+    if entry.get("supports_prompt_caching"):
+        caps.append("prompt_caching")
+    if entry.get("supports_web_search"):
+        caps.append("web_search")
+    if entry.get("supports_audio_input") or entry.get("supports_audio_output"):
+        caps.append("audio")
+    if entry.get("supports_video_input"):
+        caps.append("video")
+    if entry.get("supports_native_structured_output"):
+        caps.append("structured_output")
+    if entry.get("supports_computer_use"):
+        caps.append("computer_use")
     return caps or ["chat"]
 
 
