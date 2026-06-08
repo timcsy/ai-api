@@ -14,6 +14,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from ai_api.models import ModelCatalog
+from ai_api.services import responses_support
 
 # Enum sets used by both Pydantic schema and filter validation.
 MODALITY_VALUES = ("text", "image", "audio", "video", "embedding")
@@ -173,7 +174,9 @@ def compute_facets(models: list[ModelCatalog]) -> dict[str, dict[str, int]]:
             out["modality_input"][v] += 1
         for v in m.modality_output:
             out["modality_output"][v] += 1
-        for v in m.capabilities:
+        # Phase 25: hide internal responses:* markers from member-facing facets;
+        # the bare `responses` value (= "Agent 相容") is kept and filterable.
+        for v in responses_support.strip_internal(m.capabilities):
             out["capabilities"][v] += 1
         out["cost_tier"][m.cost_tier] += 1
         for v in m.recommended_for:

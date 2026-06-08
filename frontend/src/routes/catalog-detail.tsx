@@ -39,6 +39,10 @@ interface ModelDetail {
   modality_input: string[];
   modality_output: string[];
   capabilities: string[];
+  responses_support?: {
+    state: "available" | "unavailable" | "unknown";
+    source: "tested" | "manual" | null;
+  };
   context_window: number;
   cost_tier: string;
   recommended_for: string[];
@@ -137,9 +141,19 @@ export function CatalogDetailPage() {
           <Badge>成本：{facetLabel(m.cost_tier)}</Badge>
           <Badge variant="secondary">{m.family}</Badge>
           <Badge variant="outline">上下文 {m.context_window.toLocaleString()} tokens</Badge>
-          {m.capabilities.map((c) => (
-            <Badge key={c} variant="outline">{facetLabel(c)}</Badge>
-          ))}
+          {m.capabilities.map((c) => {
+            if (c === "responses") {
+              const src = m.responses_support?.source;
+              const srcLabel = src === "tested" ? "實測" : src === "manual" ? "手動" : null;
+              return (
+                <Badge key={c} variant="outline">
+                  {facetLabel(c)}
+                  {srcLabel ? `・${srcLabel}` : ""}
+                </Badge>
+              );
+            }
+            return <Badge key={c} variant="outline">{facetLabel(c)}</Badge>;
+          })}
         </div>
       </section>
 

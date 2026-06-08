@@ -16,27 +16,25 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import get_db_session
 from ai_api.config import get_settings
 from ai_api.db import get_sessionmaker
-from ai_api.models import CallOutcome, ModelCatalog
+from ai_api.models import CallOutcome
 from ai_api.observability.logging import redact_string
 from ai_api.observability.request_id import current_request_id
 from ai_api.proxy import upstream
 from ai_api.proxy.auth import parse_bearer_token
 from ai_api.proxy.preflight import PreflightRejection, run_preflight
 from ai_api.proxy.router import _error_payload, _outcome_for_code
+from ai_api.services import responses_support
 from ai_api.services.pricing import calculate_cost, lookup_price_for_call
 from ai_api.services.records import RecordsService
 from ai_api.services.stored_responses import StoredResponseService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-RESPONSES_CAPABILITY = "responses"
 
 # Request fields forwarded verbatim to the upstream Responses API.
 _PASSTHROUGH_FIELDS = (
@@ -71,17 +69,6 @@ _FAILED_KNOWN_NOISE_KEYS = frozenset({
     "store", "truncation", "stream", "user",
 })
 
-
-async def model_supports_responses(session: AsyncSession, requested_model: str) -> bool:
-    """True if the model is in the catalog AND advertises the `responses` capability."""
-    row = (
-        await session.execute(
-            select(ModelCatalog).where(ModelCatalog.slug == requested_model)
-        )
-    ).scalar_one_or_none()
-    if row is None:
-        return False
-    return RESPONSES_CAPABILITY in (row.capabilities or [])
 
 
 def _as_dict(obj: Any) -> dict[str, Any]:
@@ -273,11 +260,14 @@ async def proxy_responses(
     # the capability gate, billing model_key, and stored-response attribution.
     requested_model = result.canonical_model
 
-    # 4. Responses capability gate
-    if not await model_supports_responses(session, requested_model):
+    # 4. Responses soft gate (Phase 25): don't pre-block on a static flag. The only
+    # pre-block is admin's manual "unavailable"; available/unknown are tried, and an
+    # unsupported model surfaces the real upstream error below (no info-less 400).
+    support = await responses_support.lookup(session, requested_model)
+    if support["state"] == "unavailable":
         return await reject(
-            "model_not_responses_capable",
-            f"model '{requested_model}' does not support the responses endpoint",
+            "model_responses_disabled",
+            f"model '{requested_model}' has been manually disabled for the responses endpoint",
             400,
         )
 
@@ -500,4 +490,4 @@ async def proxy_responses(
 
 
 # Re-export so callers/tests can patch a single redact entrypoint consistently.
-__all__ = ["model_supports_responses", "redact_string", "router"]
+__all__ = ["redact_string", "router"]
