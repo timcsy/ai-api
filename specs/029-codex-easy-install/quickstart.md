@@ -41,6 +41,14 @@
 - [ ] **網頁版 Codex（chatgpt.com/codex）**：確認**不適用**（跑在 OpenAI 雲端、綁 ChatGPT 帳號、不經本地設定）——
       記錄為「不支援、引導改用 CLI」。
 
+### 真機驗收紀錄
+
+- **Windows（2026-06-08，rev 62）**：一行指令 → 授權 → 新終端機 `codex` 正常。三個真機坑已修並上線：
+  (1) 安裝後預設模型曾 fallback 成 Codex 內建 `gpt-5.5` → device-flow 回傳模型 + 腳本 pin（rev 60）；
+  (2) `/model` 選單看不到/選不到成員模型（`azure/gpt-5.4` vs Codex bare slug `gpt-5.4`）→ proxy bare-slug alias + pin bare slug（rev 62）——**已確認 `/model` 看得到也選得到 `gpt-5.4`**；
+  (3) 誤選範圍外模型 → 可操作中文錯誤（點名可用模型 + /model 提示，rev 61）。
+- **macOS / Linux**：待測。
+
 ## 前端（vitest + 手動）
 
 - [ ] 授權頁 `/device`：輸入/確認 user_code → 顯示請求摘要 → 選分配 → 核可/拒絕；非本人分配不可選。

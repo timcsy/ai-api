@@ -465,3 +465,23 @@
   (b) seed 舊資料用 raw SQL（ORM 反映的是 head schema，會跟舊欄位打架）；(c) 任何「自己跑 alembic」的整合測試
   要把 schema 當共享資源，跑前清、跑後也清（try/finally DROP SCHEMA），免得污染 metadata-based 測試。
 - **來源**：`alembic/versions/0015_per_device_credentials.py`、`tests/integration/test_credential_migration.py`；階段 18
+
+### 前置 client 自帶模型目錄時，gateway 的命名空間要能被它的 picker 看見
+
+- **理論說**：我們的 model 用 `provider/slug` 命名（`azure/gpt-5.4`）區分多 provider，client（Codex）把 base_url
+  指過來、填好 key 就能用——預設模型 pin 好就收工。
+- **實際發生**（Windows 真機，階段 19 收尾）：三個接連的坑。①安裝腳本只寫 `model_provider` 沒寫 `model`
+  → Codex 用**它自己內建的預設模型**（gpt-5.5），不是成員分配的 `azure/gpt-5.4`。②就算 pin 了 `azure/gpt-5.4`，
+  Codex 的 `/model` 選單列的是**它內建 catalog 的 bare slug**（`gpt-5.4`、`gpt-5.5`…），**完全沒有** `azure/gpt-5.4`
+  → 成員的模型不在選單、選不到、也切不回來；選單裡的 `gpt-5.4` 送出後又跟 `azure/gpt-5.4` 對不上 → mismatch。
+  ③`/model` 是 client 本機切換，選的當下不連伺服器，無法「選到就擋」，只能下一個指令才報錯。
+- **解決方式**：(a) device-flow 回傳代表模型、安裝腳本 pin 進 config；(b) **bare-slug alias**——proxy 對無前綴
+  請求找「去前綴後在 scope 內唯一相符」的分配，且 provider/catalog/upstream 一律改用**分配的正規 slug**（不是請求原字串），
+  litellm 仍收 `azure/gpt-5.4`；歧義（一把 key 同時有 `azure/X`+`openai/X`）就不 alias；pin 時也優先 bare slug（唯一才用），
+  讓預設模型同時「能用」且「在 picker 可選」；(c) 擋不住的誤選改回**可操作的錯誤訊息**（點名 bare slug + 提示 /model）。
+- **教訓**：當你的 gateway 前置一個**自帶模型目錄**的 client（Codex、未來其他 agent CLI），你的模型命名空間若和它的
+  catalog slug 不一致，它的 picker 就看不到你的模型——光 pin 預設不夠。對策是**在 proxy 層做雙向對齊**（接受 client 的
+  bare slug、對外仍用你的正規 slug），而**正規 slug／provider 前綴是 litellm 路由必需、不能為了好看拿掉**（它決定打哪家 API）。
+  另記：client 端的本機切換（`/model`）伺服器管不到，凡「選的當下無法擋」的互動，退而求其次給清楚錯誤訊息。
+- **來源**：`src/ai_api/proxy/preflight.py`（canonical_model 對齊）、`services/allocations.py` `resolve_scope_allocation`（alias）、
+  `services/device_flow.py`（pin bare slug）、`src/ai_api/install/codex.{sh,ps1}.tmpl`；階段 19 收尾（Windows 真機暴露）
