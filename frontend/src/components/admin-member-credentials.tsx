@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
 
@@ -34,6 +36,7 @@ export function AdminMemberCredentials({ memberId }: { memberId: string }) {
   const key = ["admin", "members", memberId, "credentials"];
   const [renameId, setRenameId] = React.useState<string | null>(null);
   const [renameName, setRenameName] = React.useState("");
+  const [showRevoked, setShowRevoked] = React.useState(false);
 
   const q = useQuery<AppCredential[], ApiError>({
     queryKey: key,
@@ -54,18 +57,39 @@ export function AdminMemberCredentials({ memberId }: { memberId: string }) {
     onError: (e: ApiError) => toast({ title: "改名失敗", description: e.message, variant: "destructive" }),
   });
 
-  const creds = q.data ?? [];
+  const allCreds = q.data ?? [];
+  const revokedCount = allCreds.filter((c) => c.status !== "active").length;
+  const creds = showRevoked ? allCreds : allCreds.filter((c) => c.status === "active");
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">應用金鑰</CardTitle>
-        <CardDescription>該成員的應用金鑰；可改名或撤回（撤回會讓該金鑰涵蓋的所有模型一起失效）。</CardDescription>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <CardTitle className="text-lg">應用金鑰</CardTitle>
+            <CardDescription>該成員的應用金鑰；可改名或撤回（撤回會讓該金鑰涵蓋的所有模型一起失效）。</CardDescription>
+          </div>
+          {revokedCount > 0 && (
+            <div className="flex shrink-0 items-center gap-2">
+              <Switch
+                id="show-revoked-member-keys"
+                checked={showRevoked}
+                onCheckedChange={setShowRevoked}
+              />
+              <Label htmlFor="show-revoked-member-keys" className="text-sm">含已撤回</Label>
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {q.isLoading && <p className="text-muted-foreground">載入中…</p>}
-        {q.isSuccess && creds.length === 0 && (
+        {q.isSuccess && allCreds.length === 0 && (
           <p className="text-muted-foreground py-3 text-center">此成員還沒有應用金鑰。</p>
+        )}
+        {q.isSuccess && allCreds.length > 0 && creds.length === 0 && (
+          <p className="text-muted-foreground py-3 text-center">
+            目前沒有使用中的金鑰；開啟「含已撤回」可查看 {revokedCount} 把已撤回的金鑰。
+          </p>
         )}
         {creds.length > 0 && (
           <ul className="divide-y">
