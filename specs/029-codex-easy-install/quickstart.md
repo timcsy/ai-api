@@ -43,11 +43,11 @@
 
 ### 真機驗收紀錄
 
-- **Windows（2026-06-08，rev 62）**：一行指令 → 授權 → 新終端機 `codex` 正常。三個真機坑已修並上線：
-  (1) 安裝後預設模型曾 fallback 成 Codex 內建 `gpt-5.5` → device-flow 回傳模型 + 腳本 pin（rev 60）；
-  (2) `/model` 選單看不到/選不到成員模型（`azure/gpt-5.4` vs Codex bare slug `gpt-5.4`）→ proxy bare-slug alias + pin bare slug（rev 62）——**已確認 `/model` 看得到也選得到 `gpt-5.4`**；
-  (3) 誤選範圍外模型 → 可操作中文錯誤（點名可用模型 + /model 提示，rev 61）。
-- **macOS / Linux**：待測。
+**三平台（Windows / macOS / Linux）2026-06-08 全數通過（SC-006 完成）。** 一行指令 → 授權 → 新終端機 `codex` 正常；
+`/model` 看得到也選得到成員模型。驗收過程修掉三個真機坑並上線：
+- (1) 安裝後預設模型曾 fallback 成 Codex 內建 `gpt-5.5` → device-flow 回傳模型 + 腳本 pin（rev 60）。
+- (2) `/model` 選單看不到/選不到成員模型（`azure/gpt-5.4` vs Codex bare slug `gpt-5.4`）→ proxy bare-slug alias + pin bare slug（rev 62）。
+- (3) 誤選範圍外模型 → 可操作中文錯誤（點名可用模型 + /model 提示，rev 61）。
 
 ## 前端（vitest + 手動）
 

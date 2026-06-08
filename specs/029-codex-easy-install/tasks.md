@@ -155,7 +155,7 @@ description: "Tasks for 階段 19 — 一鍵安裝 Codex + device-flow 免貼 to
 
 - [X] T033 跑 `uv run pytest tests/` 全套確認零回歸（device-flow + 既有 token/proxy/計費/配額 + migration，SC-007）。
 - [X] T034 跑 `uv run ruff check . && uv run mypy src/` 零警告；`npm --prefix frontend run test && lint && typecheck && build` 綠。
-- [ ] T035 **三平台真機驗收（SC-006）**：Windows / macOS / Linux 各跑 quickstart 真機清單——
+- [X] T035 **三平台真機驗收（SC-006）**：Windows / macOS / Linux 各跑 quickstart 真機清單——
       一行指令 → 瀏覽器授權 → 新終端機零參數 `codex` → `/model` 切換不脫鉤 → 清單可見可撤回。記錄結果。
       **含「已裝過 Codex」情境**（quickstart 新增段）：已裝 CLI（不重裝、保留設定、切預設 provider、可逆登入）、
       已裝編輯器擴充（與 CLI 共用 `~/.codex/`，支援度如實記錄）、ChatGPT App/網頁版（確認不適用、引導改用 CLI）。
