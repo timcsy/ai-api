@@ -21,6 +21,7 @@ from ai_api.models import (
     ActorType,
     Allocation,
     AuditEventType,
+    CredentialAllocation,
     DeviceAuthorization,
     DeviceAuthStatus,
     Member,
@@ -223,15 +224,28 @@ class DeviceFlowService:
             return PollResult("expired_token")
         plaintext = decrypt_str(row.encrypted_token.encode("ascii"))
         row.encrypted_token = None  # single-use delivery
-        # Representative model: resource_model of the first chosen allocation, so
-        # the install script can pin Codex's default to a model the member owns.
+        # Model to pin in Codex's config. Prefer the **bare** slug (strip the
+        # provider prefix) so it matches Codex's built-in catalog entry and is
+        # selectable in /model — but only when unambiguous within this key's
+        # scope; otherwise pin the full prefixed slug to avoid a broken default.
         model: str | None = None
         if row.allocation_id is not None:
-            model = (
+            repr_model = (
                 await self._s.execute(
                     select(Allocation.resource_model).where(Allocation.id == row.allocation_id)
                 )
             ).scalar_one_or_none()
+            if repr_model is not None:
+                bare = repr_model.split("/", 1)[-1]
+                scope = (
+                    await self._s.execute(
+                        select(CredentialAllocation.resource_model).where(
+                            CredentialAllocation.credential_id == row.credential_id
+                        )
+                    )
+                ).scalars().all()
+                same_bare = [m for m in scope if m.split("/", 1)[-1] == bare]
+                model = bare if len(same_bare) == 1 else repr_model
         await self._s.flush()
         return PollResult(
             "success",

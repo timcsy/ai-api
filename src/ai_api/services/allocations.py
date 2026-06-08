@@ -327,7 +327,12 @@ class AllocationService:
     ) -> Allocation | None:
         """The allocation in this key's scope whose `resource_model == model`, or
         None if the model is outside the key's scope. `UNIQUE(credential_id,
-        resource_model)` guarantees ≤1 (no billing ambiguity)."""
+        resource_model)` guarantees ≤1 (no billing ambiguity).
+
+        Alias: a **bare** model id (no provider prefix, e.g. `gpt-5.4` as Codex's
+        /model picker sends) resolves to a scoped provider-prefixed model
+        (`azure/gpt-5.4`) **iff exactly one** scope model strips to it. A prefixed
+        request must match exactly — no cross-provider aliasing."""
         stmt = (
             select(Allocation)
             .join(CredentialAllocation, CredentialAllocation.allocation_id == Allocation.id)
@@ -336,7 +341,18 @@ class AllocationService:
                 CredentialAllocation.resource_model == model,
             )
         )
-        return (await self._s.execute(stmt)).scalar_one_or_none()
+        exact = (await self._s.execute(stmt)).scalar_one_or_none()
+        if exact is not None or "/" in model:
+            return exact
+        rows = (
+            await self._s.execute(
+                select(Allocation)
+                .join(CredentialAllocation, CredentialAllocation.allocation_id == Allocation.id)
+                .where(CredentialAllocation.credential_id == credential.id)
+            )
+        ).scalars().all()
+        matches = [a for a in rows if a.resource_model.split("/", 1)[-1] == model]
+        return matches[0] if len(matches) == 1 else None
 
     async def first_scope_allocation(self, credential: Credential) -> Allocation | None:
         """A representative allocation in the key's scope (oldest). Used to

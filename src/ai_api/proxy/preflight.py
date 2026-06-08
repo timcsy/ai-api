@@ -34,6 +34,10 @@ class PreflightSuccess:
     provider: str
     resolved: ResolvedCredential
     upstream_model: str
+    # The allocation's canonical (provider-prefixed) slug, e.g. `azure/gpt-5.4`.
+    # Downstream catalog/capability checks key off this, not the raw request
+    # string (which may be a bare Codex slug aliased into scope).
+    canonical_model: str
 
 
 @dataclass
@@ -71,17 +75,10 @@ async def run_preflight(
     requested_model: str,
 ) -> PreflightSuccess | PreflightRejection:
     """Run all pre-upstream checks. Returns success context or a rejection."""
-    # Provider allowlist (before any DB lookups).
-    provider, _ = parse_provider(requested_model)
-    if not check_allowed(provider, settings.allowed_providers):
-        return PreflightRejection(
-            "provider_not_allowed",
-            f"provider '{provider}' is not in the allowlist",
-            403,
-        )
-
     # Phase 20: token → application key → pick the scope allocation by request
     # model. Invalid token → 401; model outside the key's scope → model_mismatch.
+    # (Provider allowlist runs after this so it can key off the resolved
+    # allocation's canonical model, supporting bare-Codex-slug aliasing.)
     alloc_service = AllocationService(session)
     credential = await alloc_service.lookup_credential_by_token(token)
     if credential is None:
@@ -91,19 +88,32 @@ async def run_preflight(
         # Attribute the reject to a representative allocation in the key's scope
         # (the only one, in the single-allocation case) so it shows in its calls.
         repr_alloc = await alloc_service.first_scope_allocation(credential)
-        # Make it actionable: name the model(s) this key CAN call, so a stray
-        # Codex /model pick gives a "switch to X" message instead of a cryptic
-        # failure. (Codex's picker can list models outside this key's scope.)
+        # Make it actionable: name the model(s) this key CAN call as the bare
+        # slugs Codex's /model picker lists, so a stray pick gives a "switch to X"
+        # message instead of a cryptic failure.
         allowed = await alloc_service.scope_models(credential)
         if allowed:
-            hint = "、".join(allowed)
+            picks = "、".join(sorted({m.split("/", 1)[-1] for m in allowed}))
             msg = (
                 f"模型 '{requested_model}' 不在這把金鑰的範圍。"
-                f"可用的模型有 {hint}。在 Codex 用 /model 選其中之一。"
+                f"可用的模型有 {picks}。在 Codex 用 /model 選其中之一。"
             )
         else:
             msg = f"model '{requested_model}' is not in this credential's scope"
         return PreflightRejection("model_mismatch", msg, 403, repr_alloc)
+
+    # Canonical model = the allocation's provider-prefixed slug. Provider routing,
+    # catalog lookup and the upstream call all key off this, so a bare Codex slug
+    # (gpt-5.4) behaves exactly like its scoped azure/gpt-5.4.
+    canonical_model = allocation.resource_model
+    provider, _ = parse_provider(canonical_model)
+    if not check_allowed(provider, settings.allowed_providers):
+        return PreflightRejection(
+            "provider_not_allowed",
+            f"provider '{provider}' is not in the allowlist",
+            403,
+            allocation,
+        )
 
     if allocation.status.value == "revoked":
         return PreflightRejection(
@@ -136,7 +146,7 @@ async def run_preflight(
     from fastapi import HTTPException
 
     try:
-        enforce_model_binding(allocation, requested_model)
+        enforce_model_binding(allocation, canonical_model)
     except HTTPException as exc:
         return PreflightRejection(
             exc.detail["error"]["code"],  # type: ignore[index]
@@ -152,7 +162,7 @@ async def run_preflight(
 
     model_row = (
         await session.execute(
-            select(ModelCatalog).where(ModelCatalog.slug == requested_model)
+            select(ModelCatalog).where(ModelCatalog.slug == canonical_model)
         )
     ).scalar_one_or_none()
     if model_row is not None:
@@ -162,7 +172,7 @@ async def run_preflight(
         ):
             return PreflightRejection(
                 "model_forbidden",
-                f"model '{requested_model}' is not accessible to this member",
+                f"model '{canonical_model}' is not accessible to this member",
                 403,
                 allocation,
             )
@@ -179,12 +189,15 @@ async def run_preflight(
             allocation,
         )
 
+    # litellm needs a provider prefix to route; un-prefixed catalog slugs get the
+    # resolved provider prepended (preserves the pre-alias behavior).
     upstream_model = (
-        requested_model if "/" in requested_model else f"{provider}/{requested_model}"
+        canonical_model if "/" in canonical_model else f"{provider}/{canonical_model}"
     )
     return PreflightSuccess(
         allocation=allocation,
         provider=provider,
         resolved=resolved,
         upstream_model=upstream_model,
+        canonical_model=canonical_model,
     )

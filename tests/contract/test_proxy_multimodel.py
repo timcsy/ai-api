@@ -6,6 +6,7 @@ the matching allocation. A model outside the key's scope is refused
 """
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
@@ -15,6 +16,24 @@ from ulid import ULID
 from ai_api.db import get_sessionmaker
 from ai_api.models import Member, MemberProvider, MemberStatus
 from ai_api.services.allocations import AllocationService
+
+
+async def _member_scoped(models: list[str]) -> str:
+    """Member + one key scoped to allocations for each of `models`. Returns token."""
+    sm = get_sessionmaker()
+    async with sm() as s:
+        member = Member(
+            id=str(ULID()), email=f"{ULID()}@x.com", provider=MemberProvider.external,
+            display_name="p", status=MemberStatus.active, password_hash=None,
+            created_at=datetime.now(UTC), disabled_at=None, created_by="test",
+        )
+        s.add(member)
+        await s.flush()
+        svc = AllocationService(s)
+        ids = [(await svc.create(member_id=member.id, resource_model=m)).allocation.id for m in models]
+        _cred, token = await svc.create_member_credential(member.id, "app", ids)
+        await s.commit()
+        return token.plaintext
 
 
 def _stub(model: str) -> dict:
@@ -104,3 +123,32 @@ async def test_model_outside_scope_is_refused(app_client: AsyncClient) -> None:
     # so a stray Codex /model pick gives "switch to X", not a cryptic failure.
     assert "gpt-4o-mini" in err["message"] and "gpt-4o" in err["message"]
     assert "/model" in err["message"]
+
+
+@pytest.mark.asyncio
+async def test_bare_codex_slug_aliases_to_prefixed_scope_model(app_client: AsyncClient) -> None:
+    # A key scoped to azure/gpt-5.4 is callable with Codex's bare slug gpt-5.4.
+    token = await _member_scoped(["azure/gpt-5.4"])
+    with patch("ai_api.proxy.upstream.acompletion") as mock:
+        mock.return_value = _stub("azure/gpt-5.4")
+        r = await app_client.post(
+            "/v1/chat/completions",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"model": "gpt-5.4", "messages": [{"role": "user", "content": "hi"}]},
+        )
+    assert r.status_code == 200, r.text
+    # Upstream gets the canonical prefixed model so litellm routes to azure.
+    assert mock.call_args.kwargs["model"] == "azure/gpt-5.4"
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_bare_slug_is_refused(app_client: AsyncClient) -> None:
+    # Same bare slug under two providers → no aliasing; the request is refused.
+    token = await _member_scoped(["azure/gpt-4o", "openai/gpt-4o"])
+    r = await app_client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"model": "gpt-4o", "messages": [{"role": "user", "content": "hi"}]},
+    )
+    assert r.status_code == 403
+    assert r.json()["error"]["code"] == "model_mismatch"

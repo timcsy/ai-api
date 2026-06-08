@@ -189,7 +189,7 @@ def _stub() -> dict:
 
 
 async def _login_member_with_allocation(
-    client: AsyncClient, admin_headers: dict[str, str], email: str
+    client: AsyncClient, admin_headers: dict[str, str], email: str, model: str = "gpt-4o-mini"
 ) -> str:
     """Create + login a member, give them one allocation. Returns allocation_id."""
     await client.post(
@@ -208,10 +208,29 @@ async def _login_member_with_allocation(
         await client.post(
             "/admin/allocations",
             headers=admin_headers,
-            json={"member_id": me["id"], "resource_model": "gpt-4o-mini"},
+            json={"member_id": me["id"], "resource_model": model},
         )
     ).json()
     return alloc["id"]
+
+
+@pytest.mark.asyncio
+async def test_token_model_is_bare_codex_slug_for_pinning(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    # An azure/gpt-5.4 allocation → the token response pins the bare `gpt-5.4`,
+    # which matches Codex's catalog entry and is selectable in /model.
+    alloc_id = await _login_member_with_allocation(
+        app_client, admin_headers, "pin@x.com", model="azure/gpt-5.4"
+    )
+    auth = (await app_client.post("/device/authorize", json={"device_label": "Codex"})).json()
+    await app_client.post(
+        f"/me/device/{auth['user_code']}/approve",
+        headers=_csrf(app_client),
+        json={"allocation_ids": [alloc_id]},
+    )
+    tok = (await app_client.post("/device/token", json={"device_code": auth["device_code"]})).json()
+    assert tok["model"] == "gpt-5.4"
 
 
 @pytest.mark.asyncio

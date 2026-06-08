@@ -268,6 +268,10 @@ async def proxy_responses(
     allocation = result.allocation
     provider = result.provider
     resolved = result.resolved
+    # Use the allocation's canonical (prefixed) slug from here on, so a bare Codex
+    # slug aliased into scope (gpt-5.4) is treated as its azure/gpt-5.4 model for
+    # the capability gate, billing model_key, and stored-response attribution.
+    requested_model = result.canonical_model
 
     # 4. Responses capability gate
     if not await model_supports_responses(session, requested_model):
