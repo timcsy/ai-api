@@ -89,7 +89,7 @@ export function LiteLLMUpdateDiff({
         <DialogHeader>
           <DialogTitle>檢查 LiteLLM 更新：{slug}</DialogTitle>
           <DialogDescription>
-            勾選要採納的欄位。手動改過的欄位不會被覆寫；採納價格會新增一筆價目版本（不蓋舊的）。
+            勾選要採納的欄位。手動改過的欄位預設不勾，但你仍可勾選覆寫——覆寫後該欄轉回 LiteLLM 自動管理。採納價格會新增一筆價目版本（不蓋舊的）。
           </DialogDescription>
         </DialogHeader>
         {loading && <p className="text-sm text-muted-foreground">讀取最新登錄表…</p>}
@@ -109,7 +109,6 @@ export function LiteLLMUpdateDiff({
                     <li key={d.field} className="flex items-start gap-2 rounded border p-2 text-sm">
                       <Checkbox
                         className="mt-0.5"
-                        disabled={manual}
                         checked={picked.has(d.field)}
                         onCheckedChange={(v) =>
                           setPicked((s) => {
@@ -123,7 +122,7 @@ export function LiteLLMUpdateDiff({
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-xs">{d.field}</span>
                           <Badge variant={manual ? "outline" : "secondary"} className="text-[10px]">
-                            {manual ? "手動（不會覆寫）" : d.source === "borrowed" ? "借用" : "LiteLLM"}
+                            {manual ? "手動（勾選可覆寫）" : d.source === "borrowed" ? "借用" : "LiteLLM"}
                           </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground break-words">

@@ -71,15 +71,20 @@ async def test_apply_price_appends_version(app_client: AsyncClient, admin_header
 
 
 @pytest.mark.asyncio
-async def test_apply_skips_manual_field(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
-    # Override context_window at create → manual → apply must NOT overwrite it.
+async def test_apply_can_overwrite_manual_field_and_reclaims_it(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    # Override context_window at create → manual. The admin can still explicitly
+    # adopt it; doing so overwrites the value AND flips its source back to litellm
+    # (re-enters auto-management).
     s = (await app_client.get("/admin/catalog/litellm/suggest/azure/gpt-4o", headers=admin_headers)).json()
-    await app_client.post(
+    create = await app_client.post(
         "/admin/catalog/models",
         headers=admin_headers,
         json={"slug": "azure/gpt-4o", "provider": "azure", "display_name": "GPT-4o",
               "base_model_key": "azure/gpt-4o", **s["metadata"], "context_window": 50000},
     )
+    assert create.json()["litellm_sync"]["field_sources"]["context_window"] == "manual"
     with patch("ai_api.api.admin_catalog.litellm_registry.fetch_latest",
                new=AsyncMock(return_value=_bumped_map())):
         r = await app_client.post(
@@ -90,4 +95,5 @@ async def test_apply_skips_manual_field(app_client: AsyncClient, admin_headers: 
     sm = get_sessionmaker()
     async with sm() as db:
         m = await db.get(ModelCatalog, "azure/gpt-4o")
-        assert m.context_window == 50000  # manual value untouched
+        assert m.context_window == 200000  # overwritten with the latest value
+        assert m.litellm_sync["field_sources"]["context_window"] == "litellm"  # back to auto

@@ -517,8 +517,9 @@ async def admin_litellm_apply(
     want_price = False
     for field in payload.fields:
         if field in litellm_registry.SYNCABLE_FIELDS:
-            if sources.get(field) == "manual":
-                continue  # never auto-overwrite a manual field
+            # Manual fields aren't auto-selected by the UI, but if the admin
+            # explicitly picks one it IS overwritten and re-enters auto-management
+            # (its source flips back to litellm below).
             setattr(m, field, latest_meta[field])
             applied_meta.append(field)
         elif field.startswith("price."):

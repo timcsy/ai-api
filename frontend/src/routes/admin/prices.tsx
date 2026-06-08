@@ -344,7 +344,7 @@ function AddPriceDialog({
 
   return (
     <Dialog open={state !== null} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "編輯價格" : "新增價格"}</DialogTitle>
           <DialogDescription>
