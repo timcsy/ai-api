@@ -1,9 +1,12 @@
+import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { ApiError, api } from "@/lib/api-client";
 
 interface AllocationRef {
@@ -32,9 +35,13 @@ export function AllocationKeysReadonly({ allocationId }: { allocationId: string 
     queryKey: ["me", "credentials"],
     queryFn: () => api<AppCredential[]>("/me/credentials"),
   });
-  const keys = (q.data ?? []).filter((k) =>
+  const [showRevoked, setShowRevoked] = React.useState(false);
+
+  const forModel = (q.data ?? []).filter((k) =>
     k.allocations.some((a) => a.allocation_id === allocationId),
   );
+  const revokedCount = forModel.filter((k) => k.status !== "active").length;
+  const keys = showRevoked ? forModel : forModel.filter((k) => k.status === "active");
 
   return (
     <Card>
@@ -46,16 +53,33 @@ export function AllocationKeysReadonly({ allocationId }: { allocationId: string 
               金鑰可同時涵蓋多個 model；建立 / 改名 / 撤回請到「我的應用金鑰」統一管理。
             </CardDescription>
           </div>
-          <Button asChild variant="outline" size="sm">
-            <Link to="/dashboard">前往管理</Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            {revokedCount > 0 && (
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="show-revoked-alloc-keys"
+                  checked={showRevoked}
+                  onCheckedChange={setShowRevoked}
+                />
+                <Label htmlFor="show-revoked-alloc-keys" className="text-sm">含已撤回</Label>
+              </div>
+            )}
+            <Button asChild variant="outline" size="sm">
+              <Link to="/dashboard">前往管理</Link>
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
         {q.isLoading && <p className="text-muted-foreground">載入中…</p>}
-        {q.isSuccess && keys.length === 0 && (
+        {q.isSuccess && keys.length === 0 && revokedCount === 0 && (
           <p className="text-muted-foreground py-4 text-center">
             還沒有能用這個 model 的應用金鑰——到「我的應用金鑰」建立一把並勾選它。
+          </p>
+        )}
+        {q.isSuccess && keys.length === 0 && revokedCount > 0 && (
+          <p className="text-muted-foreground py-4 text-center">
+            目前沒有使用中的金鑰；開啟「含已撤回」可查看 {revokedCount} 把已撤回的金鑰。
           </p>
         )}
         {keys.length > 0 && (
