@@ -236,7 +236,10 @@ async def test_provider_connection(
             api_key=api_key,
             api_base=cred.base_url,
             api_version=extra.get("api_version"),
-            max_tokens=16,
+            # Generous cap so reasoning models (gpt-5/o-series) don't spend the whole
+            # budget on reasoning tokens and fail with "raise max_tokens"; normal
+            # models answer "ping" briefly and stop, so real cost stays tiny.
+            max_tokens=2048,
         )
     except Exception as exc:
         # Test that successfully connected (any non-network error counts as
