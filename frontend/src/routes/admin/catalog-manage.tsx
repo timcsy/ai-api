@@ -104,7 +104,7 @@ function DeleteWithDependentsDialog({
     <AlertDialog open={target !== null} onOpenChange={(v) => !v && onCancel()}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>從 catalog 移除？</AlertDialogTitle>
+          <AlertDialogTitle>從目錄移除？</AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-2">
               {target && <code className="text-xs">{target.slug}</code>}
@@ -112,7 +112,7 @@ function DeleteWithDependentsDialog({
               {depQuery.data && depQuery.data.allocation_count > 0 ? (
                 <div className="rounded-md border border-destructive bg-destructive/10 p-2 text-xs space-y-1">
                   <p className="font-semibold">
-                    ⚠ {depQuery.data.allocation_count} 筆 allocation 依賴此 model；
+                    ⚠ {depQuery.data.allocation_count} 筆分配依賴此模型；
                     移除後它們的呼叫會回 503 provider_unavailable。
                   </p>
                   <ul className="list-disc pl-4">
@@ -200,7 +200,7 @@ export function AdminCatalogManagePage() {
       setCreateOpen(false);
       createForm.reset();
       setLitellmDraft(null);
-      toast({ title: "已加入 catalog" });
+      toast({ title: "已加入目錄" });
       queryClient.invalidateQueries({ queryKey: ["admin", "catalog-models-admin"] });
     },
     onError: (e) => toast({ title: "新增失敗", description: e.message, variant: "destructive" }),
@@ -210,7 +210,7 @@ export function AdminCatalogManagePage() {
     mutationFn: (slug) =>
       api(`/admin/catalog/models/${slug}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast({ title: "已從 catalog 移除" });
+      toast({ title: "已從目錄移除" });
       setDeleteConfirm(null);
       queryClient.invalidateQueries({ queryKey: ["admin", "catalog-models-admin"] });
     },
@@ -225,14 +225,14 @@ export function AdminCatalogManagePage() {
           <Button variant="outline" asChild>
             <Link to="/admin/model/prices">價目</Link>
           </Button>
-          <Button onClick={() => setCreateOpen(true)}>加入 Model</Button>
+          <Button onClick={() => setCreateOpen(true)}>加入模型</Button>
         </div>
       </div>
 
       <p className="text-sm text-muted-foreground">
-        這裡列出 gateway 已知的所有 model。Member 在「模型目錄」看到的會再經過
-        credential gate（provider 必須有 active credential）與 access policy（tag）兩段過濾。
-        若 model 對應的 provider 尚無 credential，model 仍然存在於 catalog 但對 member 隱藏。
+        這裡列出本平台已知的所有模型。成員在「模型目錄」看到的會再經過
+        credential gate（provider 必須有使用中的憑證）與 access policy（標籤）兩段過濾。
+        若模型對應的 provider 尚無憑證，模型仍然存在於目錄但對成員隱藏。
       </p>
 
       <Table className="responsive-table">
@@ -257,7 +257,7 @@ export function AdminCatalogManagePage() {
           {query.data?.length === 0 && (
             <TableRow>
               <TableCell colSpan={8} className="text-muted-foreground">
-                Catalog 是空的。按「加入 Model」開始。
+                目錄是空的。按「加入模型」開始。
               </TableCell>
             </TableRow>
           )}
@@ -324,7 +324,7 @@ export function AdminCatalogManagePage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>加入 Model 到 Catalog</DialogTitle>
+            <DialogTitle>加入模型到目錄</DialogTitle>
             <DialogDescription>
               先用「從 LiteLLM 帶入」搜尋帶入，或手動填寫。
             </DialogDescription>
@@ -346,7 +346,7 @@ export function AdminCatalogManagePage() {
               已帶入 <span className="font-mono">{litellmDraft.key}</span>
               （context {litellmDraft.metadata.context_window.toLocaleString()}
               {litellmDraft.suggested_price ? ` · 建議價 $${litellmDraft.suggested_price.input_per_1k}/1k` : ""}）。
-              可改 Model 名稱做自訂 deployment。
+              可改模型名稱做自訂 deployment。
             </p>
           )}
           <Form {...createForm}>

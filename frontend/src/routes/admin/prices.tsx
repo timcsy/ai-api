@@ -297,7 +297,7 @@ function AddPriceDialog({
     const p = provider.trim();
     const m = model.trim();
     if (!p || !m) {
-      toast({ title: "請先填 Provider 與 Model" });
+      toast({ title: "請先填 Provider 與模型" });
       return;
     }
     setLitellmBusy(true);
@@ -359,7 +359,7 @@ function AddPriceDialog({
               {litellmBusy ? "查詢中…" : "從 LiteLLM 帶入建議價"}
             </Button>
             <p className="text-xs text-muted-foreground mt-1">
-              依 Provider + Model 取 LiteLLM 公開牌價填入（可再手改）；查無則請手填。
+              依 Provider + 模型 取 LiteLLM 公開牌價填入（可再手改）；查無則請手填。
             </p>
           </div>
 

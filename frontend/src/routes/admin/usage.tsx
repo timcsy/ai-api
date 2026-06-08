@@ -151,7 +151,7 @@ export function AdminUsagePage() {
               <SelectItem value="member">依成員</SelectItem>
               <SelectItem value="allocation">依分配</SelectItem>
               <SelectItem value="model">依模型</SelectItem>
-              <SelectItem value="tag">依 Tag（班級／群組）</SelectItem>
+              <SelectItem value="tag">依標籤（班級／群組）</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -171,8 +171,8 @@ export function AdminUsagePage() {
       {groupBy === "tag" && (
         <Alert>
           <AlertDescription>
-            成員可同時掛多個 tag，各 tag 的加總<strong>可能重複計算</strong>、不等於平台總用量。
-            點一列可展開該 tag 的成員明細。
+            成員可同時掛多個標籤，各標籤的加總<strong>可能重複計算</strong>、不等於平台總用量。
+            點一列可展開該標籤的成員明細。
           </AlertDescription>
         </Alert>
       )}

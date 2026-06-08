@@ -189,7 +189,7 @@ export function AdminModelDetailPage() {
   ) => {
     const t = input.trim().toLowerCase();
     if (!t || !/^[a-z][a-z0-9_-]{0,63}$/.test(t)) {
-      toast({ title: "Tag 格式錯誤", variant: "destructive" });
+      toast({ title: "標籤格式錯誤", variant: "destructive" });
       return;
     }
     if (!list.includes(t)) setList([...list, t]);
@@ -202,9 +202,9 @@ export function AdminModelDetailPage() {
   if (!model) {
     return (
       <div className="container mx-auto py-8 max-w-3xl space-y-4">
-        <p>找不到 model「{slug}」</p>
+        <p>找不到模型「{slug}」</p>
         <Button asChild variant="outline">
-          <Link to="/admin/model">回 Model 列表</Link>
+          <Link to="/admin/model">回模型列表</Link>
         </Button>
       </div>
     );
@@ -352,13 +352,13 @@ export function AdminModelDetailPage() {
               <div className="flex items-center gap-2">
                 <RadioGroupItem id="da-open" value="open" />
                 <Label htmlFor="da-open" className="font-normal text-sm">
-                  open — 所有 active member 可見（被 denied_tags 命中者除外）
+                  open — 所有使用中的成員可見（被 denied_tags 命中者除外）
                 </Label>
               </div>
               <div className="flex items-center gap-2">
                 <RadioGroupItem id="da-restricted" value="restricted" />
                 <Label htmlFor="da-restricted" className="font-normal text-sm">
-                  restricted — 只有命中 allowed_tags 的 member 可見
+                  restricted — 只有命中 allowed_tags 的成員可見
                 </Label>
               </div>
             </RadioGroup>
@@ -375,7 +375,7 @@ export function AdminModelDetailPage() {
           />
 
           <TagsEditor
-            label="Denied Tags（優先於 Allowed）"
+            label="拒絕標籤（優先於允許）"
             tags={deniedTags}
             input={denyInput}
             setInput={setDenyInput}
@@ -397,7 +397,7 @@ export function AdminModelDetailPage() {
         <CardHeader>
           <CardTitle className="text-lg">自助領取</CardTitle>
           <CardDescription>
-            開放後，被存取規則允許的成員可在自己的儀表板一鍵領取此 model 的憑證，不需 admin 逐筆建立。
+            開放後，被存取規則允許的成員可在自己的儀表板一鍵領取此模型 的憑證，不需 admin 逐筆建立。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -639,7 +639,7 @@ function TagsEditor({
       <Label>{label}</Label>
       <div className="flex gap-2 mt-1">
         <Input
-          placeholder="tag 名稱"
+          placeholder="標籤名稱"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {

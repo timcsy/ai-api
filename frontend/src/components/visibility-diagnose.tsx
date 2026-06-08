@@ -45,8 +45,8 @@ interface Props {
 const CHECK_LABEL: Record<VisibilityCheck["check"], string> = {
   credential_gate: "Provider 憑證",
   default_access: "預設可見性",
-  deny_tags: "Deny tag 規則",
-  allow_tags: "Allow tag 規則",
+  deny_tags: "拒絕標籤規則",
+  allow_tags: "允許標籤規則",
 };
 
 export function VisibilityDiagnose({ modelSlug, memberId, compact = false }: Props) {
@@ -93,11 +93,11 @@ export function VisibilityDiagnose({ modelSlug, memberId, compact = false }: Pro
         body: JSON.stringify({ tags: [tag] }),
       }),
     onSuccess: (_, tag) => {
-      toast({ title: `已給該 member 加 tag「${tag}」` });
+      toast({ title: `已給該成員加標籤「${tag}」` });
       queryClient.invalidateQueries({ queryKey: ["admin", "diagnose"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "members", selectedMember, "tags"] });
     },
-    onError: (e) => toast({ title: "加 tag 失敗", description: e.message, variant: "destructive" }),
+    onError: (e) => toast({ title: "加標籤失敗", description: e.message, variant: "destructive" }),
   });
 
   const removeTagMut = useMutation<void, ApiError, string>({
@@ -106,7 +106,7 @@ export function VisibilityDiagnose({ modelSlug, memberId, compact = false }: Pro
         method: "DELETE",
       }),
     onSuccess: (_, tag) => {
-      toast({ title: `已移除 tag「${tag}」` });
+      toast({ title: `已移除標籤「${tag}」` });
       queryClient.invalidateQueries({ queryKey: ["admin", "diagnose"] });
     },
     onError: (e) => toast({ title: "移除失敗", description: e.message, variant: "destructive" }),
@@ -117,7 +117,7 @@ export function VisibilityDiagnose({ modelSlug, memberId, compact = false }: Pro
       <CardHeader className={compact ? "pb-3" : undefined}>
         <CardTitle className="text-base">以指定 member 視角預覽</CardTitle>
         <CardDescription>
-          評估 (member, model) 兩段過濾，告訴你「可見 / 不可見 + 原因」並提供修補捷徑。
+          評估 (成員, 模型) 兩段過濾，告訴你「可見 / 不可見 + 原因」並提供修補捷徑。
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -125,7 +125,7 @@ export function VisibilityDiagnose({ modelSlug, memberId, compact = false }: Pro
           {!memberId && (
             <div>
               <Select value={selectedMember} onValueChange={setSelectedMember}>
-                <SelectTrigger><SelectValue placeholder="選 member" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="選成員" /></SelectTrigger>
                 <SelectContent>
                   {members.data?.map((m) => (
                     <SelectItem key={m.id} value={m.id}>{m.email}</SelectItem>
@@ -137,7 +137,7 @@ export function VisibilityDiagnose({ modelSlug, memberId, compact = false }: Pro
           {!modelSlug && (
             <div>
               <Select value={selectedModel} onValueChange={setSelectedModel}>
-                <SelectTrigger><SelectValue placeholder="選 model" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="選模型" /></SelectTrigger>
                 <SelectContent>
                   {models.data?.map((m) => (
                     <SelectItem key={m.slug} value={m.slug}>{m.slug}</SelectItem>
@@ -208,7 +208,7 @@ function RepairCta({
     if (allowedTags.length === 0) {
       return (
         <p className="text-muted-foreground mt-1">
-          此 model 設為 restricted 但 allowed_tags 是空的；需到「Model 存取」設定。
+          此模型設為 restricted 但 allowed_tags 是空的；需到「模型存取」設定。
         </p>
       );
     }
@@ -222,7 +222,7 @@ function RepairCta({
             className="h-7 text-xs"
             onClick={() => onAddTag(t)}
           >
-            給該 member 加 tag「{t}」
+            給該成員加標籤「{t}」
           </Button>
         ))}
       </div>
@@ -232,7 +232,7 @@ function RepairCta({
     // The check.detail includes which tags hit. We don't parse it; just hint.
     return (
       <p className="text-muted-foreground mt-1">
-        要解除，需移除該 member 命中 denied_tags 的 tag（去成員頁編輯）。
+        要解除，需移除該成員命中 denied_tags 的標籤（去成員頁編輯）。
       </p>
     );
   }

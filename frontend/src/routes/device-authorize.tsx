@@ -85,7 +85,7 @@ export function DeviceAuthorizePage() {
         <CardHeader>
           <CardTitle>授權安裝 Codex</CardTitle>
           <CardDescription>
-            確認終端機顯示的代碼、勾選這台裝置可用的 model，按授權後會在你的「我的應用金鑰」**新增一把**金鑰給它。
+            確認終端機顯示的代碼、勾選這台裝置可用的模型，按授權後會在你的「我的應用金鑰」**新增一把**金鑰給它。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -130,7 +130,7 @@ export function DeviceAuthorizePage() {
                     裝置：<span className="text-foreground">{reqQuery.data.device_label ?? "未命名裝置"}</span>
                   </div>
                   <div className="space-y-2">
-                    <Label>這台裝置可用哪些 model（可多選）</Label>
+                    <Label>這台裝置可用哪些模型（可多選）</Label>
                     <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-2">
                       {activeAllocs.map((a) => (
                         <label key={a.id} className="flex items-center gap-2 py-1 text-sm">
@@ -151,7 +151,7 @@ export function DeviceAuthorizePage() {
                     </div>
                     {activeAllocs.length === 0 && allocsQuery.isSuccess && (
                       <p className="text-xs text-muted-foreground">
-                        你還沒有可用的分配，請先到 Dashboard 領取一個 model。
+                        你還沒有可用的分配，請先到儀表板領取一個模型。
                       </p>
                     )}
                   </div>

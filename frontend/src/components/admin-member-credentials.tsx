@@ -60,7 +60,7 @@ export function AdminMemberCredentials({ memberId }: { memberId: string }) {
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">應用金鑰</CardTitle>
-        <CardDescription>該成員的應用金鑰；可改名或撤回（撤回會讓該金鑰涵蓋的所有 model 一起失效）。</CardDescription>
+        <CardDescription>該成員的應用金鑰；可改名或撤回（撤回會讓該金鑰涵蓋的所有模型一起失效）。</CardDescription>
       </CardHeader>
       <CardContent>
         {q.isLoading && <p className="text-muted-foreground">載入中…</p>}

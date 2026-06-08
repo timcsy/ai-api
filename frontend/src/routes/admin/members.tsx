@@ -278,7 +278,7 @@ function MemberTagsCell({ memberId }: { memberId: string }) {
       queryClient.invalidateQueries({ queryKey: ["admin", "members", memberId, "tags"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "tags"] });
     },
-    onError: (e) => toast({ title: "加 tag 失敗", description: e.message, variant: "destructive" }),
+    onError: (e) => toast({ title: "加標籤失敗", description: e.message, variant: "destructive" }),
   });
 
   const removeMut = useMutation<void, ApiError, string>({
@@ -290,7 +290,7 @@ function MemberTagsCell({ memberId }: { memberId: string }) {
       queryClient.invalidateQueries({ queryKey: ["admin", "members", memberId, "tags"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "tags"] });
     },
-    onError: (e) => toast({ title: "移除 tag 失敗", description: e.message, variant: "destructive" }),
+    onError: (e) => toast({ title: "移除標籤失敗", description: e.message, variant: "destructive" }),
   });
 
   return (
@@ -311,7 +311,7 @@ function MemberTagsCell({ memberId }: { memberId: string }) {
           size="icon"
           variant="ghost"
           className="h-6 w-6 text-muted-foreground"
-          title="加 tag"
+          title="加標籤"
           onClick={() => setOpen(true)}
         >
           +

@@ -77,8 +77,8 @@ export function AdminTagsPage() {
       api(`/admin/tags/bulk-apply`, { method: "POST", body: JSON.stringify(data) }),
     onSuccess: (result) => {
       toast({
-        title: `已套用 tag "${result.tag}"`,
-        description: `新增 ${result.applied_count} 人，已有 tag 跳過 ${result.skipped_count} 人`,
+        title: `已套用標籤 "${result.tag}"`,
+        description: `新增 ${result.applied_count} 人，已有標籤跳過 ${result.skipped_count} 人`,
       });
       setBulkOpen(false);
       setBulkTag("");
@@ -92,7 +92,7 @@ export function AdminTagsPage() {
     mutationFn: (tag) =>
       api<TagSummary>("/admin/tags", { method: "POST", body: JSON.stringify({ tag }) }),
     onSuccess: (r) => {
-      toast({ title: `已建立 tag「${r.tag}」`, description: "現在可在 Model 存取頁套用此 tag" });
+      toast({ title: `已建立 tag「${r.tag}」`, description: "現在可在「模型存取」頁套用此標籤" });
       setCreateOpen(false);
       setNewTag("");
       queryClient.invalidateQueries({ queryKey: ["admin", "tags"] });
@@ -119,13 +119,13 @@ export function AdminTagsPage() {
           <Button variant="outline" asChild>
             <Link to="/admin/tag/rules">自動標籤規則</Link>
           </Button>
-          <Button variant="outline" onClick={() => setCreateOpen(true)}>建立 Tag</Button>
+          <Button variant="outline" onClick={() => setCreateOpen(true)}>建立標籤</Button>
           <Button onClick={() => setBulkOpen(true)}>批次貼標</Button>
         </div>
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Tag 用於控制 model 對成員的可見性。在「Model 存取」頁設定哪些 tag 可使用哪個 model。
+        標籤用於控制模型對成員的可見性。在「模型存取」頁設定哪些標籤可使用哪個模型。
       </p>
 
       <Table className="responsive-table">
@@ -145,7 +145,7 @@ export function AdminTagsPage() {
           {tagsQuery.data?.length === 0 && (
             <TableRow>
               <TableCell colSpan={3} className="text-muted-foreground">
-                目前沒有任何 tag；按「批次貼標」開始。
+                目前沒有任何標籤；按「批次貼標」開始。
               </TableCell>
             </TableRow>
           )}
@@ -171,9 +171,9 @@ export function AdminTagsPage() {
       <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>批次貼 Tag</DialogTitle>
+            <DialogTitle>批次貼標籤</DialogTitle>
             <DialogDescription>
-              一次為多名成員加上同一個 tag。已有此 tag 的成員會跳過。
+              一次為多名成員加上同一個標籤。已有此標籤的成員會跳過。
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -235,9 +235,9 @@ export function AdminTagsPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>建立 Tag</DialogTitle>
+            <DialogTitle>建立標籤</DialogTitle>
             <DialogDescription>
-              先定義 tag 名稱（之後可在 Model 存取頁設定哪些 model 允許 / 禁止此 tag）。
+              先定義標籤名稱（之後可在「模型存取」頁設定哪些模型允許 / 禁止此標籤）。
               成員可在批次貼標 dialog 套用此 tag。
             </DialogDescription>
           </DialogHeader>
@@ -271,9 +271,9 @@ export function AdminTagsPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>從所有成員移除 tag「{deleteConfirm?.tag}」？</AlertDialogTitle>
+            <AlertDialogTitle>從所有成員移除標籤「{deleteConfirm?.tag}」？</AlertDialogTitle>
             <AlertDialogDescription>
-              {deleteConfirm?.member_count} 名成員會失去這個 tag；如有 model 依賴它做存取控制，他們將立即失去存取權。
+              {deleteConfirm?.member_count} 名成員會失去這個標籤；如有模型依賴它做存取控制，他們將立即失去存取權。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

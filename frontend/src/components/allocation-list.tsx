@@ -107,7 +107,7 @@ export function AllocationList() {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">可自助領取</h2>
           <p className="text-sm text-muted-foreground">
-            以下 model 已開放自助領取且你被允許使用。按「領取憑證」即可取得一張可呼叫的 token。
+            以下模型已開放自助領取且你被允許使用。按「領取憑證」即可取得一張可呼叫的 token。
           </p>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {claimableQuery.data?.map((m) => (

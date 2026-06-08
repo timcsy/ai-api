@@ -125,7 +125,7 @@ export function AppCredentialsCard() {
     onSuccess: () => {
       setRevokeTarget(null);
       invalidate();
-      toast({ title: "已撤回金鑰", description: "其涵蓋的 model 全部失效，其他金鑰不受影響" });
+      toast({ title: "已撤回金鑰", description: "其涵蓋的模型全部失效，其他金鑰不受影響" });
     },
     onError: (e: ApiError) => toast({ title: "撤回失敗", description: e.message, variant: "destructive" }),
   });
@@ -186,7 +186,7 @@ export function AppCredentialsCard() {
           <div>
             <CardTitle className="text-lg">我的應用 / 金鑰</CardTitle>
             <CardDescription>
-              一把金鑰可指定多個 model（分配）；同一把 token 即可呼叫全部。token 僅在建立時顯示一次。
+              一把金鑰可指定多個模型（分配）；同一把 token 即可呼叫全部。token 僅在建立時顯示一次。
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -215,7 +215,7 @@ export function AppCredentialsCard() {
             <TableHeader>
               <TableRow>
                 <TableHead>名稱</TableHead>
-                <TableHead>可用 model</TableHead>
+                <TableHead>可用模型</TableHead>
                 <TableHead>Token 前綴</TableHead>
                 <TableHead>最後使用</TableHead>
                 <TableHead>狀態</TableHead>
@@ -226,7 +226,7 @@ export function AppCredentialsCard() {
               {creds.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium" data-label="名稱">{c.name}</TableCell>
-                  <TableCell data-label="可用 model">
+                  <TableCell data-label="可用模型">
                     <div className="flex flex-wrap gap-1">
                       {c.allocations.map((a) => (
                         <Badge key={a.allocation_id} variant="secondary" className="font-mono text-[10px]">
@@ -265,7 +265,7 @@ export function AppCredentialsCard() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>建立應用金鑰</DialogTitle>
-            <DialogDescription>取個名字，勾選這把金鑰可用的 model。</DialogDescription>
+            <DialogDescription>取個名字，勾選這把金鑰可用的模型。</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">
@@ -273,7 +273,7 @@ export function AppCredentialsCard() {
               <Input id="key-name" value={newName} maxLength={64} placeholder="我的筆電 Codex" onChange={(e) => setNewName(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>可用 model</Label>
+              <Label>可用模型</Label>
               <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-2">
                 {activeAllocs.map((a) => (
                   <label key={a.id} className="flex items-center gap-2 py-1 text-sm">
@@ -307,7 +307,7 @@ export function AppCredentialsCard() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>編輯金鑰</DialogTitle>
-            <DialogDescription>改名稱與可用 model 都在這裡，按儲存一次生效（同一把 token，不需換）。至少保留一個 model。</DialogDescription>
+            <DialogDescription>改名稱與可用模型都在這裡，按儲存一次生效（同一把 token，不需換）。至少保留一個模型。</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-2">
@@ -320,7 +320,7 @@ export function AppCredentialsCard() {
               />
             </div>
             <div className="space-y-2">
-              <Label>可用 model</Label>
+              <Label>可用模型</Label>
               <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border p-2">
                 {activeAllocs.map((a) => (
                   <label key={a.id} className="flex items-center gap-2 py-1 text-sm">
@@ -372,7 +372,7 @@ export function AppCredentialsCard() {
             <AlertDialogDescription>
               這把金鑰涵蓋的{" "}
               <strong>
-                {revokeTarget?.allocations.length ?? 0} 個 model（
+                {revokeTarget?.allocations.length ?? 0} 個模型（
                 {revokeTarget?.allocations.map((a) => a.display_name ?? a.resource_model).join("、")}）會一起立即失效
               </strong>
               、無法復原。其他金鑰不受影響。

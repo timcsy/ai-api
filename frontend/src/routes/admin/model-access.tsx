@@ -118,7 +118,7 @@ export function AdminModelAccessPage() {
     const t = input.trim().toLowerCase();
     if (!t) return;
     if (!/^[a-z][a-z0-9_-]{0,63}$/.test(t)) {
-      toast({ title: "Tag 格式錯誤", description: "^[a-z][a-z0-9_-]{0,63}$", variant: "destructive" });
+      toast({ title: "標籤格式錯誤", description: "^[a-z][a-z0-9_-]{0,63}$", variant: "destructive" });
       return;
     }
     if (list.includes(t)) return;
@@ -160,7 +160,7 @@ export function AdminModelAccessPage() {
             }}
           >
             <SelectTrigger>
-              <SelectValue placeholder={modelsQuery.isLoading ? "載入中…" : "選一個 model"} />
+              <SelectValue placeholder={modelsQuery.isLoading ? "載入中…" : "選一個模型"} />
             </SelectTrigger>
             <SelectContent>
               {modelsQuery.data?.map((m) => (
@@ -192,13 +192,13 @@ export function AdminModelAccessPage() {
                 <div className="flex items-center gap-2">
                   <RadioGroupItem id="da-open" value="open" />
                   <Label htmlFor="da-open" className="font-normal">
-                    open — 所有 active member 可見（被 denied_tags 命中者除外）
+                    open — 所有使用中的成員可見（被 denied_tags 命中者除外）
                   </Label>
                 </div>
                 <div className="flex items-center gap-2">
                   <RadioGroupItem id="da-restricted" value="restricted" />
                   <Label htmlFor="da-restricted" className="font-normal">
-                    restricted — 只有命中 allowed_tags 的 member 可見
+                    restricted — 只有命中 allowed_tags 的成員可見
                   </Label>
                 </div>
               </RadioGroup>
@@ -250,7 +250,7 @@ export function AdminModelAccessPage() {
             </div>
 
             <div>
-              <Label>Denied Tags（優先於 Allowed）</Label>
+              <Label>拒絕標籤（優先於允許）</Label>
               <div className="flex gap-2 mt-1">
                 <Input
                   placeholder="tag 名稱"
@@ -297,7 +297,7 @@ export function AdminModelAccessPage() {
                 )}
                 {previewQuery.data && !previewQuery.data.provider_has_credential && (
                   <span className="text-amber-700">
-                    ⚠ 該 provider 沒有 active credential — 套用後 model 仍對所有 member 隱藏
+                    ⚠ 該 provider 沒有使用中的憑證 — 套用後模型仍對所有成員隱藏
                   </span>
                 )}
                 {previewQuery.data && previewQuery.data.provider_has_credential && (

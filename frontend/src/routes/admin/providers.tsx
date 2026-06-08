@@ -273,7 +273,7 @@ export function AdminProvidersPage() {
                       disabled={testMut.isPending && testMut.variables?.id === c.id}
                       onClick={() => {
                         const customModel = window.prompt(
-                          `測試 ${c.provider} credential（${c.label}）— 留空走預設 model；填入指定 model（Azure deployment 名稱 / OpenAI model id 等）`,
+                          `測試 ${c.provider} 憑證（${c.label}）— 留空走預設模型；填入指定模型（Azure deployment 名稱 / OpenAI model id 等）`,
                           "",
                         );
                         if (customModel === null) return;
@@ -448,7 +448,7 @@ export function AdminProvidersPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>停用此 credential？</AlertDialogTitle>
             <AlertDialogDescription>
-              停用後，依賴此 credential 的所有 model 對成員立即不可用。
+              停用後，依賴此憑證的所有模型對成員立即不可用。
               {disableConfirmFor && (
                 <span className="block mt-2 font-mono text-xs">
                   {disableConfirmFor.provider} / {disableConfirmFor.label}

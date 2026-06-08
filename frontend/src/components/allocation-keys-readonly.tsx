@@ -48,9 +48,9 @@ export function AllocationKeysReadonly({ allocationId }: { allocationId: string 
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <CardTitle className="text-lg">能用這個 model 的應用金鑰</CardTitle>
+            <CardTitle className="text-lg">能用這個模型的應用金鑰</CardTitle>
             <CardDescription>
-              金鑰可同時涵蓋多個 model；建立 / 改名 / 撤回請到「我的應用金鑰」統一管理。
+              金鑰可同時涵蓋多個模型；建立 / 改名 / 撤回請到「我的應用金鑰」統一管理。
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -74,7 +74,7 @@ export function AllocationKeysReadonly({ allocationId }: { allocationId: string 
         {q.isLoading && <p className="text-muted-foreground">載入中…</p>}
         {q.isSuccess && keys.length === 0 && revokedCount === 0 && (
           <p className="text-muted-foreground py-4 text-center">
-            還沒有能用這個 model 的應用金鑰——到「我的應用金鑰」建立一把並勾選它。
+            還沒有能用這個模型的應用金鑰——到「我的應用金鑰」建立一把並勾選它。
           </p>
         )}
         {q.isSuccess && keys.length === 0 && revokedCount > 0 && (

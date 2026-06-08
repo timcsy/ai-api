@@ -138,7 +138,7 @@ export function AdminMemberDetailPage() {
   if (!member) {
     return (
       <div className="container mx-auto py-8 max-w-3xl space-y-4">
-        <p>找不到 member id「{memberId}」</p>
+        <p>找不到成員 id「{memberId}」</p>
         <Button asChild variant="outline"><Link to="/admin/member">回成員列表</Link></Button>
       </div>
     );
@@ -177,12 +177,12 @@ export function AdminMemberDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Tag</CardTitle>
+          <CardTitle className="text-lg">標籤</CardTitle>
           <CardDescription>到「成員」列表 inline 編輯；此處檢視用</CardDescription>
         </CardHeader>
         <CardContent>
           {tagsQuery.data?.length === 0 ? (
-            <p className="text-sm text-muted-foreground">無 tag</p>
+            <p className="text-sm text-muted-foreground">無標籤</p>
           ) : (
             <div className="flex flex-wrap gap-1">
               {tagsQuery.data?.map((t) => (
@@ -203,15 +203,15 @@ export function AdminMemberDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">可用 Model</CardTitle>
+          <CardTitle className="text-lg">可用模型</CardTitle>
           <CardDescription>
-            該 member 通過 credential gate ∩ access policy 後實際看得到的清單
+            該成員通過 credential gate ∩ access policy 後實際看得到的清單
           </CardDescription>
         </CardHeader>
         <CardContent>
           {visibleQuery.isLoading && <p className="text-sm">載入中…</p>}
           {visibleQuery.data?.length === 0 && (
-            <p className="text-sm text-muted-foreground">該 member 目前看不到任何 model</p>
+            <p className="text-sm text-muted-foreground">該成員目前看不到任何模型</p>
           )}
           {(visibleQuery.data ?? []).length > 0 && (
             <ul className="text-sm space-y-1">
@@ -236,7 +236,7 @@ export function AdminMemberDetailPage() {
           <div className="flex items-start justify-between gap-2">
             <div>
               <CardTitle className="text-lg">分配（Allocations）</CardTitle>
-              <CardDescription>該成員的所有分配（model 授權）；在此直接建立與撤回</CardDescription>
+              <CardDescription>該成員的所有分配（模型授權）；在此直接建立與撤回</CardDescription>
             </div>
             <div className="flex items-center gap-3 shrink-0">
               {revokedCount > 0 && (
@@ -445,10 +445,10 @@ function CreateAllocationDialog({
                 <SelectValue
                   placeholder={
                     catalogQuery.isLoading
-                      ? "載入 catalog…"
+                      ? "載入目錄…"
                       : (catalogQuery.data?.length ?? 0) === 0
-                        ? "catalog 是空的；先到 Model → Catalog 管理加入"
-                        : "選擇 model"
+                        ? "目錄是空的；先到「模型目錄」管理加入"
+                        : "選擇模型"
                   }
                 />
               </SelectTrigger>

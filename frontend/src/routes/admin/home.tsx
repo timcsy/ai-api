@@ -96,28 +96,28 @@ export function AdminHomePage() {
       label: "新增至少一筆 Provider 憑證",
       description:
         activeProviders.length > 0
-          ? `已有 ${activeProviders.length} 筆 active credential`
-          : "沒有 credential，所有 model 對成員都隱藏",
+          ? `已有 ${activeProviders.length} 筆使用中的憑證`
+          : "沒有憑證，所有模型對成員都隱藏",
       to: "/admin/providers",
       cta: "去 Provider 憑證",
     },
     {
       done: totalModels > 0,
-      label: "在 Catalog 加入 Model",
+      label: "在目錄加入模型",
       description:
         totalModels > 0
-          ? `Catalog 有 ${totalModels} 個 model（${hiddenModels} 個對 member 隱藏）`
-          : "Catalog 是空的；先加入至少 1 個 model member 才有東西可用",
+          ? `目錄有 ${totalModels} 個模型（${hiddenModels} 個對成員隱藏）`
+          : "目錄是空的；先加入至少 1 個模型與成員才有東西可用",
       to: "/admin/model",
-      cta: "去 Model",
+      cta: "去目錄",
     },
     {
       done: activeMembers.length > 0,
       label: "建立成員（或設定自動註冊）",
       description:
         activeMembers.length > 0
-          ? `有 ${activeMembers.length} 個 active member`
-          : "沒有 active member；google SSO 或 local password 兩種方式",
+          ? `有 ${activeMembers.length} 個使用中的成員`
+          : "沒有使用中的成員；google SSO 或 local password 兩種方式",
       to: "/admin/member",
       cta: "去成員",
     },
@@ -165,10 +165,10 @@ export function AdminHomePage() {
         <Card className="border-amber-500">
           <CardHeader>
             <CardTitle className="text-base text-amber-900">
-              ⚠ {hiddenModels} 個 model 對成員隱藏
+              ⚠ {hiddenModels} 個模型對成員隱藏
             </CardTitle>
             <CardDescription>
-              可能原因：對應 provider 沒有 active credential、或 access policy 沒命中任何 member。
+              可能原因：對應 provider 沒有使用中的憑證、或 access policy 沒命中任何成員。
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -271,10 +271,10 @@ function Dashboard({
         <Card className="border-amber-500">
           <CardHeader>
             <CardTitle className="text-base text-amber-900">
-              ⚠ {hiddenModels} 個 model 對所有 member 隱藏
+              ⚠ {hiddenModels} 個模型對所有成員隱藏
             </CardTitle>
             <CardDescription>
-              該 model 對應 provider 無 active credential，或 access policy 沒命中任何 member。
+              該模型對應 provider 無使用中的憑證，或 access policy 沒命中任何成員。
             </CardDescription>
           </CardHeader>
           <CardContent>

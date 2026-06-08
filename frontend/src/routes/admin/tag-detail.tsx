@@ -71,7 +71,7 @@ export function AdminTagDetailPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">持有此 tag 的成員（{holdingMembers.length}）</CardTitle>
-          <CardDescription>到「成員」列表 inline 編輯加 / 移除 tag</CardDescription>
+          <CardDescription>到「成員」列表直接編輯加 / 移除標籤</CardDescription>
         </CardHeader>
         <CardContent>
           {holdingMembers.length === 0 ? (

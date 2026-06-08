@@ -180,7 +180,7 @@ export function DashboardCharts({ range }: { range: TimeRange }) {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">各 Model 花費占比</CardTitle>
-            <CardDescription>前 5 名 + 其他，點扇形看 model 詳情</CardDescription>
+            <CardDescription>前 5 名 + 其他，點扇形看模型詳情</CardDescription>
           </CardHeader>
           <CardContent>
             <Chart isLoading={byModel.isLoading} isEmpty={donutTotal === 0} height={240} emptyText="此區間沒有計費用量">
@@ -262,7 +262,7 @@ export function DashboardCharts({ range }: { range: TimeRange }) {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Top 5 群組／班級（依花費）</CardTitle>
-          <CardDescription>依 Tag 加總；成員可掛多 tag，數字可能重複計算</CardDescription>
+          <CardDescription>依標籤加總；成員可掛多個標籤，數字可能重複計算</CardDescription>
         </CardHeader>
         <CardContent>
           {byTag.isLoading ? (

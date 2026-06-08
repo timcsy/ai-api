@@ -197,7 +197,7 @@ export function AdminTagRulesPage() {
         <div>
           <h1 className="text-2xl font-bold">自動標籤規則</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            新成員<strong>首次註冊</strong>時，系統由上而下評估規則，套用<strong>第一條命中</strong>的 tag。
+            新成員<strong>首次註冊</strong>時，系統由上而下評估規則，套用<strong>第一條命中</strong>的標籤。
             <Link to="/admin/tag" className="ml-1 underline">← 回 Tag 管理</Link>
           </p>
         </div>
@@ -209,7 +209,7 @@ export function AdminTagRulesPage() {
           <TableRow>
             <TableHead className="w-20">順序</TableHead>
             <TableHead>條件</TableHead>
-            <TableHead>貼上 Tag</TableHead>
+            <TableHead>貼上標籤</TableHead>
             <TableHead>啟用</TableHead>
             <TableHead className="text-right">動作</TableHead>
           </TableRow>
@@ -254,7 +254,7 @@ export function AdminTagRulesPage() {
                   )}
                 </div>
               </TableCell>
-              <TableCell data-label="貼上 Tag"><Badge variant="secondary">{rule.tag}</Badge></TableCell>
+              <TableCell data-label="貼上標籤"><Badge variant="secondary">{rule.tag}</Badge></TableCell>
               <TableCell data-label="啟用">
                 <Switch
                   checked={rule.enabled}
@@ -350,7 +350,7 @@ export function AdminTagRulesPage() {
               </div>
             )}
             <div>
-              <Label htmlFor="rule-tag">貼上的 Tag</Label>
+              <Label htmlFor="rule-tag">貼上的標籤</Label>
               <Input
                 id="rule-tag"
                 className="mt-1"
@@ -388,7 +388,7 @@ export function AdminTagRulesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>刪除規則？</AlertDialogTitle>
             <AlertDialogDescription>
-              已自動貼上的 tag 不會被移除；只是之後新成員不再套用此規則。
+              已自動貼上的標籤不會被移除；只是之後新成員不再套用此規則。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

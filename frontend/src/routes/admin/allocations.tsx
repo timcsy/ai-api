@@ -328,7 +328,7 @@ export function AdminAllocationsPage() {
         <div className="space-y-2">
           <h2 className="text-lg font-semibold">自助領取鎖定</h2>
           <p className="text-sm text-muted-foreground">
-            這些（成員, model）的自助憑證被撤回後鎖定，解鎖後成員才能再次自助領取。
+            這些（成員, 模型）的自助憑證被撤回後鎖定，解鎖後成員才能再次自助領取。
           </p>
           <Table>
             <TableHeader>
@@ -378,7 +378,7 @@ export function AdminAllocationsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>分配已建立 — 此 token 只顯示一次</DialogTitle>
-            <DialogDescription>請立即複製並安全保存。關閉此 dialog 後無法再次取得。</DialogDescription>
+            <DialogDescription>請立即複製並安全保存。關閉此對話框後無法再次取得。</DialogDescription>
           </DialogHeader>
           <pre className="bg-muted p-3 rounded text-xs overflow-x-auto break-all">
             {tokenDialog}
@@ -536,10 +536,10 @@ function CreateAllocationDialog({
                       <SelectTrigger>
                         <SelectValue placeholder={
                           catalogQuery.isLoading
-                            ? "載入 catalog…"
+                            ? "載入目錄…"
                             : (catalogQuery.data?.length ?? 0) === 0
-                              ? "catalog 是空的；先去「Catalog 管理」加入"
-                              : "選擇 model"
+                              ? "目錄是空的；先去「模型目錄」加入"
+                              : "選擇模型"
                         } />
                       </SelectTrigger>
                     </FormControl>

@@ -129,7 +129,7 @@ export function AllocationDetailPage() {
     <div className="container mx-auto py-8 space-y-6">
       <section className="space-y-2">
         <Link to="/dashboard" className="text-sm text-muted-foreground hover:underline">
-          ← 回 Dashboard
+          ← 回儀表板
         </Link>
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-3xl font-bold min-w-0 truncate">{alloc?.display_name ?? alloc?.resource_model ?? id}</h1>

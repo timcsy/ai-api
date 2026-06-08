@@ -65,7 +65,7 @@ export function MemberOverview() {
           {hasClaimable && (
             <Alert>
               <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-                <span>有可自助領取的 model 等你領取。</span>
+                <span>有可自助領取的模型等你領取。</span>
                 <Link to="/allocations" className="font-medium underline underline-offset-4">去領取 →</Link>
               </AlertDescription>
             </Alert>
