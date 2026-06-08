@@ -782,7 +782,13 @@ async def admin_test_model(
     started = time.perf_counter()
     try:
         if kind == "chat":
-            await upstream.acompletion(messages=[{"role": "user", "content": "ping"}], max_tokens=1, **common)
+            # Generous cap: reasoning models (gpt-5/o-series) spend the completion
+            # budget on reasoning tokens, so a tiny cap → "could not finish, raise
+            # max_tokens" even though the model is reachable. Normal models still
+            # answer "ping" briefly and stop, so the real cost stays tiny.
+            await upstream.acompletion(
+                messages=[{"role": "user", "content": "ping"}], max_tokens=2048, **common
+            )
         elif kind == "embedding":
             await upstream.aembedding(input="ping", **common)
         elif kind == "tts":
