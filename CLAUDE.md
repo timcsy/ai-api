@@ -52,6 +52,8 @@ Auto-generated from all feature plans. Last updated: 2026-06-08
 - PostgreSQL（生產）/ SQLite（dev、CI）；**無新 migration**——沿用階段 23 `model_catalog.litellm_sync`（JSON 欄）多存 `raw`；價格沿用 `price_list`。 (034-catalog-admin-consolidation)
 - Python 3.11+（後端，既有不變）/ TypeScript strict + React 19 + Vite 6（前端，既有不變） + FastAPI、SQLAlchemy 2.x async、Pydantic v2、`litellm`（aresponses 橋接，既有）；TanStack Query、shadcn/ui（前端，既有）。**不新增套件。** (035-responses-support-detection)
 - PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表、不新增 migration**——responses 狀態以既有 `model_catalog.capabilities`（JSON list）的標記約定承載。 (035-responses-support-detection)
+- Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端），皆既有不變 + FastAPI、SQLAlchemy 2.x async、Pydantic v2、`litellm`（library form：`acompletion`/`aresponses`/`aembedding`/`aspeech`/`aimage_generation`，皆既有套件內函式）；TanStack Query、shadcn/ui（前端）。**不新增套件。** (036-admin-model-test)
+- PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表、不新增 migration**——只讀既有 `model_catalog`（modality + `litellm_sync.raw.mode`）。 (036-admin-model-test)
 
 - Python 3.11+ + LiteLLM（proxy core）、FastAPI（admin API）、 (001-gateway-core)
 
@@ -72,9 +74,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 036-admin-model-test: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端），皆既有不變 + FastAPI、SQLAlchemy 2.x async、Pydantic v2、`litellm`（library form：`acompletion`/`aresponses`/`aembedding`/`aspeech`/`aimage_generation`，皆既有套件內函式）；TanStack Query、shadcn/ui（前端）。**不新增套件。**
 - 035-responses-support-detection: Added Python 3.11+（後端，既有不變）/ TypeScript strict + React 19 + Vite 6（前端，既有不變） + FastAPI、SQLAlchemy 2.x async、Pydantic v2、`litellm`（aresponses 橋接，既有）；TanStack Query、shadcn/ui（前端，既有）。**不新增套件。**
 - 034-catalog-admin-consolidation: Added TypeScript strict + React 19 + Vite 6（前端為主）/ Python 3.11+（後端少量擴充） + FastAPI、SQLAlchemy 2.x async、Pydantic v2、`litellm`（既有）、TanStack Query、shadcn/ui。**不新增套件。**
-- 033-litellm-catalog-sync: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2、**`litellm`（既有，library form——讀其內建 `model_cost` + `get_model_cost_map` 線上抓）**、TanStack Query、shadcn/ui。**不新增套件。**
 
 
 <!-- MANUAL ADDITIONS START -->

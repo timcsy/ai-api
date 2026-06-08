@@ -2,6 +2,16 @@ import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,6 +69,9 @@ interface CatalogModel {
     state: "available" | "unavailable" | "unknown";
     source: "tested" | "manual" | null;
   };
+  test_kind?: "chat" | "embedding" | "tts" | "image" | "stt" | "unknown";
+  test_billable?: boolean;
+  test_supported?: boolean;
   recommended_for: string[];
   tags: string[];
   default_access: "open" | "restricted";
@@ -178,6 +191,45 @@ export function AdminModelDetailPage() {
     onError: (e) => toast({ title: "更新失敗", description: e.message, variant: "destructive" }),
   });
 
+  // Phase 26: test the model itself (by kind: chat/embedding/tts/image).
+  const [billableConfirmOpen, setBillableConfirmOpen] = React.useState(false);
+  const testModelMut = useMutation<
+    { ok: boolean; kind?: string; latency_ms?: number; error_type?: string; message?: string; needs_confirmation?: boolean },
+    ApiError,
+    { acknowledge_billable?: boolean }
+  >({
+    mutationFn: (body) =>
+      api(`/admin/catalog/models/${slug}/test`, { method: "POST", body: JSON.stringify(body) }),
+    onSuccess: (r) => {
+      if (r.needs_confirmation) {
+        setBillableConfirmOpen(true);
+        return;
+      }
+      if (r.ok) {
+        toast({ title: "模型測試通過", description: `延遲 ${r.latency_ms} ms` });
+      } else {
+        toast({
+          title: "模型測試未通過",
+          description: r.message ?? r.error_type ?? "上游錯誤",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (e) => toast({ title: "測試失敗", description: e.message, variant: "destructive" }),
+  });
+
+  const onTestModel = () => {
+    if (model?.test_supported === false) {
+      toast({ title: "尚不支援自動測試", description: "此模型類型目前無法自動測試。" });
+      return;
+    }
+    if (model?.test_billable) {
+      setBillableConfirmOpen(true);
+      return;
+    }
+    testModelMut.mutate({});
+  };
+
   const [editBasicsOpen, setEditBasicsOpen] = React.useState(false);
   const [checkOpen, setCheckOpen] = React.useState(false);
 
@@ -225,7 +277,16 @@ export function AdminModelDetailPage() {
               <CardTitle className="text-xl">{model.display_name}</CardTitle>
               <CardDescription className="font-mono text-xs">{model.slug}</CardDescription>
             </div>
-            <div className="flex shrink-0 gap-1">
+            <div className="flex shrink-0 flex-wrap gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={testModelMut.isPending || model.test_supported === false}
+                title={model.test_supported === false ? "此模型類型尚不支援自動測試" : undefined}
+                onClick={onTestModel}
+              >
+                {testModelMut.isPending ? "測試中…" : "測試模型"}
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setCheckOpen(true)}>
                 檢查 LiteLLM 更新
               </Button>
@@ -481,6 +542,30 @@ export function AdminModelDetailPage() {
           setEditBasicsOpen(false);
         }}
       />
+
+      <AlertDialog open={billableConfirmOpen} onOpenChange={setBillableConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>這個測試會產生實際費用</AlertDialogTitle>
+            <AlertDialogDescription>
+              {model.test_kind === "image"
+                ? "測試圖片生成模型會實際生成一張圖片，產生一次實際費用。要繼續嗎？"
+                : "測試此模型會實際呼叫上游，產生一次實際費用。要繼續嗎？"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setBillableConfirmOpen(false);
+                testModelMut.mutate({ acknowledge_billable: true });
+              }}
+            >
+              確認測試
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
