@@ -88,6 +88,31 @@ describe("<AppCredentialsCard />", () => {
     await waitFor(() => expect(screen.getByText("aiapi_secretsecret")).toBeInTheDocument());
   });
 
+  it("hides revoked keys by default and reveals them with the 含已撤回 toggle", async () => {
+    const withRevoked = [
+      CREDS[0],
+      {
+        id: "c9", name: "舊裝置", token_prefix: "aiapi_zz",
+        created_at: "2026-05-01T00:00:00Z", last_used_at: null, status: "revoked",
+        allocations: [{ allocation_id: "a1", resource_model: "gpt-4o-mini", display_name: null, status: "active" }],
+      },
+    ];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = typeof input === "string" ? input : (input as Request).url;
+      if (url.endsWith("/me/credentials")) return jsonResponse(200, withRevoked);
+      if (url.endsWith("/me/allocations")) return jsonResponse(200, ALLOCS);
+      return jsonResponse(404, { error: {} });
+    });
+    const user = userEvent.setup();
+    renderCard();
+    await waitFor(() => expect(screen.getByText("我的筆電")).toBeInTheDocument());
+    // revoked key hidden by default
+    expect(screen.queryByText("舊裝置")).not.toBeInTheDocument();
+    // toggle reveals it
+    await user.click(screen.getByRole("switch", { name: /含已撤回/ }));
+    await waitFor(() => expect(screen.getByText("舊裝置")).toBeInTheDocument());
+  });
+
   it("has a single 編輯 action (no separate 改名 / 編輯 model)", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const url = typeof input === "string" ? input : (input as Request).url;

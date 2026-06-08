@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -98,6 +99,7 @@ export function AppCredentialsCard() {
   const [editTarget, setEditTarget] = React.useState<AppCredential | null>(null);
   const [editPick, setEditPick] = React.useState<Set<string>>(new Set());
   const [editName, setEditName] = React.useState("");
+  const [showRevoked, setShowRevoked] = React.useState(false);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: key });
 
@@ -173,7 +175,9 @@ export function AppCredentialsCard() {
     patchMut.mutate({ id: editTarget.id, body });
   }
 
-  const creds = credsQuery.data ?? [];
+  const allCreds = credsQuery.data ?? [];
+  const revokedCount = allCreds.filter((c) => c.status !== "active").length;
+  const creds = showRevoked ? allCreds : allCreds.filter((c) => c.status === "active");
 
   return (
     <Card>
@@ -185,15 +189,26 @@ export function AppCredentialsCard() {
               一把金鑰可指定多個 model（分配）；同一把 token 即可呼叫全部。token 僅在建立時顯示一次。
             </CardDescription>
           </div>
-          <Button size="sm" onClick={() => setCreateOpen(true)} disabled={activeAllocs.length === 0}>
-            建立金鑰
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            {revokedCount > 0 && (
+              <div className="flex items-center gap-2">
+                <Switch id="show-revoked-keys" checked={showRevoked} onCheckedChange={setShowRevoked} />
+                <Label htmlFor="show-revoked-keys" className="text-sm">含已撤回</Label>
+              </div>
+            )}
+            <Button size="sm" onClick={() => setCreateOpen(true)} disabled={activeAllocs.length === 0}>
+              建立金鑰
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
         {credsQuery.isLoading && <p className="text-muted-foreground">載入中…</p>}
-        {credsQuery.isSuccess && creds.length === 0 && (
+        {credsQuery.isSuccess && allCreds.length === 0 && (
           <p className="text-muted-foreground py-4 text-center">尚無應用金鑰</p>
+        )}
+        {credsQuery.isSuccess && allCreds.length > 0 && creds.length === 0 && (
+          <p className="text-muted-foreground py-4 text-center">沒有使用中的金鑰（{revokedCount} 把已撤回）</p>
         )}
         {creds.length > 0 && (
           <Table className="responsive-table">
