@@ -75,9 +75,11 @@ function FacetSection({
             />
             <Label
               htmlFor={id}
-              title={facetHint(value)}
+              title={facetHint(value, filterKey)}
               className={`text-sm cursor-pointer flex-1 ${
-                facetHint(value) ? "underline decoration-dotted decoration-muted-foreground/40 underline-offset-4" : ""
+                facetHint(value, filterKey)
+                  ? "underline decoration-dotted decoration-muted-foreground/40 underline-offset-4"
+                  : ""
               }`}
             >
               {facetLabel(value)}

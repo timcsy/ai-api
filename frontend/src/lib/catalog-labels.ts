@@ -46,11 +46,22 @@ export const FACET_LABELS: Record<string, string> = {
 
 // Plain-language 一句話說明：給不熟 AI 術語的人 hover 時看得懂「這個能力能做什麼」。
 // 用於 facet 標籤與能力徽章的 title（原生 hover 提示，無額外套件）。未列出者回空字串。
-export const FACET_HINTS: Record<string, string> = {
-  // modality
+//
+// 模態同一個值（文字／圖片／語音）在「輸入」與「輸出」兩邊意義不同，故依方向分開；
+// 能力與成本則與方向無關，放在共用的 FACET_HINTS。
+export const MODALITY_INPUT_HINTS: Record<string, string> = {
   text: "可以輸入文字（一般的文字提問／指令）。",
   image: "可以輸入圖片，讓模型「看圖」回答（看照片、截圖、圖表）。",
   audio: "可以輸入語音／音訊（例如把錄音轉成文字）。",
+};
+export const MODALITY_OUTPUT_HINTS: Record<string, string> = {
+  text: "會輸出文字回覆（最常見）。",
+  image: "會生成圖片（文字生圖）。",
+  audio: "會輸出語音／音訊（文字轉語音）。",
+};
+
+export const FACET_HINTS: Record<string, string> = {
+  // modality（與方向無關者；text/image/audio 改由上面兩張方向表處理）
   embedding: "把文字轉成向量，用於搜尋、相似度比對、分類（不是聊天）。",
   // capabilities
   chat: "一般對話問答，最常用的模式。",
@@ -74,7 +85,14 @@ export const FACET_HINTS: Record<string, string> = {
   high: "最強但較貴，留給困難或重要的任務。",
 };
 
-export function facetHint(value: string): string {
+// `dim` 是 facet 維度（如 "modality_input" / "modality_output"），用來區分同名模態的方向。
+export function facetHint(value: string, dim?: string): string {
+  if (dim === "modality_input" && MODALITY_INPUT_HINTS[value]) {
+    return MODALITY_INPUT_HINTS[value];
+  }
+  if (dim === "modality_output" && MODALITY_OUTPUT_HINTS[value]) {
+    return MODALITY_OUTPUT_HINTS[value];
+  }
   return FACET_HINTS[value] ?? FACET_HINTS[value.replace(/_/g, "-")] ?? "";
 }
 
