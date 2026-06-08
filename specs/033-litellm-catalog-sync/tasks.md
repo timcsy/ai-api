@@ -136,9 +136,9 @@
 
 - [X] T036 跑 `uv run pytest tests/` 全套零回歸（含 migration 0018 + 既有目錄/價目/計費/proxy）；`uv run ruff check . && uv run mypy src/` 零警告。
 - [X] T037 前端全綠：`npm --prefix frontend run test && lint && typecheck && build`；360px RWD 不溢出（picker / diff 對話框）。
-- [ ] T038 [P] 知識/文件：`knowledge/vision.md` 加階段 23 → ✅；若有新教訓（litellm 欄位對應、線上抓 egress）補 `knowledge/experience.md`；`knowledge/design/` 可選加 model-catalog↔litellm 對接設計頁。
-- [ ] T039 commit + push + 開 PR；push 前 ruff + 前端 build；**特別檢視 migration 0018 additive、線上抓 timeout/回退、價格 append-only**；等 CI 全綠後 squash merge 到 main。
-- [ ] T040 main image build 綠後 `helm upgrade`（**含 `--set migrationJob.enabled=true` 套 0018** + 新 backend sha + frontend sha）；**部署後驗 egress**：admin 按「檢查更新」回 `source:"live"`（或環境擋外連時回 `bundled-fallback` 不卡）；既有 proxy/計費零回歸（壞 token → 401）。
+- [X] T038 [P] 知識/文件：`knowledge/vision.md` 加階段 23 → ✅；若有新教訓（litellm 欄位對應、線上抓 egress）補 `knowledge/experience.md`；`knowledge/design/` 可選加 model-catalog↔litellm 對接設計頁。
+- [X] T039 commit + push + 開 PR；push 前 ruff + 前端 build；**特別檢視 migration 0018 additive、線上抓 timeout/回退、價格 append-only**；等 CI 全綠後 squash merge 到 main。
+- [X] T040 main image build 綠後 `helm upgrade`（**含 `--set migrationJob.enabled=true` 套 0018** + 新 backend sha + frontend sha）；**部署後驗 egress**：admin 按「檢查更新」回 `source:"live"`（或環境擋外連時回 `bundled-fallback` 不卡）；既有 proxy/計費零回歸（壞 token → 401）。
 
 ---
 
