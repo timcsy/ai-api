@@ -179,7 +179,7 @@ export function DashboardCharts({ range }: { range: TimeRange }) {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">各 Model 花費占比</CardTitle>
+            <CardTitle className="text-base">各模型花費占比</CardTitle>
             <CardDescription>前 5 名 + 其他，點扇形看模型詳情</CardDescription>
           </CardHeader>
           <CardContent>
@@ -268,7 +268,7 @@ export function DashboardCharts({ range }: { range: TimeRange }) {
           {byTag.isLoading ? (
             <p className="text-sm text-muted-foreground">載入中…</p>
           ) : topTags.length === 0 ? (
-            <p className="text-sm text-muted-foreground">此區間沒有掛 tag 的用量</p>
+            <p className="text-sm text-muted-foreground">此區間沒有掛標籤的用量</p>
           ) : (
             <ul className="divide-y text-sm">
               {topTags.map((t) => (

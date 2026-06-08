@@ -214,7 +214,7 @@ export function AdminModelDetailPage() {
   return (
     <div className="container mx-auto py-8 max-w-3xl space-y-4">
       <div className="text-sm">
-        <Link to="/admin/model" className="text-muted-foreground hover:underline">← 回 Model</Link>
+        <Link to="/admin/model" className="text-muted-foreground hover:underline">← 回模型</Link>
       </div>
 
       {/* 1. 基本資訊 */}
@@ -237,7 +237,7 @@ export function AdminModelDetailPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-            <div><span className="text-muted-foreground">Provider：</span>{model.provider}</div>
+            <div><span className="text-muted-foreground">供應商：</span>{model.provider}</div>
             <div><span className="text-muted-foreground">Cost tier：</span>{model.cost_tier}</div>
             <div>
               <span className="text-muted-foreground">Context window：</span>
@@ -338,7 +338,7 @@ export function AdminModelDetailPage() {
         <CardHeader>
           <CardTitle className="text-lg">存取規則</CardTitle>
           <CardDescription>
-            設定後即時生效。member 下一次呼叫 catalog 或 proxy 立刻看到新規則。
+            設定後即時生效。成員下一次呼叫目錄或 proxy 立刻看到新規則。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -365,7 +365,7 @@ export function AdminModelDetailPage() {
           </div>
 
           <TagsEditor
-            label="Allowed Tags"
+            label="允許標籤"
             tags={allowedTags}
             input={allowInput}
             setInput={setAllowInput}
@@ -442,12 +442,12 @@ export function AdminModelDetailPage() {
           {vis && (
             <div className="text-sm space-y-1">
               <div>
-                <span className="text-muted-foreground">Provider credential：</span>
+                <span className="text-muted-foreground">供應商憑證：</span>
                 {vis.provider_has_credential ? (
-                  <Badge>active</Badge>
+                  <Badge>使用中</Badge>
                 ) : (
                   <Badge variant="outline" className="text-amber-700 border-amber-500">
-                    ⚠ 無 active credential
+                    ⚠ 無使用中的憑證
                   </Badge>
                 )}
                 {!vis.provider_has_credential && (
@@ -458,10 +458,10 @@ export function AdminModelDetailPage() {
               </div>
               <div>
                 <span className="text-muted-foreground">對成員可見：</span>
-                <strong>{vis.visible_member_count}</strong> / {vis.total_active_members} active member
+                <strong>{vis.visible_member_count}</strong> / {vis.total_active_members} 使用中的成員
               </div>
               <div>
-                <span className="text-muted-foreground">綁定的 allocation：</span>
+                <span className="text-muted-foreground">綁定的分配：</span>
                 <strong>{vis.allocation_count}</strong> 筆
               </div>
             </div>
@@ -552,7 +552,7 @@ function EditBasicsDialog({
         <DialogHeader>
           <DialogTitle>編輯基本資訊</DialogTitle>
           <DialogDescription>
-            <span className="font-mono text-xs">{slug}</span>；provider 與 slug 不可改（改 slug 等於換模型）。
+            <span className="font-mono text-xs">{slug}</span>；供應商與 slug 不可改（改 slug 等於換模型）。
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">

@@ -189,7 +189,7 @@ export function AdminNotificationsPage() {
       <div>
         <h1 className="text-2xl font-bold">管理員通知</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          設定 SMTP，平台會在分配被自動隔離、上游連續失敗、provider 憑證失效等重要事件
+          設定 SMTP，平台會在分配被自動隔離、上游連續失敗、供應商憑證失效等重要事件
           發生時主動寄信通知。建議用 Gmail App Password 或學校既有 mail server。
         </p>
       </div>

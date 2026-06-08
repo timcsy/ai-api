@@ -206,7 +206,7 @@ export function AdminQuotaPoolPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>確認手動執行再分配？</AlertDialogTitle>
             <AlertDialogDescription>
-              這會立即重新分配所有池內 allocation 的 quota，並寫入 RebalanceLog。
+              這會立即重新分配所有池內分配的配額，並寫入 RebalanceLog。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

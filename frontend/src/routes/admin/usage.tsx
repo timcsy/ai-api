@@ -196,7 +196,7 @@ export function AdminUsagePage() {
                 {groupBy === "member" && "成員"}
                 {groupBy === "allocation" && "分配"}
                 {groupBy === "model" && "模型"}
-                {groupBy === "tag" && "Tag"}
+                {groupBy === "tag" && "標籤"}
               </TableHead>
               <TableHead className="text-right">輸入 tokens</TableHead>
               <TableHead className="text-right">輸出 tokens</TableHead>
@@ -254,7 +254,7 @@ function TagRow({ item, fromIso, toIso }: { item: UsageItem; fromIso: string; to
   return (
     <>
       <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => setOpen((v) => !v)}>
-        <TableCell className="font-medium" data-label="Tag">
+        <TableCell className="font-medium" data-label="標籤">
           {open ? "▾ " : "▸ "}
           {item.group_key}
         </TableCell>
@@ -275,7 +275,7 @@ function TagRow({ item, fromIso, toIso }: { item: UsageItem; fromIso: string; to
               </div>
               {drill.isLoading && <p className="text-sm text-muted-foreground">載入中…</p>}
               {drill.data && drill.data.members.length === 0 && (
-                <p className="text-sm text-muted-foreground">此 tag 在區間內無用量。</p>
+                <p className="text-sm text-muted-foreground">此標籤在區間內無用量。</p>
               )}
               {drill.data && drill.data.members.length > 0 && (
                 <table className="w-full text-sm block overflow-x-auto sm:table">

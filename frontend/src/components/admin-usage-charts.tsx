@@ -53,7 +53,7 @@ export function UsageCharts({ fromIso, toIso }: { fromIso: string; toIso: string
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">各 Provider 花費占比</CardTitle>
+          <CardTitle className="text-base">各供應商花費占比</CardTitle>
           <CardDescription>依供應商加總（區間內計費用量）</CardDescription>
         </CardHeader>
         <CardContent>

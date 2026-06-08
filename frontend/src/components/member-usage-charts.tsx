@@ -138,7 +138,7 @@ export function MemberUsageCharts({ range }: { range: TimeRange }) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">我的各 Model 花費</CardTitle>
+          <CardTitle className="text-base">我的各模型花費</CardTitle>
           <CardDescription>我的花費集中在哪些模型</CardDescription>
         </CardHeader>
         <CardContent>

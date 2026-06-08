@@ -39,6 +39,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { copyToClipboard } from "@/lib/clipboard";
 import { ApiError, api } from "@/lib/api-client";
+import { statusLabel } from "@/lib/status-label";
 
 interface AdminAllocation {
   id: string;
@@ -222,7 +223,7 @@ export function AdminAllocationsPage() {
                     <span className="font-mono text-xs text-muted-foreground break-all">{a.resource_model}</span>
                     {catalogSlugs.data && !knownSlugs.has(a.resource_model) && (
                       <Badge variant="outline" className="ml-2 shrink-0 whitespace-nowrap text-amber-700 border-amber-500">
-                        ⚠ 已不在 catalog
+                        ⚠ 已不在目錄
                       </Badge>
                     )}
                   </div>
@@ -234,14 +235,14 @@ export function AdminAllocationsPage() {
                     <QuarantineReasonBadge allocationId={a.id} status="paused" />
                   ) : (
                     <Badge variant={a.status === "active" ? "default" : "secondary"}>
-                      {a.status}
+                      {statusLabel(a.status)}
                     </Badge>
                   )}
                 </TableCell>
                 <TableCell data-label="配額">{a.quota_tokens_per_month ?? "無限額"}</TableCell>
                 <TableCell className="space-x-1" data-label="標籤">
-                  {a.is_service_allocation && <Badge variant="outline">service</Badge>}
-                  {a.quota_locked && <Badge variant="outline">locked</Badge>}
+                  {a.is_service_allocation && <Badge variant="outline">服務型</Badge>}
+                  {a.quota_locked && <Badge variant="outline">已鎖定</Badge>}
                 </TableCell>
                 <TableCell className="font-mono text-xs" data-label="Token 前綴">{a.token_prefix}…</TableCell>
                 <TableCell className="text-right" data-label="操作">
@@ -316,7 +317,7 @@ export function AdminAllocationsPage() {
                 <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   {!showRevoked && revokedCount > 0
                     ? `無進行中的分配（另有 ${revokedCount} 筆已撤回，開啟上方「含已撤回」可查看）`
-                    : "尚無 allocation"}
+                    : "尚無分配"}
                 </TableCell>
               </TableRow>
             )}

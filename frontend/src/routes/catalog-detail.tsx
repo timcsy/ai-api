@@ -20,6 +20,7 @@ import { ApiError, api } from "@/lib/api-client";
 import { facetHint, facetLabel } from "@/lib/catalog-labels";
 import { per1kToPer1m } from "@/lib/price-format";
 import { copyToClipboard } from "@/lib/clipboard";
+import { statusLabel } from "@/lib/status-label";
 
 interface MyAllocation {
   id: string;
@@ -167,7 +168,7 @@ export function CatalogDetailPage() {
           <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
             <div className="text-sm min-w-0">
               <span className="font-medium">你已領取此模型</span>
-              <Badge variant="default" className="ml-2">{heldAlloc.status}</Badge>
+              <Badge variant="default" className="ml-2">{statusLabel(heldAlloc.status)}</Badge>
               <p className="text-xs text-muted-foreground mt-1">用 token 呼叫即可；憑證與用量在儀表板管理。</p>
             </div>
             <Button asChild variant="outline" size="sm" className="shrink-0">

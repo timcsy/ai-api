@@ -43,7 +43,7 @@ interface Props {
 }
 
 const CHECK_LABEL: Record<VisibilityCheck["check"], string> = {
-  credential_gate: "Provider 憑證",
+  credential_gate: "供應商憑證",
   default_access: "預設可見性",
   deny_tags: "拒絕標籤規則",
   allow_tags: "允許標籤規則",
@@ -115,7 +115,7 @@ export function VisibilityDiagnose({ modelSlug, memberId, compact = false }: Pro
   return (
     <Card>
       <CardHeader className={compact ? "pb-3" : undefined}>
-        <CardTitle className="text-base">以指定 member 視角預覽</CardTitle>
+        <CardTitle className="text-base">以指定成員視角預覽</CardTitle>
         <CardDescription>
           評估 (成員, 模型) 兩段過濾，告訴你「可見 / 不可見 + 原因」並提供修補捷徑。
         </CardDescription>
@@ -200,7 +200,7 @@ function RepairCta({
   if (check === "credential_gate") {
     return (
       <Button asChild size="sm" variant="outline" className="mt-1">
-        <Link to="/admin/providers">去新增該 provider 的 credential</Link>
+        <Link to="/admin/providers">去新增該供應商的憑證</Link>
       </Button>
     );
   }

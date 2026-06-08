@@ -46,6 +46,7 @@ import { AdminMemberCredentials } from "@/components/admin-member-credentials";
 import { VisibilityDiagnose } from "@/components/visibility-diagnose";
 import { ApiError, api } from "@/lib/api-client";
 import { copyToClipboard } from "@/lib/clipboard";
+import { statusLabel } from "@/lib/status-label";
 
 interface AdminMember {
   id: string;
@@ -161,7 +162,7 @@ export function AdminMemberDetailPage() {
             <div>
               <span className="text-muted-foreground">狀態：</span>
               <Badge variant={member.status === "active" ? "default" : "secondary"}>
-                {member.status}
+                {statusLabel(member.status)}
               </Badge>
             </div>
             <div>
@@ -235,7 +236,7 @@ export function AdminMemberDetailPage() {
         <CardHeader>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <CardTitle className="text-lg">分配（Allocations）</CardTitle>
+              <CardTitle className="text-lg">分配</CardTitle>
               <CardDescription>該成員的所有分配（模型授權）；在此直接建立與撤回</CardDescription>
             </div>
             <div className="flex items-center gap-3 shrink-0">
@@ -281,7 +282,7 @@ export function AdminMemberDetailPage() {
                       </div>
                     </TableCell>
                     <TableCell data-label="狀態">
-                      <Badge variant={a.status === "active" ? "default" : "secondary"}>{a.status}</Badge>
+                      <Badge variant={a.status === "active" ? "default" : "secondary"}>{statusLabel(a.status)}</Badge>
                     </TableCell>
                     <TableCell data-label="配額">{a.quota_tokens_per_month ?? "無限額"}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground" data-label="Token">{a.token_prefix}…</TableCell>

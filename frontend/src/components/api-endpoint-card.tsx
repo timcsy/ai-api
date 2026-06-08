@@ -25,7 +25,7 @@ export function ApiEndpointCard() {
           {member?.gateway_base_url &&
             !window.location.origin.startsWith(member.gateway_base_url) && (
             <p className="text-xs text-muted-foreground mt-2">
-              如果你從其他主機呼叫，可改用 admin 設定的 base URL：
+              如果你從其他主機呼叫，可改用管理員設定的 base URL：
               <code className="ml-1 break-all">{member.gateway_base_url}/v1</code>
             </p>
           )}

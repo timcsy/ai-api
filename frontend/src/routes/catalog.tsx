@@ -209,7 +209,7 @@ export function CatalogPage() {
         {modelsQuery.data && modelsQuery.data.length === 0 && (
           <Card>
             <CardContent className="py-10 text-center text-muted-foreground">
-              沒有符合條件的模型，請放寬 filter。
+              沒有符合條件的模型，請放寬篩選。
             </CardContent>
           </Card>
         )}

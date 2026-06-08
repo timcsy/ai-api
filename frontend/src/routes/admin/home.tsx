@@ -93,13 +93,13 @@ export function AdminHomePage() {
   }> = [
     {
       done: activeProviders.length > 0,
-      label: "新增至少一筆 Provider 憑證",
+      label: "新增至少一筆供應商憑證",
       description:
         activeProviders.length > 0
           ? `已有 ${activeProviders.length} 筆使用中的憑證`
           : "沒有憑證，所有模型對成員都隱藏",
       to: "/admin/providers",
-      cta: "去 Provider 憑證",
+      cta: "去供應商憑證",
     },
     {
       done: totalModels > 0,
@@ -168,12 +168,12 @@ export function AdminHomePage() {
               ⚠ {hiddenModels} 個模型對成員隱藏
             </CardTitle>
             <CardDescription>
-              可能原因：對應 provider 沒有使用中的憑證、或 access policy 沒命中任何成員。
+              可能原因：對應供應商沒有使用中的憑證、或 access policy 沒命中任何成員。
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild variant="outline" size="sm">
-              <Link to="/admin/model">去 Model</Link>
+              <Link to="/admin/model">去模型</Link>
             </Button>
           </CardContent>
         </Card>
@@ -213,8 +213,8 @@ export function AdminHomePage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-            <Link className="text-primary hover:underline" to="/admin/tags">Tag 管理</Link>
-            <Link className="text-primary hover:underline" to="/admin/model-access">Model 存取規則</Link>
+            <Link className="text-primary hover:underline" to="/admin/tags">標籤管理</Link>
+            <Link className="text-primary hover:underline" to="/admin/model-access">模型存取規則</Link>
             <Link className="text-primary hover:underline" to="/admin/usage">用量</Link>
             <Link className="text-primary hover:underline" to="/admin/observability/quota">配額池</Link>
             <Link className="text-primary hover:underline" to="/admin/observability/rebalance">Rebalance 記錄</Link>
@@ -274,12 +274,12 @@ function Dashboard({
               ⚠ {hiddenModels} 個模型對所有成員隱藏
             </CardTitle>
             <CardDescription>
-              該模型對應 provider 無使用中的憑證，或 access policy 沒命中任何成員。
+              該模型對應供應商無使用中的憑證，或 access policy 沒命中任何成員。
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild variant="outline" size="sm">
-              <Link to="/admin/model">去 Model 檢查</Link>
+              <Link to="/admin/model">去模型檢查</Link>
             </Button>
           </CardContent>
         </Card>
@@ -316,10 +316,10 @@ function Dashboard({
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-            <Link className="text-primary hover:underline" to="/admin/model">Model</Link>
+            <Link className="text-primary hover:underline" to="/admin/model">模型</Link>
             <Link className="text-primary hover:underline" to="/admin/member">成員</Link>
-            <Link className="text-primary hover:underline" to="/admin/tag">Tag</Link>
-            <Link className="text-primary hover:underline" to="/admin/providers">Provider 憑證</Link>
+            <Link className="text-primary hover:underline" to="/admin/tag">標籤</Link>
+            <Link className="text-primary hover:underline" to="/admin/providers">供應商憑證</Link>
             <Link className="text-primary hover:underline" to="/admin/observability/usage">用量</Link>
             <Link className="text-primary hover:underline" to="/admin/observability/quota">配額池</Link>
           </div>

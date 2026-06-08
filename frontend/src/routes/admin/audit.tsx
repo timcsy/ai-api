@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ApiError, api } from "@/lib/api-client";
+import { actorLabel } from "@/lib/status-label";
 
 interface AuditRow {
   id: string;
@@ -84,7 +85,7 @@ export function AdminAuditPage() {
             <SelectContent>
               <SelectItem value="all">全部</SelectItem>
               {ACTOR_TYPES.map((a) => (
-                <SelectItem key={a} value={a}>{a}</SelectItem>
+                <SelectItem key={a} value={a}>{actorLabel(a)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -134,7 +135,7 @@ export function AdminAuditPage() {
               </TableCell>
               <TableCell className="text-xs" data-label="操作者">
                 <div className="min-w-0">
-                  <div>{r.actor_type}</div>
+                  <div>{actorLabel(r.actor_type)}</div>
                   {r.actor_id && <div className="text-muted-foreground break-all">{r.actor_id}</div>}
                 </div>
               </TableCell>

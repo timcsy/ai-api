@@ -40,6 +40,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
 import { copyToClipboard } from "@/lib/clipboard";
+import { statusLabel } from "@/lib/status-label";
 
 interface ProviderCredential {
   id: string;
@@ -127,7 +128,7 @@ export function AdminProvidersPage() {
       setCreateOpen(false);
       createForm.reset();
       setPlaintextDialog({
-        title: "Credential 已建立 — 一次性顯示明文",
+        title: "憑證已建立 — 一次性顯示明文",
         api_key: cred.api_key!,
         fingerprint: cred.fingerprint,
         warning: cred.warning
@@ -205,7 +206,7 @@ export function AdminProvidersPage() {
   return (
     <div className="container mx-auto py-8 max-w-6xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold">Provider 憑證</h1>
+        <h1 className="text-2xl font-bold">供應商憑證</h1>
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <Switch
@@ -241,8 +242,8 @@ export function AdminProvidersPage() {
             <TableRow>
               <TableCell colSpan={7} className="text-muted-foreground">
                 {query.data && query.data.length > 0
-                  ? "目前無 active credential；勾「含已停用」可看 disabled。"
-                  : "尚未加入任何 provider 憑證；按「新增」開始。"}
+                  ? "目前無使用中的憑證；勾「含已停用」可看已停用。"
+                  : "尚未加入任何供應商憑證；按「新增」開始。"}
               </TableCell>
             </TableRow>
           )}
@@ -253,9 +254,9 @@ export function AdminProvidersPage() {
               <TableCell className="font-mono text-xs" data-label="指紋"><span className="block max-w-[140px] truncate">{c.fingerprint}</span></TableCell>
               <TableCell data-label="狀態">
                 {c.status === "active" ? (
-                  <Badge>active</Badge>
+                  <Badge>{statusLabel(c.status)}</Badge>
                 ) : (
-                  <Badge variant="secondary">disabled</Badge>
+                  <Badge variant="secondary">{statusLabel(c.status)}</Badge>
                 )}
               </TableCell>
               <TableCell className="text-xs text-muted-foreground" data-label="最後使用">
@@ -300,7 +301,7 @@ export function AdminProvidersPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>新增 Provider 憑證</DialogTitle>
+            <DialogTitle>新增供應商憑證</DialogTitle>
             <DialogDescription>
               明文 API key 僅在建立完成的下一個畫面顯示一次，離開後無法再取得。
             </DialogDescription>
@@ -315,7 +316,7 @@ export function AdminProvidersPage() {
                 name="provider"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Provider</FormLabel>
+                    <FormLabel>供應商</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger><SelectValue /></SelectTrigger>
@@ -446,7 +447,7 @@ export function AdminProvidersPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>停用此 credential？</AlertDialogTitle>
+            <AlertDialogTitle>停用此憑證？</AlertDialogTitle>
             <AlertDialogDescription>
               停用後，依賴此憑證的所有模型對成員立即不可用。
               {disableConfirmFor && (

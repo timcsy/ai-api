@@ -129,14 +129,14 @@ export function AdminModelAccessPage() {
   return (
     <div className="container mx-auto py-8 max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Model 存取規則</h1>
+        <h1 className="text-2xl font-bold">模型存取規則</h1>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">選擇 Model</CardTitle>
+          <CardTitle className="text-lg">選擇模型</CardTitle>
           <CardDescription>
-            設定後即時生效；成員下一次呼叫 catalog 或 proxy 立刻看到新規則。
+            設定後即時生效；成員下一次呼叫目錄或 proxy 立刻看到新規則。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -205,10 +205,10 @@ export function AdminModelAccessPage() {
             </div>
 
             <div>
-              <Label>Allowed Tags</Label>
+              <Label>允許標籤</Label>
               <div className="flex gap-2 mt-1">
                 <Input
-                  placeholder="tag 名稱"
+                  placeholder="標籤名稱"
                   value={allowInput}
                   onChange={(e) => setAllowInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -244,7 +244,7 @@ export function AdminModelAccessPage() {
               </div>
               {tagsQuery.data && tagsQuery.data.length > 0 && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  既有 tag：{tagsQuery.data.map((t) => t.tag).join(", ")}
+                  既有標籤：{tagsQuery.data.map((t) => t.tag).join(", ")}
                 </p>
               )}
             </div>
@@ -253,7 +253,7 @@ export function AdminModelAccessPage() {
               <Label>拒絕標籤（優先於允許）</Label>
               <div className="flex gap-2 mt-1">
                 <Input
-                  placeholder="tag 名稱"
+                  placeholder="標籤名稱"
                   value={denyInput}
                   onChange={(e) => setDenyInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -297,14 +297,14 @@ export function AdminModelAccessPage() {
                 )}
                 {previewQuery.data && !previewQuery.data.provider_has_credential && (
                   <span className="text-amber-700">
-                    ⚠ 該 provider 沒有使用中的憑證 — 套用後模型仍對所有成員隱藏
+                    ⚠ 該供應商沒有使用中的憑證 — 套用後模型仍對所有成員隱藏
                   </span>
                 )}
                 {previewQuery.data && previewQuery.data.provider_has_credential && (
                   <span>
                     將影響{" "}
                     <strong>{previewQuery.data.visible_member_count}</strong> /{" "}
-                    {previewQuery.data.total_active_members} 個 active member
+                    {previewQuery.data.total_active_members} 個使用中的成員
                   </span>
                 )}
               </div>

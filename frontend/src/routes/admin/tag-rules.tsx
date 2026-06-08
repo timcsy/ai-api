@@ -198,7 +198,7 @@ export function AdminTagRulesPage() {
           <h1 className="text-2xl font-bold">自動標籤規則</h1>
           <p className="text-sm text-muted-foreground mt-1">
             新成員<strong>首次註冊</strong>時，系統由上而下評估規則，套用<strong>第一條命中</strong>的標籤。
-            <Link to="/admin/tag" className="ml-1 underline">← 回 Tag 管理</Link>
+            <Link to="/admin/tag" className="ml-1 underline">← 回標籤管理</Link>
           </p>
         </div>
         <Button onClick={openCreate}>新增規則</Button>
@@ -273,7 +273,7 @@ export function AdminTagRulesPage() {
       {/* Test email box */}
       <div className="border rounded-md p-4 space-y-3">
         <Label htmlFor="test-email" className="font-semibold">測試 email</Label>
-        <p className="text-xs text-muted-foreground">輸入一個 email，預覽會命中哪條規則、貼哪個 tag（不會建立成員）。</p>
+        <p className="text-xs text-muted-foreground">輸入一個 email，預覽會命中哪條規則、貼哪個標籤（不會建立成員）。</p>
         <div className="flex gap-2">
           <Input
             id="test-email"
@@ -292,7 +292,7 @@ export function AdminTagRulesPage() {
             {testResult.matched ? (
               <span>命中 → 貼上 <Badge variant="secondary">{testResult.tag}</Badge></span>
             ) : (
-              <span className="text-muted-foreground">沒有任何規則命中（不會貼 auto tag）</span>
+              <span className="text-muted-foreground">沒有任何規則命中（不會貼自動標籤）</span>
             )}
           </div>
         )}
@@ -313,7 +313,7 @@ export function AdminTagRulesPage() {
           <DialogHeader>
             <DialogTitle>{editing ? "編輯規則" : "新增規則"}</DialogTitle>
             <DialogDescription>
-              選擇比對方式與要貼的 tag。regex 會在儲存時做安全檢查（拒絕高風險樣式）。
+              選擇比對方式與要貼的標籤。regex 會在儲存時做安全檢查（拒絕高風險樣式）。
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

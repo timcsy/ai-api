@@ -98,7 +98,7 @@ export function UsageSummary() {
             {q.data?.breakdown && q.data.breakdown.length > 0 && (
               <div className="mt-4 space-y-1">
                 <div className="grid grid-cols-3 border-b pb-1 text-xs font-medium text-muted-foreground">
-                  <span>Model</span>
+                  <span>模型</span>
                   <span className="text-right">tokens</span>
                   <span className="text-right">花費</span>
                 </div>

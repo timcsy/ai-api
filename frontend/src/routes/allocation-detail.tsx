@@ -12,6 +12,7 @@ import { AllocationKeysReadonly } from "@/components/allocation-keys-readonly";
 import { per1kToPer1m } from "@/lib/price-format";
 import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
+import { statusLabel } from "@/lib/status-label";
 
 interface Allocation {
   id: string;
@@ -110,7 +111,7 @@ export function AllocationDetailPage() {
   if (callsQuery.error?.status === 404) {
     return (
       <div className="container mx-auto py-10 max-w-md text-center space-y-4">
-        <h1 className="text-xl font-semibold">找不到 allocation</h1>
+        <h1 className="text-xl font-semibold">找不到分配</h1>
         <Button asChild variant="outline">
           <Link to="/dashboard">回首頁</Link>
         </Button>
@@ -135,7 +136,7 @@ export function AllocationDetailPage() {
           <h1 className="text-3xl font-bold min-w-0 truncate">{alloc?.display_name ?? alloc?.resource_model ?? id}</h1>
           {alloc && (
             <Badge variant={alloc.status === "active" ? "default" : "secondary"} className="shrink-0">
-              {alloc.status}
+              {statusLabel(alloc.status)}
             </Badge>
           )}
           <div className="ml-auto flex gap-2">
@@ -163,7 +164,7 @@ export function AllocationDetailPage() {
         </div>
         {alloc && (
           <div className="text-xs text-muted-foreground">
-            呼叫用 model 名稱：<span className="font-mono text-foreground">{alloc.resource_model}</span>
+            呼叫用模型名稱：<span className="font-mono text-foreground">{alloc.resource_model}</span>
           </div>
         )}
       </section>

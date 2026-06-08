@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
+import { statusLabel } from "@/lib/status-label";
 
 interface TagSummary {
   tag: string;
@@ -92,7 +93,7 @@ export function AdminTagsPage() {
     mutationFn: (tag) =>
       api<TagSummary>("/admin/tags", { method: "POST", body: JSON.stringify({ tag }) }),
     onSuccess: (r) => {
-      toast({ title: `已建立 tag「${r.tag}」`, description: "現在可在「模型存取」頁套用此標籤" });
+      toast({ title: `已建立標籤「${r.tag}」`, description: "現在可在「模型存取」頁套用此標籤" });
       setCreateOpen(false);
       setNewTag("");
       queryClient.invalidateQueries({ queryKey: ["admin", "tags"] });
@@ -104,7 +105,7 @@ export function AdminTagsPage() {
     mutationFn: (tag) =>
       api(`/admin/tags/${encodeURIComponent(tag)}`, { method: "DELETE" }),
     onSuccess: () => {
-      toast({ title: "Tag 已從所有成員移除" });
+      toast({ title: "標籤已從所有成員移除" });
       setDeleteConfirm(null);
       queryClient.invalidateQueries({ queryKey: ["admin", "tags"] });
     },
@@ -114,7 +115,7 @@ export function AdminTagsPage() {
   return (
     <div className="container mx-auto py-8 max-w-4xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold">Tag 管理</h1>
+        <h1 className="text-2xl font-bold">標籤管理</h1>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
             <Link to="/admin/tag/rules">自動標籤規則</Link>
@@ -131,7 +132,7 @@ export function AdminTagsPage() {
       <Table className="responsive-table">
         <TableHeader>
           <TableRow>
-            <TableHead>Tag</TableHead>
+            <TableHead>標籤</TableHead>
             <TableHead>使用人數</TableHead>
             <TableHead className="text-right">動作</TableHead>
           </TableRow>
@@ -151,7 +152,7 @@ export function AdminTagsPage() {
           )}
           {tagsQuery.data?.map((t) => (
             <TableRow key={t.tag}>
-              <TableCell data-label="Tag">
+              <TableCell data-label="標籤">
                 <Badge variant="secondary">
                   <Link to={`/admin/tag/${t.tag}`} className="hover:underline">{t.tag}</Link>
                 </Badge>
@@ -178,7 +179,7 @@ export function AdminTagsPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="bulk-tag">Tag 名稱</Label>
+              <Label htmlFor="bulk-tag">標籤名稱</Label>
               <Input
                 id="bulk-tag"
                 placeholder="eng / pm / contractor ..."
@@ -210,7 +211,7 @@ export function AdminTagsPage() {
                     />
                     <span>{m.email}</span>
                     {m.status !== "active" && (
-                      <Badge variant="outline" className="text-xs">{m.status}</Badge>
+                      <Badge variant="outline" className="text-xs">{statusLabel(m.status)}</Badge>
                     )}
                   </label>
                 ))}
@@ -238,11 +239,11 @@ export function AdminTagsPage() {
             <DialogTitle>建立標籤</DialogTitle>
             <DialogDescription>
               先定義標籤名稱（之後可在「模型存取」頁設定哪些模型允許 / 禁止此標籤）。
-              成員可在批次貼標 dialog 套用此 tag。
+              成員可在批次貼標對話框套用此標籤。
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="new-tag">Tag 名稱</Label>
+            <Label htmlFor="new-tag">標籤名稱</Label>
             <Input
               id="new-tag"
               placeholder="eng / pm / contractor ..."

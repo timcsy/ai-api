@@ -21,6 +21,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
 import { copyToClipboard } from "@/lib/clipboard";
 import { per1kToPer1m } from "@/lib/price-format";
+import { statusLabel } from "@/lib/status-label";
 
 interface Allocation {
   id: string;
@@ -139,7 +140,7 @@ export function AllocationList() {
                   )}
                   {m.state === "reclaim_locked" && (
                     <Badge variant="outline" className="shrink-0 whitespace-nowrap text-amber-700 border-amber-500">
-                      需 admin 解鎖
+                      需管理員解鎖
                     </Badge>
                   )}
                 </CardContent>
@@ -197,12 +198,12 @@ export function AllocationList() {
                   <div className="flex items-center justify-between gap-2">
                     <CardTitle className="text-lg min-w-0 truncate">{a.display_name ?? a.resource_model}</CardTitle>
                     <Badge variant={a.status === "active" ? "default" : "secondary"} className="shrink-0">
-                      {a.status}
+                      {statusLabel(a.status)}
                     </Badge>
                   </div>
                   <CardDescription className="space-y-0.5 text-xs">
                     <span className="block">
-                      呼叫用 model 名稱：<span className="font-mono text-foreground">{a.resource_model}</span>
+                      呼叫用模型名稱：<span className="font-mono text-foreground">{a.resource_model}</span>
                     </span>
                     <span className="block">
                       憑證：<span className="font-mono">{a.token_prefix}…</span>

@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
+import { statusLabel } from "@/lib/status-label";
 
 interface AdminMember {
   id: string;
@@ -113,7 +114,7 @@ export function AdminMembersPage() {
     mutationFn: (id: string) => api(`/admin/members/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "members"] });
-      toast({ title: "Member 已刪除" });
+      toast({ title: "成員已刪除" });
     },
     onError: (err: ApiError) => {
       toast({ title: "刪除失敗", description: err.message, variant: "destructive" });
@@ -153,7 +154,7 @@ export function AdminMembersPage() {
               <TableHead>登入方式</TableHead>
               <TableHead>狀態</TableHead>
               <TableHead>管理員</TableHead>
-              <TableHead>Tag</TableHead>
+              <TableHead>標籤</TableHead>
               <TableHead>建立時間</TableHead>
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
@@ -168,12 +169,12 @@ export function AdminMembersPage() {
                 </TableCell>
                 <TableCell data-label="登入方式">{m.provider}</TableCell>
                 <TableCell data-label="狀態">
-                  <Badge variant={m.status === "active" ? "default" : "secondary"}>{m.status}</Badge>
+                  <Badge variant={m.status === "active" ? "default" : "secondary"}>{statusLabel(m.status)}</Badge>
                 </TableCell>
                 <TableCell data-label="管理員">
                   {m.is_admin && <Badge>admin</Badge>}
                 </TableCell>
-                <TableCell data-label="Tag">
+                <TableCell data-label="標籤">
                   <MemberTagsCell memberId={m.id} />
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground" data-label="建立時間">
@@ -228,7 +229,7 @@ export function AdminMembersPage() {
             {query.data.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                  尚無 Member
+                  尚無成員
                 </TableCell>
               </TableRow>
             )}
@@ -342,7 +343,7 @@ function MemberTagsCell({ memberId }: { memberId: string }) {
             }}
             autoFocus
             className="h-7 w-24 text-xs"
-            placeholder="tag"
+            placeholder="標籤"
           />
         </div>
       )}
@@ -381,7 +382,7 @@ function CreateMemberDialog({
         }),
       });
       queryClient.invalidateQueries({ queryKey: ["admin", "members"] });
-      toast({ title: "Member 已建立" });
+      toast({ title: "成員已建立" });
       onOpenChange(false);
       form.reset();
     } catch (err) {

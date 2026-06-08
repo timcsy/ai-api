@@ -40,6 +40,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { LiteLLMModelPicker, type LitellmDraft } from "@/components/litellm-model-picker";
 import { ApiError, api } from "@/lib/api-client";
+import { statusLabel } from "@/lib/status-label";
 
 interface CatalogModel {
   slug: string;
@@ -130,7 +131,7 @@ function DeleteWithDependentsDialog({
                 </div>
               ) : (
                 depQuery.data && (
-                  <p className="text-xs text-muted-foreground">無 allocation 依賴此 model。</p>
+                  <p className="text-xs text-muted-foreground">無分配依賴此模型。</p>
                 )
               )}
             </div>
@@ -220,7 +221,7 @@ export function AdminCatalogManagePage() {
   return (
     <div className="container mx-auto py-8 max-w-6xl space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Catalog 管理</h1>
+        <h1 className="text-2xl font-bold">目錄管理</h1>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
             <Link to="/admin/model/prices">價目</Link>
@@ -231,8 +232,8 @@ export function AdminCatalogManagePage() {
 
       <p className="text-sm text-muted-foreground">
         這裡列出本平台已知的所有模型。成員在「模型目錄」看到的會再經過
-        credential gate（provider 必須有使用中的憑證）與 access policy（標籤）兩段過濾。
-        若模型對應的 provider 尚無憑證，模型仍然存在於目錄但對成員隱藏。
+        credential gate（供應商必須有使用中的憑證）與 access policy（標籤）兩段過濾。
+        若模型對應的供應商尚無憑證，模型仍然存在於目錄但對成員隱藏。
       </p>
 
       <Table className="responsive-table">
@@ -291,7 +292,7 @@ export function AdminCatalogManagePage() {
                   <span className="text-xs text-muted-foreground">—</span>
                 ) : !vis.provider_has_credential ? (
                   <Badge variant="outline" className="text-amber-700 border-amber-500">
-                    ⚠ 無 credential
+                    ⚠ 無憑證
                   </Badge>
                 ) : hidden ? (
                   <Badge variant="outline" className="text-amber-700 border-amber-500">
@@ -305,9 +306,9 @@ export function AdminCatalogManagePage() {
               </TableCell>
               <TableCell data-label="狀態">
                 {m.status === "active" ? (
-                  <Badge>active</Badge>
+                  <Badge>{statusLabel(m.status)}</Badge>
                 ) : (
-                  <Badge variant="secondary">{m.status}</Badge>
+                  <Badge variant="secondary">{statusLabel(m.status)}</Badge>
                 )}
               </TableCell>
               <TableCell className="text-right" data-label="動作">
@@ -359,7 +360,7 @@ export function AdminCatalogManagePage() {
                 name="provider"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Provider</FormLabel>
+                    <FormLabel>供應商</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger><SelectValue /></SelectTrigger>
@@ -379,12 +380,12 @@ export function AdminCatalogManagePage() {
                 name="model_name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Model / Deployment 名稱</FormLabel>
+                    <FormLabel>模型 / Deployment 名稱</FormLabel>
                     <FormControl>
                       <Input placeholder="例：gpt-5.4-mini" {...field} />
                     </FormControl>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Azure 填你的 deployment 名稱；其他 provider 填官方 model id。
+                      Azure 填你的 deployment 名稱；其他供應商填官方 model id。
                     </p>
                     <FormMessage />
                   </FormItem>

@@ -103,7 +103,7 @@ export function AdminPricesPage() {
   return (
     <div className="container mx-auto py-8 max-w-4xl space-y-4">
       <div className="text-sm">
-        <Link to="/admin/model" className="text-muted-foreground hover:underline">← 回 Model</Link>
+        <Link to="/admin/model" className="text-muted-foreground hover:underline">← 回模型</Link>
       </div>
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">價目表</h1>
@@ -145,7 +145,7 @@ export function AdminPricesPage() {
                 <TableRow><TableCell colSpan={6} className="pl-6 text-muted-foreground">載入中…</TableCell></TableRow>
               )}
               {pricesQuery.data?.length === 0 && !pricesQuery.isLoading && (
-                <TableRow><TableCell colSpan={6} className="pl-6 py-8 text-center text-muted-foreground">catalog 沒有任何模型</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="pl-6 py-8 text-center text-muted-foreground">目錄沒有任何模型</TableCell></TableRow>
               )}
               {pricesQuery.data?.map((row) => (
                 <React.Fragment key={row.slug}>
@@ -155,7 +155,7 @@ export function AdminPricesPage() {
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-sm break-all">{row.slug}</span>
                         {!row.in_catalog && (
-                          <Badge variant="outline" className="text-[10px]">不在 catalog</Badge>
+                          <Badge variant="outline" className="text-[10px]">不在目錄</Badge>
                         )}
                       </div>
                       <button
@@ -297,7 +297,7 @@ function AddPriceDialog({
     const p = provider.trim();
     const m = model.trim();
     if (!p || !m) {
-      toast({ title: "請先填 Provider 與模型" });
+      toast({ title: "請先填供應商與模型" });
       return;
     }
     setLitellmBusy(true);
@@ -359,19 +359,19 @@ function AddPriceDialog({
               {litellmBusy ? "查詢中…" : "從 LiteLLM 帶入建議價"}
             </Button>
             <p className="text-xs text-muted-foreground mt-1">
-              依 Provider + 模型 取 LiteLLM 公開牌價填入（可再手改）；查無則請手填。
+              依供應商 + 模型 取 LiteLLM 公開牌價填入（可再手改）；查無則請手填。
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="p-provider">Provider</Label>
+              <Label htmlFor="p-provider">供應商</Label>
               <Input id="p-provider" className="mt-1" placeholder="azure / openai / anthropic / gemini"
                 value={provider} onChange={(e) => setProvider(e.target.value)}
                 disabled={state?.lockKey} />
             </div>
             <div>
-              <Label htmlFor="p-model">Model（去 provider 前綴）</Label>
+              <Label htmlFor="p-model">模型（去供應商前綴）</Label>
               <Input id="p-model" className="mt-1 font-mono" placeholder="gpt-5.4-mini"
                 value={model} onChange={(e) => setModel(e.target.value)}
                 disabled={state?.lockKey} />

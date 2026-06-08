@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ApiError, api } from "@/lib/api-client";
+import { statusLabel } from "@/lib/status-label";
 
 interface AdminMember {
   id: string;
@@ -59,18 +60,18 @@ export function AdminTagDetailPage() {
   return (
     <div className="container mx-auto py-8 max-w-3xl space-y-4">
       <div className="text-sm">
-        <Link to="/admin/tag" className="text-muted-foreground hover:underline">← 回 Tag</Link>
+        <Link to="/admin/tag" className="text-muted-foreground hover:underline">← 回標籤</Link>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">Tag：<code>{tagName}</code></CardTitle>
+          <CardTitle className="text-xl">標籤：<code>{tagName}</code></CardTitle>
         </CardHeader>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">持有此 tag 的成員（{holdingMembers.length}）</CardTitle>
+          <CardTitle className="text-base">持有此標籤的成員（{holdingMembers.length}）</CardTitle>
           <CardDescription>到「成員」列表直接編輯加 / 移除標籤</CardDescription>
         </CardHeader>
         <CardContent>
@@ -84,7 +85,7 @@ export function AdminTagDetailPage() {
                     {m.email}
                   </Link>
                   {m.status !== "active" && (
-                    <Badge variant="outline" className="ml-2 text-xs">{m.status}</Badge>
+                    <Badge variant="outline" className="ml-2 text-xs">{statusLabel(m.status)}</Badge>
                   )}
                 </li>
               ))}
@@ -98,7 +99,7 @@ export function AdminTagDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">將此 tag 列為 Allowed 的 Model（{allowingModels.length}）</CardTitle>
+          <CardTitle className="text-base">將此標籤列為允許的模型（{allowingModels.length}）</CardTitle>
         </CardHeader>
         <CardContent>
           {allowingModels.length === 0 ? (
@@ -120,7 +121,7 @@ export function AdminTagDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">將此 tag 列為 Denied 的 Model（{denyingModels.length}）</CardTitle>
+          <CardTitle className="text-base">將此標籤列為拒絕的模型（{denyingModels.length}）</CardTitle>
         </CardHeader>
         <CardContent>
           {denyingModels.length === 0 ? (
