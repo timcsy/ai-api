@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ApiError, api } from "@/lib/api-client";
+import { actorLabel, eventLabel } from "@/lib/status-label";
 import { presetRange } from "@/lib/time-range";
 
 interface AuditRow {
@@ -123,11 +124,11 @@ export function AdminHomePage() {
     },
     {
       done: totalAllocations > 0,
-      label: "建立成員的 Allocation（發 token）",
+      label: "建立成員的分配（發 token）",
       description:
         totalAllocations > 0
-          ? `已建立 ${totalAllocations} 筆 allocation`
-          : "成員需要 allocation token 才能呼叫 proxy",
+          ? `已建立 ${totalAllocations} 筆分配`
+          : "成員需要分配 token 才能呼叫 proxy",
       to: "/admin/member",
       cta: "去成員（建立分配）",
     },
@@ -217,7 +218,7 @@ export function AdminHomePage() {
             <Link className="text-primary hover:underline" to="/admin/model-access">模型存取規則</Link>
             <Link className="text-primary hover:underline" to="/admin/usage">用量</Link>
             <Link className="text-primary hover:underline" to="/admin/observability/quota">配額池</Link>
-            <Link className="text-primary hover:underline" to="/admin/observability/rebalance">Rebalance 記錄</Link>
+            <Link className="text-primary hover:underline" to="/admin/observability/rebalance">重新平衡記錄</Link>
             <Link className="text-primary hover:underline" to="/admin/observability/audit">稽核紀錄</Link>
           </div>
         </CardContent>
@@ -298,8 +299,8 @@ function Dashboard({
               {audit.map((r) => (
                 <li key={r.id} className="flex flex-wrap items-center gap-2">
                   <span className="text-muted-foreground">{new Date(r.created_at).toLocaleString("zh-TW")}</span>
-                  <Badge variant="outline" className="font-mono text-xs">{r.event_type}</Badge>
-                  <span className="text-muted-foreground">{r.actor_type}{r.actor_id ? ` ${r.actor_id}` : ""}</span>
+                  <Badge variant="outline" className="text-xs" title={r.event_type}>{eventLabel(r.event_type)}</Badge>
+                  <span className="text-muted-foreground">{actorLabel(r.actor_type)}{r.actor_id ? ` ${r.actor_id}` : ""}</span>
                 </li>
               ))}
             </ul>

@@ -20,7 +20,7 @@ import { ApiError, api } from "@/lib/api-client";
 import { facetHint, facetLabel } from "@/lib/catalog-labels";
 import { per1kToPer1m } from "@/lib/price-format";
 import { copyToClipboard } from "@/lib/clipboard";
-import { statusLabel } from "@/lib/status-label";
+import { familyLabel, statusLabel } from "@/lib/status-label";
 
 interface MyAllocation {
   id: string;
@@ -140,7 +140,7 @@ export function CatalogDetailPage() {
         <p className="text-muted-foreground font-mono text-sm break-all">{m.slug}</p>
         <div className="flex flex-wrap gap-2 mt-2">
           <Badge>成本：{facetLabel(m.cost_tier)}</Badge>
-          <Badge variant="secondary">{m.family}</Badge>
+          <Badge variant="secondary">{familyLabel(m.family)}</Badge>
           <Badge variant="outline">上下文 {m.context_window.toLocaleString()} tokens</Badge>
           {m.capabilities.map((c) => {
             if (c === "responses") {

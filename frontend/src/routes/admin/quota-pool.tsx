@@ -80,14 +80,14 @@ export function AdminQuotaPoolPage() {
     mutationFn: () => api<LogSummary>("/admin/quota-pool/rebalance", { method: "POST" }),
     onSuccess: (data) => {
       toast({
-        title: "Rebalance 完成",
+        title: "重新平衡完成",
         description: `scanned=${data.scanned}, changed=${data.changed}`,
       });
       qc.invalidateQueries({ queryKey: ["admin", "quota-pool"] });
     },
     onError: (err: ApiError) => {
       toast({
-        title: "Rebalance 失敗",
+        title: "重新平衡失敗",
         description: `${err.code}: ${err.message}`,
         variant: "destructive",
       });
@@ -206,7 +206,7 @@ export function AdminQuotaPoolPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>確認手動執行再分配？</AlertDialogTitle>
             <AlertDialogDescription>
-              這會立即重新分配所有池內分配的配額，並寫入 RebalanceLog。
+              這會立即重新分配所有池內分配的配額，並寫入重新平衡記錄。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -219,7 +219,7 @@ export function AdminQuotaPoolPage() {
       <Dialog open={!!detailLog} onOpenChange={(open) => !open && setDetailLog(null)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>RebalanceLog {detailLog?.id}</DialogTitle>
+            <DialogTitle>重新平衡記錄 {detailLog?.id}</DialogTitle>
             <DialogDescription>{detailLog?.triggered_by} · {detailLog?.period_yyyymm}</DialogDescription>
           </DialogHeader>
           <pre className="bg-muted p-3 rounded text-xs max-h-[400px] overflow-auto">

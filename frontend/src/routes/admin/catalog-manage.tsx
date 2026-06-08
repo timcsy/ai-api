@@ -40,7 +40,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { LiteLLMModelPicker, type LitellmDraft } from "@/components/litellm-model-picker";
 import { ApiError, api } from "@/lib/api-client";
-import { statusLabel } from "@/lib/status-label";
+import { accessLabel, statusLabel } from "@/lib/status-label";
+import { facetLabel } from "@/lib/catalog-labels";
 
 interface CatalogModel {
   slug: string;
@@ -275,11 +276,11 @@ export function AdminCatalogManagePage() {
               <TableCell data-label="顯示名稱">{m.display_name}</TableCell>
               <TableCell data-label="供應商">{m.provider}</TableCell>
               <TableCell data-label="成本">
-                <Badge variant="outline">{m.cost_tier}</Badge>
+                <Badge variant="outline">{facetLabel(m.cost_tier)}</Badge>
               </TableCell>
               <TableCell data-label="存取">
                 <Badge variant={m.default_access === "open" ? "default" : "secondary"}>
-                  {m.default_access}
+                  {accessLabel(m.default_access)}
                 </Badge>
                 {(m.allowed_tags.length > 0 || m.denied_tags.length > 0) && (
                   <span className="ml-1 text-xs text-muted-foreground">

@@ -192,13 +192,13 @@ export function AdminModelAccessPage() {
                 <div className="flex items-center gap-2">
                   <RadioGroupItem id="da-open" value="open" />
                   <Label htmlFor="da-open" className="font-normal">
-                    open — 所有使用中的成員可見（被 denied_tags 命中者除外）
+                    開放 — 所有使用中的成員可見（被 denied_tags 命中者除外）
                   </Label>
                 </div>
                 <div className="flex items-center gap-2">
                   <RadioGroupItem id="da-restricted" value="restricted" />
                   <Label htmlFor="da-restricted" className="font-normal">
-                    restricted — 只有命中 allowed_tags 的成員可見
+                    限定 — 只有命中 allowed_tags 的成員可見
                   </Label>
                 </div>
               </RadioGroup>

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { ApiError, api } from "@/lib/api-client";
+import { eventLabel } from "@/lib/status-label";
 
 interface NotificationConfigResponse {
   smtp_host: string;
@@ -434,7 +435,7 @@ function NotificationHistory() {
                       <Badge variant={isFailure ? "destructive" : "outline"}>
                         {outcomeLabel(r.outcome)}
                       </Badge>
-                      <span className="font-mono text-xs text-muted-foreground">{r.event_type}</span>
+                      <span className="text-xs text-muted-foreground" title={r.event_type}>{eventLabel(r.event_type)}</span>
                     </div>
                     <span className="text-xs text-muted-foreground">
                       {new Date(r.created_at).toLocaleString("zh-TW")}

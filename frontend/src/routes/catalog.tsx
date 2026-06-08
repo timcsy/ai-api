@@ -17,6 +17,7 @@ import {
 } from "@/hooks/use-catalog-filters";
 import { ApiError, api } from "@/lib/api-client";
 import { facetHint, facetLabel } from "@/lib/catalog-labels";
+import { familyLabel } from "@/lib/status-label";
 import { per1kToPer1m } from "@/lib/price-format";
 
 interface Model {
@@ -225,7 +226,7 @@ export function CatalogPage() {
                     </Badge>
                   </div>
                   <CardDescription className="text-xs break-words">
-                    <Badge variant="secondary" className="mr-1">{m.family}</Badge>
+                    <Badge variant="secondary" className="mr-1">{familyLabel(m.family)}</Badge>
                     {m.modality_input.map(facetLabel).join(" / ")} → {m.modality_output.map(facetLabel).join(" / ")}
                   </CardDescription>
                 </CardHeader>

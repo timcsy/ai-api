@@ -214,7 +214,7 @@ export function DashboardCharts({ range }: { range: TimeRange }) {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Top 5 分配（依花費）</CardTitle>
+            <CardTitle className="text-base">前 5 名分配（依花費）</CardTitle>
             <CardDescription>點長條前往分配維運頁</CardDescription>
           </CardHeader>
           <CardContent>
@@ -261,7 +261,7 @@ export function DashboardCharts({ range }: { range: TimeRange }) {
           ≤3-charts-per-page constraint still holds. */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Top 5 群組／班級（依花費）</CardTitle>
+          <CardTitle className="text-base">前 5 名群組／班級（依花費）</CardTitle>
           <CardDescription>依標籤加總；成員可掛多個標籤，數字可能重複計算</CardDescription>
         </CardHeader>
         <CardContent>
