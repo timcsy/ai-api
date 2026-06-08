@@ -55,6 +55,7 @@ async def device_token(
             "token": res.token,
             "token_prefix": res.token_prefix,
             "credential_id": res.credential_id,
+            "model": res.model,
         }
     if res.status == "not_found":
         return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"error": "not_found"})

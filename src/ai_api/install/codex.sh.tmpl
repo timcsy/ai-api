@@ -97,11 +97,27 @@ while [ -z "$TOKEN" ]; do
   esac
 done
 
+# The same success response carries the model this key is scoped to.
+MODEL=$(printf '%s' "$RESP" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("model") or "")' 2>/dev/null || true)
+
 # ---------------------------------------------------------------------------
 # 4. Store the credential in auth.json (no env var) and verify.
 # ---------------------------------------------------------------------------
 printf '%s' "$TOKEN" | codex login --with-api-key >/dev/null 2>&1 || {
   say "ERROR: codex login failed."; exit 1; }
+
+# Pin Codex's default model to the one this key grants, so plain `codex` uses
+# your model instead of Codex's built-in default. Switch anytime with /model.
+if [ -n "$MODEL" ]; then
+  python3 - "$CONFIG" "$MODEL" <<'PY'
+import sys, re, pathlib
+cfg, model = pathlib.Path(sys.argv[1]), sys.argv[2]
+text = cfg.read_text() if cfg.exists() else ""
+text = re.sub(r'(?m)^\s*model\s*=.*$\n?', '', text)  # drop any prior top-level model
+cfg.write_text(f'model = "{model}"\n' + text.lstrip())
+PY
+  say "Default model set to $MODEL (switch anytime with /model)."
+fi
 
 say "Verifying connection..."
 if codex exec --skip-git-repo-check "say only: ok" >/dev/null 2>&1; then

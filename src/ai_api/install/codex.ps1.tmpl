@@ -84,10 +84,24 @@ while (-not $token) {
   }
 }
 
+# The same success response carries the model this key is scoped to.
+$defaultModel = if ($resp.model) { [string]$resp.model } else { "" }
+
 # ---------------------------------------------------------------------------
 # 4. Store the credential in auth.json (no env var) and verify.
 # ---------------------------------------------------------------------------
 $token | codex login --with-api-key | Out-Null
+
+# Pin Codex's default model to the one this key grants, so plain `codex` uses
+# your model instead of Codex's built-in default. Switch anytime with /model.
+if ($defaultModel) {
+  $cfg = ""
+  if (Test-Path $Config) { $cfg = Get-Content -Raw $Config }
+  $cfg = [regex]::Replace($cfg, '(?m)^\s*model\s*=.*\r?\n?', '')  # drop any prior top-level model
+  Set-Content -Path $Config -Value ("model = `"$defaultModel`"`n" + $cfg.TrimStart())
+  Write-Host "Default model set to $defaultModel (switch anytime with /model)."
+}
+
 Write-Host "Verifying connection..."
 try {
   codex exec --skip-git-repo-check "say only: ok" | Out-Null

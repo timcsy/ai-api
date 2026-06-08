@@ -34,6 +34,11 @@ async def test_install_script_served_with_required_config(
     assert "/device/authorize" in body
     assert "/device/token" in body
     assert "codex login --with-api-key" in body
+    # Pins Codex's default model from the device-flow response (else Codex uses
+    # its own built-in default model instead of the one the key grants). The
+    # literal differs per shell (sh writes model = "..."; ps1 uses backtick
+    # quotes), so match the common "model = " prefix.
+    assert "model = " in body
 
 
 @pytest.mark.asyncio

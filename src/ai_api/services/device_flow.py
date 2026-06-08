@@ -19,6 +19,7 @@ from ulid import ULID
 from ai_api.auth.audit import record as audit_record
 from ai_api.models import (
     ActorType,
+    Allocation,
     AuditEventType,
     DeviceAuthorization,
     DeviceAuthStatus,
@@ -44,12 +45,16 @@ class AuthorizeResult:
 @dataclass(frozen=True)
 class PollResult:
     """status ∈ {authorization_pending, slow_down, expired_token, access_denied,
-    success, not_found}. token/token_prefix/credential_id only set on success."""
+    success, not_found}. token/token_prefix/credential_id/model only set on
+    success. ``model`` is the representative scoped model (resource_model of the
+    first chosen allocation) so the install script can pin Codex's default model
+    instead of falling back to Codex's built-in default."""
 
     status: str
     token: str | None = None
     token_prefix: str | None = None
     credential_id: str | None = None
+    model: str | None = None
 
 
 def _aware(dt: datetime) -> datetime:
@@ -218,10 +223,20 @@ class DeviceFlowService:
             return PollResult("expired_token")
         plaintext = decrypt_str(row.encrypted_token.encode("ascii"))
         row.encrypted_token = None  # single-use delivery
+        # Representative model: resource_model of the first chosen allocation, so
+        # the install script can pin Codex's default to a model the member owns.
+        model: str | None = None
+        if row.allocation_id is not None:
+            model = (
+                await self._s.execute(
+                    select(Allocation.resource_model).where(Allocation.id == row.allocation_id)
+                )
+            ).scalar_one_or_none()
         await self._s.flush()
         return PollResult(
             "success",
             token=plaintext,
             token_prefix=plaintext[:8],
             credential_id=row.credential_id,
+            model=model,
         )

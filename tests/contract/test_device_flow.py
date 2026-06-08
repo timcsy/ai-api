@@ -253,6 +253,9 @@ async def test_device_flow_happy_path_endpoints(
     assert tok.status_code == 200, tok.text
     tb = tok.json()
     assert tb["token"].startswith("aiapi_") and tb["credential_id"]
+    # The token response carries the scoped model so the install script can pin
+    # Codex's default model (else Codex falls back to its own built-in default).
+    assert tb["model"] == "gpt-4o-mini"
 
     # The delivered token can call the proxy.
     with patch("ai_api.proxy.upstream.acompletion") as mock:
