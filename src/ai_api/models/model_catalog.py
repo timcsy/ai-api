@@ -55,6 +55,11 @@ class ModelCatalog(Base):
     self_service_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     self_service_default_quota: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # Phase 23: LiteLLM registry provenance — {base_model_key, imported_version,
+    # field_sources: {field: litellm|borrowed|manual}, snapshot: {field: value}}.
+    # Null for hand-entered models (zero regression).
+    litellm_sync: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True, default=None)
+
     __table_args__ = (
         Index("idx_model_catalog_status", "status"),
         Index("idx_model_catalog_provider", "provider"),

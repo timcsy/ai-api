@@ -17,9 +17,39 @@ from ai_api.api.deps import get_db_session, require_admin_token
 from ai_api.auth.audit import record as audit_record
 from ai_api.config import get_settings
 from ai_api.models import ActorType, AuditEventType, DefaultAccess, ModelCatalog
-from ai_api.services import pricing
+from ai_api.services import litellm_registry, pricing
 
 router = APIRouter(dependencies=[Depends(require_admin_token)])
+
+
+def _build_litellm_sync(payload: ModelCatalogCreate) -> dict[str, Any] | None:
+    """Derive LiteLLM provenance from the create payload: pick the registry key
+    (explicit base_model_key, else slug if it's a registry key), then mark each
+    syncable field litellm/borrowed (matches registry) or manual (admin edited).
+    Returns None when the model has no LiteLLM counterpart (pure hand-entry)."""
+    key = payload.base_model_key or (payload.slug if litellm_registry.lookup(payload.slug) else None)
+    if key is None:
+        return None
+    meta = litellm_registry.lookup(key)
+    if meta is None:
+        return None
+    borrowed = bool(payload.base_model_key) and payload.base_model_key != payload.slug
+    matched_source = "borrowed" if borrowed else "litellm"
+    field_sources: dict[str, str] = {}
+    for field in litellm_registry.SYNCABLE_FIELDS:
+        field_sources[field] = matched_source if getattr(payload, field) == meta[field] else "manual"
+    return {
+        "base_model_key": key,
+        "imported_version": litellm_registry.current_version(),
+        "field_sources": field_sources,
+        "snapshot": meta,
+    }
+
+
+class SuggestedPrice(BaseModel):
+    input_per_1k: str
+    output_per_1k: str
+    cached_input_per_1k: str | None = None
 
 
 class ModelCatalogCreate(BaseModel):
@@ -41,6 +71,11 @@ class ModelCatalogCreate(BaseModel):
     default_access: DefaultAccess = DefaultAccess.open
     allowed_tags: list[str] = Field(default_factory=list)
     denied_tags: list[str] = Field(default_factory=list)
+    # Phase 23: align with a LiteLLM registry key. If set (or if `slug` itself is a
+    # registry key), the backend derives field-source provenance + snapshot.
+    base_model_key: str | None = None
+    # Optional suggested price to seed (appended as a price version with litellm source_note).
+    suggested_price: SuggestedPrice | None = None
 
 
 class ModelCatalogUpdate(BaseModel):
@@ -85,6 +120,7 @@ def _to_dict(m: ModelCatalog, price: dict[str, str] | None = None) -> dict[str, 
         "denied_tags": list(m.denied_tags or []),
         "self_service_enabled": m.self_service_enabled,
         "self_service_default_quota": m.self_service_default_quota,
+        "litellm_sync": m.litellm_sync,  # Phase 23 provenance or null
         "price": price,  # current per-1K {input_per_1k, output_per_1k} or null
         "created_at": m.created_at.isoformat(),
         "updated_at": m.updated_at.isoformat(),
@@ -258,6 +294,30 @@ async def admin_list_dependents(
     }
 
 
+@router.get("/catalog/litellm/search")
+async def admin_litellm_search(q: str = "", limit: int = 20) -> dict[str, Any]:
+    """Phase 23: search LiteLLM's bundled registry for the create-time picker."""
+    return {"results": litellm_registry.search(q, min(max(limit, 1), 50))}
+
+
+@router.get("/catalog/litellm/suggest/{key:path}")
+async def admin_litellm_suggest(key: str) -> dict[str, Any]:
+    """Phase 23: bring-in draft (metadata + suggested price) for one registry key."""
+    meta = litellm_registry.lookup(key)
+    if meta is None:
+        raise HTTPException(
+            status_code=404,
+            detail=_err("litellm_model_not_found", f"LiteLLM has no model {key!r}"),
+        )
+    return {
+        "key": key,
+        "slug_default": key,
+        "metadata": meta,
+        "suggested_price": litellm_registry.suggest_price(key),
+        "imported_version": litellm_registry.current_version(),
+    }
+
+
 @router.post(
     "/catalog/models",
     status_code=status.HTTP_201_CREATED,
@@ -301,11 +361,25 @@ async def admin_create_model(
         default_access=payload.default_access,
         allowed_tags=payload.allowed_tags,
         denied_tags=payload.denied_tags,
+        litellm_sync=_build_litellm_sync(payload),
         created_at=now,
         updated_at=now,
     )
     session.add(m)
     await session.flush()
+    # Phase 23: seed the suggested price as a versioned row (litellm = suggestion;
+    # our price_list stays the billing source of truth).
+    if payload.suggested_price is not None:
+        await pricing.create_version(
+            session,
+            provider=payload.provider,
+            model=payload.slug.split("/", 1)[-1],
+            input_per_1k=payload.suggested_price.input_per_1k,
+            output_per_1k=payload.suggested_price.output_per_1k,
+            cached_input_per_1k=payload.suggested_price.cached_input_per_1k,
+            effective_from=now,
+            source_note=f"litellm@{litellm_registry.current_version()}",
+        )
     await audit_record(
         session,
         event_type=AuditEventType.model_access_policy_updated,
@@ -327,9 +401,20 @@ async def admin_update_model(
     if m is None:
         raise HTTPException(status_code=404, detail=_err("not_found", "model not found"))
     changed = False
+    touched_syncable: list[str] = []
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(m, field, value)
         changed = True
+        if field in litellm_registry.SYNCABLE_FIELDS:
+            touched_syncable.append(field)
+    # Phase 23: editing a synced field flips its source to manual (snapshot kept).
+    if touched_syncable and m.litellm_sync:
+        sync = dict(m.litellm_sync)  # reassign so SQLAlchemy detects the JSON change
+        sources = dict(sync.get("field_sources", {}))
+        for field in touched_syncable:
+            sources[field] = "manual"
+        sync["field_sources"] = sources
+        m.litellm_sync = sync
     if changed:
         m.updated_at = datetime.now(UTC)
         await session.flush()
@@ -340,6 +425,134 @@ async def admin_update_model(
             target_type="model_catalog",
             target_id=slug,
             details={"action": "updated"},
+        )
+    return _to_dict(m)
+
+
+class LitellmApply(BaseModel):
+    fields: list[str]
+    litellm_version: str | None = None
+
+
+def _price_diffs(
+    current: dict[str, str] | None, latest: dict[str, str | None] | None
+) -> list[dict[str, Any]]:
+    from decimal import Decimal
+
+    diffs: list[dict[str, Any]] = []
+    for pf in ("input_per_1k", "output_per_1k", "cached_input_per_1k"):
+        new_v = (latest or {}).get(pf)
+        if new_v is None:
+            continue
+        cur_v = (current or {}).get(pf)
+        changed = cur_v is None or Decimal(str(cur_v)) != Decimal(str(new_v))
+        diffs.append(
+            {"field": f"price.{pf}", "current": cur_v, "latest": new_v, "source": "litellm", "changed": changed}
+        )
+    return diffs
+
+
+@router.post("/catalog/models/{slug:path}/litellm-check")
+async def admin_litellm_check(
+    slug: str, session: AsyncSession = Depends(get_db_session)
+) -> dict[str, Any]:
+    """Phase 23: fetch the latest registry (timeout → bundled fallback) and diff
+    each syncable field + price against the model's current values."""
+    m = await session.get(ModelCatalog, slug)
+    if m is None:
+        raise HTTPException(status_code=404, detail=_err("not_found", "model not found"))
+    key = (m.litellm_sync or {}).get("base_model_key") or slug
+    latest_map = await litellm_registry.fetch_latest()
+    source = "live"
+    if latest_map is None:
+        latest_map, source = litellm_registry.bundled(), "bundled-fallback"
+    entry = latest_map.get(key)
+    sources = (m.litellm_sync or {}).get("field_sources", {})
+    diffs: list[dict[str, Any]] = []
+    if entry is not None:
+        latest_meta = litellm_registry.metadata_from_entry(entry)
+        for field in litellm_registry.SYNCABLE_FIELDS:
+            cur = getattr(m, field)
+            new = latest_meta[field]
+            diffs.append(
+                {"field": field, "current": cur, "latest": new,
+                 "source": sources.get(field, "manual"), "changed": cur != new}
+            )
+        cur_price = pricing.price_for_slug(
+            await pricing.current_price_map(session, datetime.now(UTC)), m.provider, slug
+        )
+        diffs += _price_diffs(cur_price, litellm_registry.price_from_entry(entry))
+    return {
+        "source": source,
+        "litellm_version": litellm_registry.current_version(),
+        "base_model_key": key,
+        "diffs": diffs,
+    }
+
+
+@router.post("/catalog/models/{slug:path}/litellm-apply")
+async def admin_litellm_apply(
+    slug: str,
+    payload: LitellmApply = Body(...),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Phase 23: apply selected, non-manual fields. Metadata fields update the
+    catalog + snapshot; price fields append a new price version (never overwrite)."""
+    m = await session.get(ModelCatalog, slug)
+    if m is None:
+        raise HTTPException(status_code=404, detail=_err("not_found", "model not found"))
+    key = (m.litellm_sync or {}).get("base_model_key") or slug
+    latest_map = await litellm_registry.fetch_latest() or litellm_registry.bundled()
+    entry = latest_map.get(key)
+    if entry is None:
+        raise HTTPException(
+            status_code=422,
+            detail=_err("litellm_model_not_found", f"LiteLLM has no model {key!r}"),
+        )
+    latest_meta = litellm_registry.metadata_from_entry(entry)
+    sources = (m.litellm_sync or {}).get("field_sources", {})
+    applied_meta: list[str] = []
+    want_price = False
+    for field in payload.fields:
+        if field in litellm_registry.SYNCABLE_FIELDS:
+            if sources.get(field) == "manual":
+                continue  # never auto-overwrite a manual field
+            setattr(m, field, latest_meta[field])
+            applied_meta.append(field)
+        elif field.startswith("price."):
+            want_price = True
+    if applied_meta and m.litellm_sync:
+        sync = dict(m.litellm_sync)
+        fs, snap = dict(sync.get("field_sources", {})), dict(sync.get("snapshot", {}))
+        for field in applied_meta:
+            fs[field], snap[field] = "litellm", latest_meta[field]
+        sync["field_sources"], sync["snapshot"] = fs, snap
+        sync["imported_version"] = litellm_registry.current_version()
+        m.litellm_sync = sync
+    if want_price:
+        lp = litellm_registry.price_from_entry(entry) or {}
+        inp = lp.get("input_per_1k")
+        if inp is not None:
+            await pricing.create_version(
+                session,
+                provider=m.provider,
+                model=slug.split("/", 1)[-1],
+                input_per_1k=inp,
+                output_per_1k=lp.get("output_per_1k") or "0",
+                cached_input_per_1k=lp.get("cached_input_per_1k"),
+                effective_from=datetime.now(UTC),
+                source_note=f"litellm@{litellm_registry.current_version()}",
+            )
+    if applied_meta or want_price:
+        m.updated_at = datetime.now(UTC)
+        await session.flush()
+        await audit_record(
+            session,
+            event_type=AuditEventType.model_access_policy_updated,
+            actor_type=ActorType.admin,
+            target_type="model_catalog",
+            target_id=slug,
+            details={"action": "litellm_apply", "fields": payload.fields},
         )
     return _to_dict(m)
 
