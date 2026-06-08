@@ -55,6 +55,10 @@ interface CatalogModel {
   modality_input: string[];
   modality_output: string[];
   capabilities: string[];
+  responses_support?: {
+    state: "available" | "unavailable" | "unknown";
+    source: "tested" | "manual" | null;
+  };
   recommended_for: string[];
   tags: string[];
   default_access: "open" | "restricted";
@@ -133,6 +137,42 @@ export function AdminModelDetailPage() {
       }),
     onSuccess: () => {
       toast({ title: "存取規則已更新" });
+      queryClient.invalidateQueries({ queryKey: ["admin", "catalog-models-admin"] });
+    },
+    onError: (e) => toast({ title: "更新失敗", description: e.message, variant: "destructive" }),
+  });
+
+  // Phase 25: responses (Agent) support — test (real call) or manual override.
+  const testResponsesMut = useMutation<
+    { ok: boolean; latency_ms?: number; error_type?: string; message?: string },
+    ApiError,
+    void
+  >({
+    mutationFn: () =>
+      api(`/admin/catalog/models/${slug}/test-responses`, { method: "POST" }),
+    onSuccess: (r) => {
+      if (r.ok) {
+        toast({ title: "Responses 測試通過", description: `延遲 ${r.latency_ms} ms` });
+      } else {
+        toast({
+          title: "Responses 測試未通過",
+          description: r.message ?? r.error_type ?? "上游錯誤",
+          variant: "destructive",
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["admin", "catalog-models-admin"] });
+    },
+    onError: (e) => toast({ title: "測試失敗", description: e.message, variant: "destructive" }),
+  });
+
+  const setSupportMut = useMutation<unknown, ApiError, boolean>({
+    mutationFn: (available: boolean) =>
+      api(`/admin/catalog/models/${slug}/responses-support`, {
+        method: "POST",
+        body: JSON.stringify({ available }),
+      }),
+    onSuccess: () => {
+      toast({ title: "Responses 可用性已更新（手動）" });
       queryClient.invalidateQueries({ queryKey: ["admin", "catalog-models-admin"] });
     },
     onError: (e) => toast({ title: "更新失敗", description: e.message, variant: "destructive" }),
@@ -235,6 +275,63 @@ export function AdminModelDetailPage() {
           onApplied={() => queryClient.invalidateQueries({ queryKey: ["admin", "catalog-models-admin"] })}
         />
       )}
+
+      {/* Phase 25: Agent 相容（Responses）support */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Agent 相容（Responses）</CardTitle>
+          <CardDescription>
+            這個模型能不能走 <span className="font-mono">/v1/responses</span>（Codex／Agent 入口）。
+            可「測試」實打一次判定，或手動指定；手動會蓋過實測。未測也未手動時，runtime 仍會先試。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2 text-sm">
+            <span>目前狀態：</span>
+            {(() => {
+              const st = model.responses_support?.state ?? "unknown";
+              const src = model.responses_support?.source;
+              const label =
+                st === "available" ? "可用" : st === "unavailable" ? "不可用" : "未知";
+              const variant =
+                st === "available" ? "default" : st === "unavailable" ? "destructive" : "outline";
+              const srcLabel = src === "tested" ? "實測" : src === "manual" ? "手動" : null;
+              return (
+                <>
+                  <Badge variant={variant as "default" | "destructive" | "outline"}>{label}</Badge>
+                  {srcLabel && <span className="text-muted-foreground">來源：{srcLabel}</span>}
+                </>
+              );
+            })()}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={testResponsesMut.isPending}
+              onClick={() => testResponsesMut.mutate()}
+            >
+              {testResponsesMut.isPending ? "測試中…" : "測試 responses"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={setSupportMut.isPending}
+              onClick={() => setSupportMut.mutate(true)}
+            >
+              手動設為可用
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={setSupportMut.isPending}
+              onClick={() => setSupportMut.mutate(false)}
+            >
+              手動設為不可用
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* 2. 存取規則 */}
       <Card>

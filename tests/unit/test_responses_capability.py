@@ -1,4 +1,6 @@
-"""Phase 11 T012: /v1/responses capability gate."""
+"""Phase 25: /v1/responses gate truth source is responses_support.lookup (axis ③).
+Was Phase 11's static model_supports_responses; the soft gate now only pre-blocks
+on a manual "unavailable" (responses:blocked)."""
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
@@ -10,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from ai_api.db import Base
 from ai_api.models import ModelCatalog
-from ai_api.proxy.responses import model_supports_responses
+from ai_api.services import responses_support as rs
 
 pytestmark = pytest.mark.integration
 
@@ -37,19 +39,26 @@ def _catalog(slug: str, caps: list[str]) -> ModelCatalog:
 
 
 @pytest.mark.asyncio
-async def test_capability_present(session: AsyncSession) -> None:
-    session.add(_catalog("azure/gpt-5", ["responses", "tools"]))
+async def test_available_when_responses_marker(session: AsyncSession) -> None:
+    session.add(_catalog("azure/gpt-5", [rs.RESPONSES, "chat"]))
     await session.commit()
-    assert await model_supports_responses(session, "azure/gpt-5") is True
+    assert (await rs.lookup(session, "azure/gpt-5"))["state"] == "available"
 
 
 @pytest.mark.asyncio
-async def test_capability_absent(session: AsyncSession) -> None:
-    session.add(_catalog("azure/gpt-4o", ["tools"]))
+async def test_unknown_when_no_marker(session: AsyncSession) -> None:
+    session.add(_catalog("azure/gpt-4o", ["chat"]))
     await session.commit()
-    assert await model_supports_responses(session, "azure/gpt-4o") is False
+    assert (await rs.lookup(session, "azure/gpt-4o"))["state"] == "unknown"
 
 
 @pytest.mark.asyncio
-async def test_unknown_model_unsupported(session: AsyncSession) -> None:
-    assert await model_supports_responses(session, "azure/ghost") is False
+async def test_unavailable_when_blocked(session: AsyncSession) -> None:
+    session.add(_catalog("azure/blocked", ["chat", rs.RESPONSES_BLOCKED, rs.RESPONSES_MANUAL]))
+    await session.commit()
+    assert (await rs.lookup(session, "azure/blocked"))["state"] == "unavailable"
+
+
+@pytest.mark.asyncio
+async def test_unknown_model_is_unknown(session: AsyncSession) -> None:
+    assert (await rs.lookup(session, "azure/ghost"))["state"] == "unknown"

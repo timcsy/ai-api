@@ -60,15 +60,19 @@ async def test_non_openai_provider_bridged(
 
 
 @pytest.mark.asyncio
-async def test_model_without_capability_rejected_cross_provider(
+async def test_manual_blocked_rejected_cross_provider(
     app_client: AsyncClient, admin_headers: dict[str, str]
 ) -> None:
+    # Phase 25: only a manual "unavailable" (responses:blocked) pre-blocks.
     slug = "gemini/gemini-2.5-pro"
-    alloc = await _seed(app_client, admin_headers, slug, "gemini", ["chat"])  # no responses
+    alloc = await _seed(
+        app_client, admin_headers, slug, "gemini",
+        ["chat", "responses:blocked", "responses:manual"],
+    )
     r = await app_client.post(
         "/v1/responses",
         headers={"Authorization": f"Bearer {alloc['token']}"},
         json={"model": slug, "input": "hi"},
     )
     assert r.status_code == 400
-    assert r.json()["error"]["code"] == "model_not_responses_capable"
+    assert r.json()["error"]["code"] == "model_responses_disabled"

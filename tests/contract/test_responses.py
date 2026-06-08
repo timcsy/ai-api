@@ -109,8 +109,10 @@ async def test_responses_400_missing_input(app_client: AsyncClient, admin_header
 
 
 @pytest.mark.asyncio
-async def test_responses_model_not_capable(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
-    await _seed_catalog(RESP_MODEL, ["tools"])  # no "responses"
+async def test_responses_manual_blocked_rejected(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
+    # Phase 25: an un-marked model is no longer pre-blocked — the ONLY pre-block is
+    # admin's manual "unavailable" (responses:blocked).
+    await _seed_catalog(RESP_MODEL, ["tools", "responses:blocked", "responses:manual"])
     await _seed_azure_provider(app_client, admin_headers)
     alloc = await _make_allocation(app_client, admin_headers)
     r = await app_client.post(
@@ -119,7 +121,7 @@ async def test_responses_model_not_capable(app_client: AsyncClient, admin_header
         json={"model": RESP_MODEL, "input": "hi"},
     )
     assert r.status_code == 400
-    assert r.json()["error"]["code"] == "model_not_responses_capable"
+    assert r.json()["error"]["code"] == "model_responses_disabled"
 
 
 @pytest.mark.asyncio

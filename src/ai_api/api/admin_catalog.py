@@ -17,7 +17,7 @@ from ai_api.api.deps import get_db_session, require_admin_token
 from ai_api.auth.audit import record as audit_record
 from ai_api.config import get_settings
 from ai_api.models import ActorType, AuditEventType, DefaultAccess, ModelCatalog
-from ai_api.services import litellm_registry, pricing
+from ai_api.services import litellm_registry, pricing, responses_support
 
 router = APIRouter(dependencies=[Depends(require_admin_token)])
 
@@ -110,6 +110,8 @@ def _to_dict(m: ModelCatalog, price: dict[str, str] | None = None) -> dict[str, 
         "modality_input": list(m.modality_input),
         "modality_output": list(m.modality_output),
         "capabilities": list(m.capabilities),
+        # Phase 25: derived responses support (axis ③) for the admin panel.
+        "responses_support": responses_support.get_support(m.capabilities),
         "context_window": m.context_window,
         "cost_tier": m.cost_tier,
         "recommended_for": list(m.recommended_for),
@@ -519,7 +521,12 @@ async def admin_litellm_apply(
             # Manual fields aren't auto-selected by the UI, but if the admin
             # explicitly picks one it IS overwritten and re-enters auto-management
             # (its source flips back to litellm below).
-            setattr(m, field, latest_meta[field])
+            value = latest_meta[field]
+            if field == "capabilities":
+                # Phase 25: responses* markers are axis ③ (not litellm-governed);
+                # merge-preserve them so a sync never wipes admin's responses state.
+                value = responses_support.preserve_into(value, m.capabilities or [])
+            setattr(m, field, value)
             applied_meta.append(field)
         elif field.startswith("price."):
             want_price = True
@@ -578,3 +585,115 @@ async def admin_delete_model(
         target_id=slug,
         details={"action": "deleted"},
     )
+
+
+class ResponsesSupportSet(BaseModel):
+    available: bool
+
+
+@router.post("/catalog/models/{slug:path}/test-responses")
+async def admin_test_responses(
+    slug: str,
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Phase 25 US2: issue a minimal real /v1/responses call to verify the model
+    can be bridged. The result IS the response — NEVER raise 5xx for upstream errors
+    (mirrors admin_providers.test_provider_connection). On success (and not manually
+    blocked) the model is recorded responses-available, source "tested"."""
+    import time
+
+    from ai_api.proxy import upstream
+    from ai_api.proxy.allowlist import parse_provider
+    from ai_api.proxy.preflight import _resolve_credential
+    from ai_api.services.provider_credentials import (
+        ProviderCredentialService,
+        ProviderUnavailableError,
+    )
+
+    m = await session.get(ModelCatalog, slug)
+    if m is None:
+        raise HTTPException(status_code=404, detail=_err("not_found", "model not found"))
+
+    provider, _ = parse_provider(slug)
+    settings = get_settings()
+    try:
+        resolved = await _resolve_credential(ProviderCredentialService(session), provider, settings)
+    except ProviderUnavailableError:
+        return {
+            "ok": False,
+            "slug": slug,
+            "error_type": "provider_unavailable",
+            "message": f"no active credential for provider '{provider}'",
+            "support": responses_support.get_support(m.capabilities),
+        }
+
+    upstream_model = slug if "/" in slug else f"{provider}/{slug}"
+    extra = resolved.extra_config or {}
+    started = time.perf_counter()
+    try:
+        await upstream.aresponses(
+            model=upstream_model,
+            input="ping",
+            api_key=resolved.api_key,
+            api_base=resolved.base_url,
+            api_version=extra.get("api_version"),
+            max_output_tokens=16,
+        )
+    except Exception as e:  # test result IS the response — never 5xx
+        return {
+            "ok": False,
+            "slug": slug,
+            "error_type": "upstream_error",
+            "message": str(e)[:500],
+            "support": responses_support.get_support(m.capabilities),
+        }
+    latency_ms = int((time.perf_counter() - started) * 1000)
+
+    # Manual "unavailable" wins: a passing test must not flip admin's block.
+    if responses_support.get_support(m.capabilities)["state"] != "unavailable":
+        m.capabilities = responses_support.mark_tested_ok(m.capabilities)
+        m.updated_at = datetime.now(UTC)
+        await session.flush()
+    await audit_record(
+        session,
+        event_type=AuditEventType.responses_tested,
+        actor_type=ActorType.admin,
+        target_type="model_catalog",
+        target_id=slug,
+        details={"ok": True, "latency_ms": latency_ms},
+    )
+    return {
+        "ok": True,
+        "slug": slug,
+        "latency_ms": latency_ms,
+        "support": responses_support.get_support(m.capabilities),
+    }
+
+
+@router.post("/catalog/models/{slug:path}/responses-support")
+async def admin_set_responses_support(
+    slug: str,
+    payload: ResponsesSupportSet = Body(...),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Phase 25 US3: admin manual override of responses support (source "manual",
+    overrides any tested result). available=false is the only runtime pre-block."""
+    m = await session.get(ModelCatalog, slug)
+    if m is None:
+        raise HTTPException(status_code=404, detail=_err("not_found", "model not found"))
+    m.capabilities = (
+        responses_support.mark_manual_on(m.capabilities)
+        if payload.available
+        else responses_support.mark_manual_off(m.capabilities)
+    )
+    m.updated_at = datetime.now(UTC)
+    await session.flush()
+    await audit_record(
+        session,
+        event_type=AuditEventType.responses_support_overridden,
+        actor_type=ActorType.admin,
+        target_type="model_catalog",
+        target_id=slug,
+        details={"available": payload.available},
+    )
+    return {"slug": slug, "support": responses_support.get_support(m.capabilities)}

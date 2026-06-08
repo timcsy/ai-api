@@ -72,6 +72,9 @@ class AuditEventType(enum.StrEnum):
     credential_scope_removed = "credential_scope_removed"
     # Phase 21: rename
     credential_renamed = "credential_renamed"
+    # Phase 25: responses support (axis ③) — tested / manual override
+    responses_tested = "responses_tested"
+    responses_support_overridden = "responses_support_overridden"
 
 
 class ActorType(enum.StrEnum):

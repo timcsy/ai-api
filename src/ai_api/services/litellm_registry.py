@@ -68,14 +68,14 @@ def _capabilities(entry: dict[str, Any]) -> list[str]:
     Only flags that answer 'can this model do X' — not internal protocol details.
     Vocabulary is hyphenated to match the existing catalog/facet labels.
 
-    `responses` is a GATEWAY capability, not a litellm one: we bridge chat-style
-    models to /v1/responses (litellm aresponses), and the proxy gates that endpoint
-    on this capability — so derive it from mode rather than dropping it."""
+    Phase 25: `responses` is axis ③ (gateway endpoint availability), decided by
+    real test / admin override via `responses_support` — NOT derived here. litellm
+    only governs axes ① (mode) and ② (capability flags); it MUST NOT touch responses
+    state, otherwise a sync would silently wipe admin's setting (latent bug)."""
     caps: list[str] = []
     mode = entry.get("mode") or "chat"
     if mode in ("chat", "completion", "responses"):
         caps.append("chat")
-        caps.append("responses")  # our gateway exposes /v1/responses for chat-style models
     if entry.get("supports_function_calling"):
         caps.append("function-calling")
     if entry.get("supports_vision"):
