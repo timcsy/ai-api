@@ -16,7 +16,7 @@ import {
   type ListFilter,
 } from "@/hooks/use-catalog-filters";
 import { ApiError, api } from "@/lib/api-client";
-import { facetLabel } from "@/lib/catalog-labels";
+import { facetHint, facetLabel } from "@/lib/catalog-labels";
 import { per1kToPer1m } from "@/lib/price-format";
 
 interface Model {
@@ -73,7 +73,13 @@ function FacetSection({
               checked={selected.includes(value)}
               onCheckedChange={() => onToggle(filterKey, value)}
             />
-            <Label htmlFor={id} className="text-sm cursor-pointer flex-1">
+            <Label
+              htmlFor={id}
+              title={facetHint(value)}
+              className={`text-sm cursor-pointer flex-1 ${
+                facetHint(value) ? "underline decoration-dotted decoration-muted-foreground/40 underline-offset-4" : ""
+              }`}
+            >
               {facetLabel(value)}
             </Label>
             <span className="text-xs text-muted-foreground">({count})</span>

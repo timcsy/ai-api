@@ -17,7 +17,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { ApiUsageExample } from "@/components/api-usage-example";
 import { ApiError, api } from "@/lib/api-client";
-import { facetLabel } from "@/lib/catalog-labels";
+import { facetHint, facetLabel } from "@/lib/catalog-labels";
 import { per1kToPer1m } from "@/lib/price-format";
 import { copyToClipboard } from "@/lib/clipboard";
 
@@ -146,13 +146,17 @@ export function CatalogDetailPage() {
               const src = m.responses_support?.source;
               const srcLabel = src === "tested" ? "實測" : src === "manual" ? "手動" : null;
               return (
-                <Badge key={c} variant="outline">
+                <Badge key={c} variant="outline" title={facetHint(c)} className="cursor-help">
                   {facetLabel(c)}
                   {srcLabel ? `・${srcLabel}` : ""}
                 </Badge>
               );
             }
-            return <Badge key={c} variant="outline">{facetLabel(c)}</Badge>;
+            return (
+              <Badge key={c} variant="outline" title={facetHint(c)} className="cursor-help">
+                {facetLabel(c)}
+              </Badge>
+            );
           })}
         </div>
       </section>
