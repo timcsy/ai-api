@@ -104,6 +104,14 @@ def _lower_set(values: Iterable[str] | None) -> set[str] | None:
     return {v.strip().lower() for v in values if v.strip()}
 
 
+def canon_capability(v: str) -> str:
+    """Canonicalize capability vocab so the underscore/hyphen variants merge
+    (function_calling == function-calling, prompt_caching == prompt-caching).
+    litellm emits hyphenated, but older/hand-entered rows used underscores —
+    canonicalizing at the facet/filter layer collapses the duplicate buckets."""
+    return v.strip().lower().replace("_", "-")
+
+
 def filter_models(
     models: list[ModelCatalog],
     *,
@@ -118,7 +126,7 @@ def filter_models(
     min_context_window: int | None = None,
 ) -> list[ModelCatalog]:
     """Filter models per spec FR-007 AND semantics."""
-    caps = _lower_set(capabilities)
+    caps = {canon_capability(c) for c in capabilities} if capabilities is not None else None
     mi = _lower_set(modality_input)
     mo = _lower_set(modality_output)
     rec = _lower_set(recommended_for)
@@ -128,7 +136,7 @@ def filter_models(
     fam = family.strip().lower() if family else None
 
     def matches(m: ModelCatalog) -> bool:
-        if caps and not caps.issubset({c.lower() for c in m.capabilities}):
+        if caps and not caps.issubset({canon_capability(c) for c in m.capabilities}):
             return False
         if mi and not mi.issubset({v.lower() for v in m.modality_input}):
             return False
@@ -176,8 +184,10 @@ def compute_facets(models: list[ModelCatalog]) -> dict[str, dict[str, int]]:
             out["modality_output"][v] += 1
         # Phase 25: hide internal responses:* markers from member-facing facets;
         # the bare `responses` value (= "Agent 相容") is kept and filterable.
+        # Canonicalize vocab so function_calling/function-calling merge into one
+        # bucket (else the facet shows two "函式呼叫" rows).
         for v in responses_support.strip_internal(m.capabilities):
-            out["capabilities"][v] += 1
+            out["capabilities"][canon_capability(v)] += 1
         out["cost_tier"][m.cost_tier] += 1
         for v in m.recommended_for:
             out["recommended_for"][v] += 1

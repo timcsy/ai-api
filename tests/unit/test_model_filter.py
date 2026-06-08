@@ -162,3 +162,19 @@ def test_facets_counts_correctly() -> None:
 def test_facets_schema_stable_with_data() -> None:
     out = compute_facets([_m("a/x")])
     assert set(out.keys()) == set(FACET_DIMENSIONS)
+
+
+def test_capability_vocab_canonicalized_merges_underscore_and_hyphen():
+    # rev 76: function_calling vs function-calling must merge into ONE facet bucket
+    models = [
+        _m("azure/a", capabilities=["chat", "function-calling"]),
+        _m("azure/b", capabilities=["chat", "function_calling"]),
+    ]
+    facets = compute_facets(models)
+    caps = facets["capabilities"]
+    assert caps.get("function-calling") == 2
+    assert "function_calling" not in caps  # underscore variant folded in
+    # filtering by the canonical value matches BOTH rows
+    assert len(filter_models(models, capabilities=["function-calling"])) == 2
+    # filtering by the underscore form also matches both (canonicalized)
+    assert len(filter_models(models, capabilities=["function_calling"])) == 2
