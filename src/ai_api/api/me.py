@@ -60,7 +60,10 @@ def _repr_token_prefix(a: Any) -> str | None:
 
 
 def _alloc_public(
-    a: Any, price: dict[str, str] | None = None, display_name: str | None = None
+    a: Any,
+    price: dict[str, str] | None = None,
+    display_name: str | None = None,
+    agent_compatible: bool = False,
 ) -> dict[str, Any]:
     return {
         "id": a.id,
@@ -75,6 +78,8 @@ def _alloc_public(
         "revoked_at": a.revoked_at.isoformat() if a.revoked_at else None,
         "token_prefix": _repr_token_prefix(a),
         "price": price,  # current per-1K price of the resource_model, or null
+        # Phase 27: can this model be driven via Responses (Codex/Agent)?
+        "agent_compatible": agent_compatible,
     }
 
 
@@ -92,18 +97,26 @@ async def list_my_allocations(
     from sqlalchemy import select
 
     from ai_api.models import ModelCatalog
-    from ai_api.services import pricing
+    from ai_api.services import pricing, responses_support
 
     allocations = await AllocationService(db).list(member_id=member.id)
     price_map = await pricing.current_price_map(db, datetime.now(UTC))
-    # slug → display_name from the catalog (orphan slugs absent → None)
-    name_rows = await db.execute(select(ModelCatalog.slug, ModelCatalog.display_name))
-    name_map: dict[str, str] = {row[0]: row[1] for row in name_rows.all()}
+    # slug → (display_name, capabilities) from the catalog (orphan slugs absent).
+    rows = await db.execute(
+        select(ModelCatalog.slug, ModelCatalog.display_name, ModelCatalog.capabilities)
+    )
+    name_map: dict[str, str] = {}
+    agent_map: dict[str, bool] = {}
+    for slug, display_name, caps in rows.all():
+        name_map[slug] = display_name
+        # Phase 27: agent-compatible = the model can be driven via Responses (Codex).
+        agent_map[slug] = responses_support.get_support(caps or [])["state"] == "available"
     return [
         _alloc_public(
             a,
             pricing.price_for_slug(price_map, _provider_of(a.resource_model), a.resource_model),
             name_map.get(a.resource_model),
+            agent_map.get(a.resource_model, False),
         )
         for a in allocations
     ]

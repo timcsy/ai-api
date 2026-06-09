@@ -164,3 +164,43 @@ async def test_claim_unknown_model_404(
 async def test_claim_requires_session(app_client: AsyncClient) -> None:
     r = await app_client.post("/me/allocations", json={"model": "azure/open-ss"})
     assert r.status_code in (401, 403)
+
+
+# Phase 27 (037): GET /me/allocations carries derived `agent_compatible`
+async def _seed_caps(slug: str, capabilities: list[str]) -> None:
+    sm = get_sessionmaker()
+    now = datetime.now(UTC)
+    async with sm() as s:
+        s.add(ModelCatalog(
+            slug=slug, provider=slug.split("/", 1)[0], display_name="M", family="x",
+            description="", modality_input=["text"], modality_output=["text"],
+            capabilities=capabilities, context_window=1024, cost_tier="low",
+            recommended_for=[], tags=[], example_request={}, official_doc_url=None,
+            status="active", deprecation_note=None, created_at=now, updated_at=now,
+            default_access="open", allowed_tags=[], denied_tags=[],
+            self_service_enabled=False, self_service_default_quota=None,
+        ))
+        await s.commit()
+
+
+@pytest.mark.asyncio
+async def test_me_allocations_agent_compatible(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    me = await _login(app_client, admin_headers, email="ac@x.com")
+    mid = me["id"]
+    await _seed_caps("azure/agent", ["chat", "responses"])   # available → true
+    await _seed_caps("azure/plain", ["chat"])                # unknown → false
+    # orphan: azure/ghost has NO catalog row → false
+    for model in ("azure/agent", "azure/plain", "azure/ghost"):
+        r = await app_client.post(
+            "/admin/allocations", headers=admin_headers,
+            json={"member_id": mid, "resource_model": model},
+        )
+        assert r.status_code in (200, 201), r.text
+
+    rows = (await app_client.get("/me/allocations")).json()
+    by_model = {a["resource_model"]: a for a in rows}
+    assert by_model["azure/agent"]["agent_compatible"] is True
+    assert by_model["azure/plain"]["agent_compatible"] is False
+    assert by_model["azure/ghost"]["agent_compatible"] is False

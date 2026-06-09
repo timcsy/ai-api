@@ -48,6 +48,7 @@ const MAIN_NAV = [
   { to: "/allocations", label: "分配", adminOnly: false },
   { to: "/usage", label: "用量", adminOnly: false },
   { to: "/catalog", label: "模型目錄", adminOnly: false },
+  { to: "/apps", label: "應用", adminOnly: false },
   { to: "/admin", label: "管理員", adminOnly: true },
 ];
 

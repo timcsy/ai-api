@@ -1,11 +1,8 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ApiEndpointCard } from "@/components/api-endpoint-card";
 import { AppCredentialsCard } from "@/components/app-credentials-card";
-import { CodexInstallCard } from "@/components/codex-install-card";
-import { useAuth } from "@/contexts/auth";
 
 export function KeysPage() {
-  const { member } = useAuth();
   return (
     <div className="container mx-auto py-8 space-y-6">
       <section>
@@ -19,7 +16,6 @@ export function KeysPage() {
 
       <section className="space-y-3">
         <ApiEndpointCard />
-        <CodexInstallCard baseUrl={member?.gateway_base_url ?? window.location.origin} />
       </section>
 
       <section>

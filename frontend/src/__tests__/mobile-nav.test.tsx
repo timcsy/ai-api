@@ -75,6 +75,7 @@ describe("mobile navigation (Phase 16 US1)", () => {
     expect(drawer.getByText("分配")).toBeInTheDocument();
     expect(drawer.getByText("用量")).toBeInTheDocument();
     expect(drawer.getByText("模型目錄")).toBeInTheDocument();
+    expect(drawer.getByText("應用")).toBeInTheDocument();
     expect(drawer.getByText("管理員")).toBeInTheDocument();
     for (const label of SUBNAV) {
       expect(drawer.getByText(label)).toBeInTheDocument();
