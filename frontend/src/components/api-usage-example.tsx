@@ -22,14 +22,101 @@ import { copyToClipboard } from "@/lib/clipboard";
 export function ApiUsageExample({
   model,
   supportsResponses = false,
+  isEmbedding = false,
 }: {
   model: string;
   supportsResponses?: boolean;
+  isEmbedding?: boolean;
 }) {
   const { toast } = useToast();
   const [tab, setTab] = React.useState("curl");
   const base = apiBaseUrl();
   const m = model || "<model-slug>";
+
+  // Phase 29: embedding models call /v1/embeddings with {model, input}.
+  if (isEmbedding) {
+    const embSnippets: Record<string, string> = {
+      curl: `curl -X POST ${base}/embeddings \\
+  -H "Authorization: Bearer $TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "${m}",
+    "input": "你好"
+  }'`,
+      python: `from openai import OpenAI
+
+client = OpenAI(
+    base_url="${base}",
+    api_key="$TOKEN",
+)
+resp = client.embeddings.create(
+    model="${m}",
+    input="你好",
+)
+print(resp.data[0].embedding)`,
+      javascript: `const res = await fetch("${base}/embeddings", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer $TOKEN",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    model: "${m}",
+    input: "你好",
+  }),
+});
+const data = await res.json();
+console.log(data.data[0].embedding);`,
+      json: `{
+  "model": "${m}",
+  "input": "你好"
+}`,
+    };
+    const embKeys = ["curl", "python", "javascript", "json"] as const;
+    const embLabel: Record<string, string> = {
+      curl: "curl", python: "Python", javascript: "JavaScript", json: "JSON body",
+    };
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <CardTitle className="text-lg">如何呼叫</CardTitle>
+              <CardDescription>
+                這是向量（embedding）模型，端點 <code className="text-xs break-all">{base}/embeddings</code>；
+                把 <code className="text-xs">$TOKEN</code> 換成你的金鑰 token。
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={async () => {
+                const ok = await copyToClipboard(embSnippets[tab] ?? embSnippets.curl!);
+                toast({ title: ok ? "已複製" : "複製失敗", variant: ok ? "default" : "destructive" });
+              }}
+            >
+              複製
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={embKeys.includes(tab as (typeof embKeys)[number]) ? tab : "curl"} onValueChange={setTab}>
+            <TabsList className="flex-wrap h-auto">
+              {embKeys.map((k) => (
+                <TabsTrigger key={k} value={k}>{embLabel[k]}</TabsTrigger>
+              ))}
+            </TabsList>
+            {embKeys.map((k) => (
+              <TabsContent key={k} value={k}>
+                <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">{embSnippets[k]}</pre>
+              </TabsContent>
+            ))}
+          </Tabs>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const snippets: Record<string, string> = {
     curl: `curl -X POST ${base}/chat/completions \\

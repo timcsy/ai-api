@@ -17,4 +17,18 @@ describe("<ApiUsageExample />", () => {
     // Phase 20: the per-model Codex config tab was removed; no Codex tab remains.
     expect(screen.queryByRole("tab", { name: "Codex" })).not.toBeInTheDocument();
   });
+
+  // Phase 29
+  it("shows /embeddings example for embedding models", () => {
+    render(<ApiUsageExample model="azure/text-embedding-3" isEmbedding />);
+    expect(screen.getByText(/向量（embedding）模型/)).toBeInTheDocument();
+    expect(screen.getAllByText(/\/embeddings/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/messages/)).not.toBeInTheDocument();
+  });
+
+  it("shows chat example (not embeddings) for non-embedding models", () => {
+    render(<ApiUsageExample model="azure/gpt-x" />);
+    expect(screen.getByText(/messages/)).toBeInTheDocument();
+    expect(screen.queryByText(/向量（embedding）模型/)).not.toBeInTheDocument();
+  });
 });

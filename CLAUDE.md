@@ -56,6 +56,8 @@ Auto-generated from all feature plans. Last updated: 2026-06-09
 - PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表、不新增 migration**——只讀既有 `model_catalog`（modality + `litellm_sync.raw.mode`）。 (036-admin-model-test)
 - TypeScript strict + React 19 + Vite 6（前端為主）/ Python 3.11+（後端僅 1 個既有端點加衍生欄） + React Router、TanStack Query、shadcn/ui（前端）；FastAPI、SQLAlchemy 2.x async（後端）。皆既有，**不新增套件。** (037-application-catalog)
 - PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表、不新增 migration**——`agent_compatible` 為查詢層唯讀計算欄（讀既有 `model_catalog.capabilities` 的 `responses` 標記）。 (037-application-catalog)
+- Python 3.11+（後端為主）/ TypeScript strict + React 19（前端僅範例顯示） + FastAPI、SQLAlchemy 2.x async、`litellm`（library form：`aembedding` 既有函式）；前端 shadcn/ui（皆既有，**不新增套件**） (038-embeddings-endpoint)
+- PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表、不新增 migration**——embedding 呼叫沿用既有 `CallRecord` + token 計費（`PriceList`）。 (038-embeddings-endpoint)
 
 - Python 3.11+ + LiteLLM（proxy core）、FastAPI（admin API）、 (001-gateway-core)
 
@@ -76,9 +78,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 038-embeddings-endpoint: Added Python 3.11+（後端為主）/ TypeScript strict + React 19（前端僅範例顯示） + FastAPI、SQLAlchemy 2.x async、`litellm`（library form：`aembedding` 既有函式）；前端 shadcn/ui（皆既有，**不新增套件**）
 - 037-application-catalog: Added TypeScript strict + React 19 + Vite 6（前端為主）/ Python 3.11+（後端僅 1 個既有端點加衍生欄） + React Router、TanStack Query、shadcn/ui（前端）；FastAPI、SQLAlchemy 2.x async（後端）。皆既有，**不新增套件。**
 - 036-admin-model-test: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端），皆既有不變 + FastAPI、SQLAlchemy 2.x async、Pydantic v2、`litellm`（library form：`acompletion`/`aresponses`/`aembedding`/`aspeech`/`aimage_generation`，皆既有套件內函式）；TanStack Query、shadcn/ui（前端）。**不新增套件。**
-- 035-responses-support-detection: Added Python 3.11+（後端，既有不變）/ TypeScript strict + React 19 + Vite 6（前端，既有不變） + FastAPI、SQLAlchemy 2.x async、Pydantic v2、`litellm`（aresponses 橋接，既有）；TanStack Query、shadcn/ui（前端，既有）。**不新增套件。**
 
 
 <!-- MANUAL ADDITIONS START -->
