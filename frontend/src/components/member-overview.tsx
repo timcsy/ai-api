@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
+import { CodexLogo } from "@/components/app-logos";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UsageSummary } from "@/components/usage-summary";
@@ -10,6 +11,7 @@ import { ApiError, api } from "@/lib/api-client";
 interface Allocation {
   id: string;
   status: string;
+  agent_compatible?: boolean;
 }
 interface AppCredential {
   id: string;
@@ -39,7 +41,9 @@ export function MemberOverview() {
     queryFn: () => api<ClaimableModel[]>("/me/claimable-models"),
   });
 
-  const activeAllocs = (allocsQuery.data ?? []).filter((a) => a.status === "active").length;
+  const allocs = allocsQuery.data ?? [];
+  const activeAllocs = allocs.filter((a) => a.status === "active").length;
+  const hasAgentModel = allocs.some((a) => a.status === "active" && a.agent_compatible);
   const activeKeys = (credsQuery.data ?? []).filter((c) => c.status === "active").length;
   const hasNoKey = credsQuery.isSuccess && activeKeys === 0;
   const hasClaimable = (claimableQuery.data ?? []).some((m) => m.state === "claimable");
@@ -102,10 +106,30 @@ export function MemberOverview() {
         </div>
       </section>
 
-      <section>
-        <Link to="/apps" className="text-sm text-muted-foreground underline underline-offset-4">
-          安裝 Codex／把金鑰接上應用 →
-        </Link>
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">應用</h2>
+          <Link to="/apps" className="text-sm text-muted-foreground underline underline-offset-4">
+            看全部應用 →
+          </Link>
+        </div>
+        {hasAgentModel && (
+          <Link to="/apps/codex" className="block">
+            <Card className="transition-colors hover:bg-accent">
+              <CardContent className="flex items-center gap-3 p-4">
+                <div className="shrink-0 rounded-md bg-muted p-2 text-foreground">
+                  <CodexLogo className="h-7 w-7" />
+                </div>
+                <div className="min-w-0">
+                  <div className="font-medium">試試 Codex</div>
+                  <p className="text-sm text-muted-foreground">
+                    你有 Agent 相容的模型——一鍵把 Codex 接上本平台。
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
       </section>
     </div>
   );
