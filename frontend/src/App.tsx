@@ -33,6 +33,7 @@ import { AllocationDetailPage } from "@/routes/allocation-detail";
 import { AllocationsPage } from "@/routes/allocations";
 import { CatalogPage } from "@/routes/catalog";
 import { DeviceAuthorizePage } from "@/routes/device-authorize";
+import { ApplicationsPage } from "@/routes/apps";
 import { CatalogDetailPage } from "@/routes/catalog-detail";
 import { DashboardPage } from "@/routes/dashboard";
 import { KeysPage } from "@/routes/keys";
@@ -72,6 +73,7 @@ export function App() {
               <Route path="/device" element={<DeviceAuthorizePage />} />
               <Route path="/catalog" element={<CatalogPage />} />
               <Route path="/catalog/*" element={<CatalogDetailPage />} />
+              <Route path="/apps" element={<ApplicationsPage />} />
 
               {/* Phase 5.1 — admin routes (consolidated) */}
               <Route element={<AdminRoute />}>

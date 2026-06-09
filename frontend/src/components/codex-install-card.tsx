@@ -82,17 +82,13 @@ export function CodexInstallCard({ baseUrl }: { baseUrl: string }) {
                   用平台金鑰取代目前登入。想換回自己的 OpenAI 帳號，重跑 <code className="break-all">codex login</code> 即可（可逆）。
                 </li>
                 <li>
-                  <strong>編輯器擴充（VS Code / Cursor / JetBrains 的 Codex）</strong>：與 CLI 共用同一份設定，通常會一起指向本平台。
+                  <strong>編輯器擴充（VS Code / Cursor / JetBrains 的 Codex）</strong>：與 CLI 共用同一份設定，
+                  從各自的 marketplace 裝好後通常會一起指向本平台、<strong>免再設定</strong>。
                 </li>
-              </ul>
-            </div>
-            <div>
-              <p className="font-medium text-foreground">△ 技術上可以、但目前不建議</p>
-              <ul className="mt-1 list-disc space-y-1 pl-5">
                 <li>
-                  <strong>Codex 桌面 App</strong>：也讀同一份 <code className="break-all">~/.codex</code> 設定、可用 API key 指向本平台，
-                  但 OpenAI 文件說「用 API key 時部分功能受限」，且目前有一個未修復的已知問題（指向自訂網址時可能帶錯金鑰）。
-                  現階段請用 <strong>CLI</strong> 最穩。
+                  <strong>Codex 桌面 App</strong>：用上面的一鍵安裝（走 CLI 寫好共用設定）後，桌面 App 開起來讀同一份
+                  <code className="break-all"> ~/.codex</code> 就能用、<strong>免再設定</strong>。
+                  （別在 App 自己的 GUI 手動填 API key——那條目前有已知問題；走共用設定這條最穩。）
                 </li>
               </ul>
             </div>

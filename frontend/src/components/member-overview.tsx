@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CodexInstallCard } from "@/components/codex-install-card";
 import { UsageSummary } from "@/components/usage-summary";
 import { useAuth } from "@/contexts/auth";
 import { ApiError, api } from "@/lib/api-client";
@@ -104,7 +103,9 @@ export function MemberOverview() {
       </section>
 
       <section>
-        <CodexInstallCard baseUrl={member?.gateway_base_url ?? window.location.origin} />
+        <Link to="/apps" className="text-sm text-muted-foreground underline underline-offset-4">
+          安裝 Codex／把金鑰接上應用 →
+        </Link>
       </section>
     </div>
   );

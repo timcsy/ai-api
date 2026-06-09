@@ -36,8 +36,10 @@ describe("<CodexInstallCard />", () => {
     // The note is collapsed behind a summary; expand it.
     await user.click(screen.getByText(/已經裝過 Codex/));
     expect(screen.getByText(/不會重裝/)).toBeInTheDocument();
-    // Desktop app is explicitly called out (works but not recommended yet).
+    // Phase 27: desktop App is now ✓ via shared config (免再設定), not "不建議".
     expect(screen.getByText(/Codex 桌面 App/)).toBeInTheDocument();
+    expect(screen.getAllByText(/免再設定/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/不建議/)).not.toBeInTheDocument();
   });
 
   it("links to the official Codex docs", () => {
