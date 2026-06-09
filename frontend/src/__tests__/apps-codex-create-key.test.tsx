@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider } from "@/contexts/auth";
-import { ApplicationsPage } from "@/routes/apps";
+import { AppDetailPage } from "@/routes/app-detail";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -35,10 +35,10 @@ function setup(allocations: unknown[]) {
   });
   render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={["/apps"]}>
+      <MemoryRouter initialEntries={["/apps/codex"]}>
         <AuthProvider queryClient={qc}>
           <Routes>
-            <Route path="/apps" element={<ApplicationsPage />} />
+            <Route path="/apps/:appId" element={<AppDetailPage />} />
           </Routes>
         </AuthProvider>
       </MemoryRouter>
@@ -49,22 +49,25 @@ function setup(allocations: unknown[]) {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("Codex create-key shortcut (Phase 27 US2)", () => {
+describe("Codex detail create-key shortcut (Phase 28 US2)", () => {
+  it("renders the Codex detail with the one-click install", async () => {
+    setup([AGENT]);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Codex" })).toBeInTheDocument());
+    expect(screen.getByText(/安裝 Codex/)).toBeInTheDocument();
+  });
+
   it("only includes agent-compatible allocations and creates a Codex-scoped key", async () => {
     const calls = setup([AGENT, PLAIN]);
     const user = userEvent.setup();
     await waitFor(() => expect(screen.getByText("為 Codex 建金鑰")).toBeInTheDocument());
     await user.click(screen.getByText("為 Codex 建金鑰"));
-    // picker lists the agent-compatible allocation, NOT the plain one
     await waitFor(() => expect(screen.getByText("Agent GPT")).toBeInTheDocument());
     expect(screen.queryByText("Plain GPT")).not.toBeInTheDocument();
-    // create → POST /me/credentials with only the agent allocation id
     await user.click(screen.getByRole("button", { name: "建立" }));
     await waitFor(() => {
       const post = calls.find((c) => c.url.endsWith("/me/credentials") && c.init?.method === "POST");
       expect(post).toBeTruthy();
-      const body = JSON.parse(post!.init!.body as string);
-      expect(body.allocation_ids).toEqual(["a-agent"]);
+      expect(JSON.parse(post!.init!.body as string).allocation_ids).toEqual(["a-agent"]);
     });
   });
 
