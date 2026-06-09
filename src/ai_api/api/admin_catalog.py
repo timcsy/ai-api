@@ -794,7 +794,10 @@ async def admin_test_model(
         elif kind == "tts":
             await upstream.aspeech(input="hi", voice="alloy", **common)
         elif kind == "image":
-            await upstream.aimage_generation(prompt="a red dot", size="256x256", n=1, **common)
+            # Don't pin a size: newer image models (gpt-image-*) reject tiny sizes
+            # ("below the current minimum pixel budget"). The model's default size
+            # is always valid; let it apply. n=1 is universally supported.
+            await upstream.aimage_generation(prompt="a red dot", n=1, **common)
     except Exception as e:  # test result IS the response — never 5xx
         await _audit(False, error_type="upstream_error")
         return {

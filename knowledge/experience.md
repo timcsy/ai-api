@@ -508,7 +508,7 @@
 - **來源**：`frontend/src/lib/status-label.ts`、`catalog-labels.ts`、`components/app-shell.tsx`、`src/__tests__/mobile-nav.test.tsx`
   等 ~27 檔；rev 71→73（2026-06-08，使用者逐輪截圖才掃乾淨）
 
-### 健康探測對推理模型不能用極小 max_tokens——推理 token 會吃掉 completion 預算
+### 健康探測別把「最小測試參數」寫死——模型一變就過時（max_tokens / image size …）
 
 - **理論說**：連通性／健康測試只要打一個極小回覆即可，`max_tokens=1`（或 16）省錢又快。
 - **實際發生**（階段 26 真機）：admin 對 `azure/gpt-5.4` 按「測試模型」回紅字
@@ -523,4 +523,8 @@
   誤報失敗。給一個「夠推理跑完」的寬上限（非推理模型不會真用到、成本不變），或別設 cap。判準：**這個 cap 是否
   含 reasoning？** 含 → 不能用「期望輸出長度」當值。附帶：BadRequest 說「raise max_tokens」其實證明模型可達，
   是「探測設定」而非「模型壞」。
-- **來源**：`src/ai_api/api/admin_catalog.py`（model test）、`admin_providers.py`（test-connection）；階段 26（gpt-5.4 真機暴露）
+  **更一般的版本（同根、原則 7 演進性）**：別把「最小測試參數」寫死——模型一變就過時。同類再現：圖片測試寫死
+  `size="256x256"`，新模型（`gpt-image-2`）有「最低 pixel budget」直接回 `Invalid size … below minimum`。
+  對策：**能不指定就用模型預設**（預設值對該模型必定有效），非用不可時給「夠寬、跨版本安全」的值，別用「我以為的最小」。
+- **來源**：`src/ai_api/api/admin_catalog.py`（model test：max_tokens=2048、image 不指定 size）、
+  `admin_providers.py`（test-connection）；階段 26（gpt-5.4 max_tokens、gpt-image-2 size 真機暴露）
