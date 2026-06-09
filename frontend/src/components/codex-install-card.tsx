@@ -89,6 +89,16 @@ export function CodexInstallCard({ baseUrl }: { baseUrl: string }) {
                   <strong>Codex 桌面 App</strong>：用上面的一鍵安裝（走 CLI 寫好共用設定）後，桌面 App 開起來讀同一份
                   <code className="break-all"> ~/.codex</code> 就能用、<strong>免再設定</strong>。
                   （別在 App 自己的 GUI 手動填 API key——那條目前有已知問題；走共用設定這條最穩。）
+                  若官方桌面 App 裝不起來，可改用社群鏡像{" "}
+                  <a
+                    href="https://github.com/Wangnov/codex-app-mirror"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    codex-app-mirror
+                  </a>
+                  （非官方、<strong>風險自負</strong>）。
                 </li>
               </ul>
             </div>
