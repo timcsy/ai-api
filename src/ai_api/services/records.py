@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import cast
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from ulid import ULID
 
@@ -70,6 +70,22 @@ class RecordsService:
             .limit(limit)
         )
         if before:
-            stmt = stmt.where(CallRecord.id < before)
+            # Keyset cursor MUST match the sort key (started_at DESC, id DESC).
+            # Filtering on `id` alone is wrong: ULIDs minted in the same
+            # millisecond order by their random suffix, not by started_at, so an
+            # `id < before` boundary returns a non-deterministic row count. Page
+            # strictly *after* the pivot row in (started_at, id) order instead.
+            pivot_started_at = (
+                select(CallRecord.started_at).where(CallRecord.id == before).scalar_subquery()
+            )
+            stmt = stmt.where(
+                or_(
+                    CallRecord.started_at < pivot_started_at,
+                    and_(
+                        CallRecord.started_at == pivot_started_at,
+                        CallRecord.id < before,
+                    ),
+                )
+            )
         result = await self._s.execute(stmt)
         return cast(list[CallRecord], list(result.scalars().all()))

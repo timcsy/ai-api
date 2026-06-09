@@ -44,6 +44,7 @@ interface ModelDetail {
     state: "available" | "unavailable" | "unknown";
     source: "tested" | "manual" | null;
   };
+  kind?: "chat" | "embedding" | "tts" | "image" | "stt" | "unknown";
   context_window: number;
   cost_tier: string;
   recommended_for: string[];
@@ -235,7 +236,11 @@ export function CatalogDetailPage() {
         </CardContent>
       </Card>
 
-      <ApiUsageExample model={m.slug} supportsResponses={m.capabilities.includes("responses")} />
+      <ApiUsageExample
+        model={m.slug}
+        supportsResponses={m.capabilities.includes("responses")}
+        isEmbedding={m.kind === "embedding"}
+      />
 
       {m.official_doc_url && (
         <p className="text-sm">

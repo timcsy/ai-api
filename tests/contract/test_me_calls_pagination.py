@@ -120,6 +120,65 @@ async def test_calls_default_limit_is_20(
     assert body["next_before_id"] is not None
 
 
+async def _seed_calls_id_desc_started_asc(allocation_id: str, n: int) -> None:
+    """Seed n rows where the ULID `id` order is the REVERSE of started_at order,
+    all within the same wall-clock instant.
+
+    Regression for the keyset-cursor bug: the query sorts by (started_at, id) but
+    the old cursor filtered on `id` alone. When ids don't track started_at (exactly
+    what happens with same-millisecond ULIDs), an `id < before` boundary returns a
+    non-deterministic page size. Here we force the worst case deterministically.
+    """
+    sm = get_sessionmaker()
+    instant = datetime.now(UTC)
+    # Descending ULIDs (lexically) paired with ascending started_at → the two
+    # orderings are exact opposites, so an id-only cursor is guaranteed wrong.
+    ids = sorted((str(ULID()) for _ in range(n)), reverse=True)
+    async with sm() as s:
+        for i, ulid in enumerate(ids):
+            s.add(
+                CallRecord(
+                    id=ulid,
+                    request_id=f"r-{i}",
+                    allocation_id=allocation_id,
+                    subject="alice@x.com",
+                    model="gpt-4o-mini",
+                    started_at=instant + timedelta(minutes=i),
+                    finished_at=instant + timedelta(minutes=i),
+                    status_code=200,
+                    outcome=CallOutcome.success,
+                    prompt_tokens=10,
+                    completion_tokens=5,
+                    total_tokens=15,
+                )
+            )
+        await s.commit()
+
+
+@pytest.mark.asyncio
+async def test_calls_cursor_paginates_when_id_order_differs_from_time(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    alloc = await _make_member_login_and_alloc(app_client, admin_headers)
+    await _seed_calls_id_desc_started_asc(alloc["id"], n=30)
+
+    r1 = await app_client.get(f"/me/allocations/{alloc['id']}/calls?limit=20")
+    page1 = r1.json()
+    assert len(page1["items"]) == 20
+    assert page1["next_before_id"] is not None
+
+    r2 = await app_client.get(
+        f"/me/allocations/{alloc['id']}/calls?limit=20&before_id={page1['next_before_id']}"
+    )
+    page2 = r2.json()
+    assert len(page2["items"]) == 10  # exactly the remainder — no off-by-N
+    assert page2["next_before_id"] is None
+    # No overlap between pages (each call returned once).
+    ids1 = {it["id"] for it in page1["items"]}
+    ids2 = {it["id"] for it in page2["items"]}
+    assert ids1.isdisjoint(ids2)
+
+
 @pytest.mark.asyncio
 async def test_calls_limit_validation(
     app_client: AsyncClient, admin_headers: dict[str, str]

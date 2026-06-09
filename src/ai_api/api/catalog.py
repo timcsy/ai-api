@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import get_db_session, require_active_member
 from ai_api.models import Member, ModelCatalog
-from ai_api.services import pricing, responses_support
+from ai_api.services import model_kind, pricing, responses_support
 from ai_api.services.model_access import ModelAccessService
 from ai_api.services.model_catalog import compute_facets, filter_models
 
@@ -37,6 +37,8 @@ def _to_summary(m: ModelCatalog, price: dict[str, str] | None = None) -> dict[st
         # badge and expose the typed support state + source separately (axis ③).
         "capabilities": responses_support.strip_internal(m.capabilities),
         "responses_support": responses_support.get_support(m.capabilities),
+        # Phase 29: derived endpoint kind so the UI shows the right call example.
+        "kind": model_kind.model_kind(m),
         "context_window": m.context_window,
         "cost_tier": m.cost_tier,
         "recommended_for": list(m.recommended_for),
