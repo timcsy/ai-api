@@ -52,6 +52,12 @@ export function CodexInstallCard({ baseUrl }: { baseUrl: string }) {
             Windows
           </button>
         </div>
+        {os === "windows" && (
+          <p className="text-xs text-amber-600 dark:text-amber-500">
+            ⚠ 請在 <strong>PowerShell</strong> 視窗貼上執行（在「開始」搜尋「PowerShell」開啟）。
+            <strong>不要用「命令提示字元 / cmd」</strong>——cmd 不認得 <code>irm</code> 指令會直接報錯。
+          </p>
+        )}
         <div className="flex items-stretch gap-2">
           <code className="block flex-1 min-w-0 break-all text-sm bg-muted px-2 py-1.5 rounded">
             {command}
