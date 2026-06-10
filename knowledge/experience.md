@@ -528,3 +528,11 @@
   對策：**能不指定就用模型預設**（預設值對該模型必定有效），非用不可時給「夠寬、跨版本安全」的值，別用「我以為的最小」。
 - **來源**：`src/ai_api/api/admin_catalog.py`（model test：max_tokens=2048、image 不指定 size）、
   `admin_providers.py`（test-connection）；階段 26（gpt-5.4 max_tokens、gpt-image-2 size 真機暴露）
+
+### 連帶刪除要在服務層顯式做，別靠 DB ondelete——SQLite 測試環境不強制 FK
+
+- **理論說**：FK 都標了 `ondelete`（CASCADE / SET NULL / RESTRICT），刪父 row 時子 row 自動連帶處理，靠 DB 就好。
+- **實際發生**：階段 30「安全刪除成員」要刪分配（連帶把 `CallRecord.allocation_id` 設 NULL 保留用量史、cascade 憑證）。schema 的 ondelete 都齊全，但 `db.py` **沒設 `PRAGMA foreign_keys=ON`** → **SQLite（dev/CI）不強制** ondelete，Postgres（生產）卻會。若靠 DB cascade：contract 測試（SQLite）會「看似通過」但連帶根本沒發生，到生產才以不同行為炸開——正是「dev/prod 用不同 DB 後端時『能跑』≠『正確』」（見 datetime tz-aware 那條）的同類陷阱。
+- **解決方式**：在 `MemberService.delete` 內以 **ORM 顯式**逐步處理整條連帶（`UPDATE call_records SET allocation_id=NULL` → 刪 credential_allocations → credentials → allocations → member），單一交易，**完全不依賴 DB ondelete**。並把這條的驗證寫成 **integration 測試（跑真 Postgres，FK 真強制）** 而非只在 SQLite contract 測，雙重保險。
+- **教訓**：凡「刪一個東西要連帶處理子資料」的邏輯，**在服務層顯式寫出每一步**，別把正確性託付給 DB 的 ondelete——只要測試 DB 與生產 DB 的 FK 強制行為不同（SQLite 預設關、Postgres 開），靠 DB cascade 就會 dev/prod drift 且測試測不出來。顯式做＝可攜、可測、可在每步插稽核。需要驗 DB 端真實行為時，補一支 Postgres integration 測試。
+- **來源**：`src/ai_api/services/members.py` `delete`；`tests/integration/test_member_safe_delete.py`；階段 30
