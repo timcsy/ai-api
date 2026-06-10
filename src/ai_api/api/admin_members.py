@@ -12,9 +12,10 @@ from ai_api.api.deps import get_db_session, require_admin_token
 from ai_api.auth.sessions import revoke_all_for_member
 from ai_api.models import Member, MemberProvider, MemberStatus, Session
 from ai_api.services.members import (
+    CannotDeleteSelfError,
+    LastAdminCannotDeleteError,
     LastAdminCannotDemoteError,
     MemberAlreadyExists,
-    MemberHasActiveAllocations,
     MemberService,
 )
 
@@ -34,6 +35,14 @@ class UpdateMemberRequest(BaseModel):
     display_name: str | None = None
     status: MemberStatus | None = None
     is_admin: bool | None = None
+
+
+class BulkDeleteRequest(BaseModel):
+    member_ids: list[str]
+
+
+class BulkCreateRequest(BaseModel):
+    emails: str  # newline-separated email list
 
 
 def _member_admin(m: Member) -> dict[str, Any]:
@@ -151,17 +160,24 @@ async def update_member(
 async def delete_member(
     member_id: str,
     session: AsyncSession = Depends(get_db_session),
+    current_admin: Member | None = Depends(require_admin_token),
 ) -> None:
     try:
-        ok = await MemberService(session).delete(member_id)
-    except MemberHasActiveAllocations as exc:
+        ok = await MemberService(session).delete(
+            member_id, acting_admin_id=current_admin.id if current_admin else None
+        )
+    except CannotDeleteSelfError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": {"code": "cannot_delete_self", "message": "cannot delete your own account"}
+            },
+        ) from exc
+    except LastAdminCannotDeleteError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
-                "error": {
-                    "code": "member_has_allocations",
-                    "message": "revoke and delete allocations before deleting member",
-                }
+                "error": {"code": "last_admin", "message": "at least one active admin must remain"}
             },
         ) from exc
     if not ok:
@@ -169,6 +185,118 @@ async def delete_member(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": {"code": "not_found", "message": "member not found"}},
         )
+
+
+@router.post("/members/bulk-delete")
+async def bulk_delete_members(
+    payload: BulkDeleteRequest,
+    current_admin: Member | None = Depends(require_admin_token),
+) -> dict[str, Any]:
+    """Batch safe-delete. Each id is processed in its own transaction; one
+    failure never rolls back or blocks the others (per-item independent)."""
+    if not payload.member_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "bad_request", "message": "member_ids must not be empty"}},
+        )
+    from ai_api.db import get_sessionmaker
+
+    acting_id = current_admin.id if current_admin else None
+    sm = get_sessionmaker()
+    results: list[dict[str, Any]] = []
+    deleted = failed = 0
+    for mid in payload.member_ids:
+        reason: str | None = None
+        try:
+            async with sm() as s:
+                ok = await MemberService(s).delete(mid, acting_admin_id=acting_id)
+                await s.commit()
+            if ok:
+                results.append({"member_id": mid, "status": "deleted", "reason": None})
+                deleted += 1
+                continue
+            reason = "not_found"
+        except CannotDeleteSelfError:
+            reason = "cannot_delete_self"
+        except LastAdminCannotDeleteError:
+            reason = "last_admin"
+        except Exception:
+            reason = "internal"
+        results.append({"member_id": mid, "status": "failed", "reason": reason})
+        failed += 1
+    return {"deleted": deleted, "failed": failed, "results": results}
+
+
+@router.post("/members/bulk-create")
+async def bulk_create_members(
+    request: Request,
+    payload: BulkCreateRequest,
+) -> dict[str, Any]:
+    """Batch pre-create local_password members from a pasted email list. Each
+    email is processed independently; results are classified created / exists /
+    invalid / duplicate."""
+    from pydantic import TypeAdapter
+
+    from ai_api.db import get_sessionmaker
+
+    email_adapter: TypeAdapter[EmailStr] = TypeAdapter(EmailStr)
+    lines = [ln.strip().lower() for ln in payload.emails.splitlines()]
+    lines = [ln for ln in lines if ln]
+    if not lines:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "bad_request", "message": "no emails provided"}},
+        )
+
+    base_url = str(request.base_url).rstrip("/")
+    sm = get_sessionmaker()
+    seen: set[str] = set()
+    results: list[dict[str, Any]] = []
+    counts = {"created": 0, "exists": 0, "invalid": 0, "duplicate": 0}
+
+    for email in lines:
+        if email in seen:
+            results.append({"email": email, "status": "duplicate", "invitation_url": None})
+            counts["duplicate"] += 1
+            continue
+        seen.add(email)
+        try:
+            email_adapter.validate_python(email)
+        except Exception:
+            results.append({"email": email, "status": "invalid", "invitation_url": None})
+            counts["invalid"] += 1
+            continue
+        try:
+            async with sm() as s:
+                created = await MemberService(s).create(
+                    email=email,
+                    provider=MemberProvider.local_password,
+                    send_invitation=True,
+                    created_by="bulk-admin",
+                )
+                from ai_api.auth import audit
+                from ai_api.models import ActorType, AuditEventType
+
+                await audit.record(
+                    s,
+                    event_type=AuditEventType.member_created,
+                    actor_type=ActorType.admin,
+                    actor_id="bulk-admin",
+                    target_type="member",
+                    target_id=created.member.id,
+                )
+                invitation_url = (
+                    f"{base_url}/auth/invitation/{created.invitation_plaintext}"
+                    if created.invitation_plaintext
+                    else None
+                )
+                await s.commit()
+            results.append({"email": email, "status": "created", "invitation_url": invitation_url})
+            counts["created"] += 1
+        except MemberAlreadyExists:
+            results.append({"email": email, "status": "exists", "invitation_url": None})
+            counts["exists"] += 1
+    return {**counts, "results": results}
 
 
 @router.get("/members/{member_id}/sessions")

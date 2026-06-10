@@ -12,7 +12,6 @@ from ulid import ULID
 from ai_api.auth import invitations, local, sessions
 from ai_api.models import (
     Allocation,
-    AllocationStatus,
     Member,
     MemberProvider,
     MemberStatus,
@@ -35,6 +34,14 @@ class LastAdminCannotDemoteError(Exception):
 
 class MemberHasActiveAllocations(Exception):
     pass
+
+
+class CannotDeleteSelfError(Exception):
+    """Raised when an admin tries to delete their own account."""
+
+
+class LastAdminCannotDeleteError(Exception):
+    """Raised when deleting the last remaining active admin."""
 
 
 class MemberService:
@@ -202,29 +209,108 @@ class MemberService:
         )
         return member
 
-    async def delete(self, member_id: str) -> bool:
+    async def delete(
+        self, member_id: str, *, acting_admin_id: str | None = None, actor: str = "admin"
+    ) -> bool:
+        """Safe-delete a member, cascading to its allocations / credentials /
+        credential links and orphan-retaining its call records (allocation_id →
+        NULL, subject kept) so usage history survives for audit.
+
+        Done explicitly at the ORM layer in a single transaction — NOT relying on
+        DB-level ondelete cascade, which SQLite (no FK pragma in this app) would
+        not enforce, so dev/CI and prod would diverge.
+
+        Guards (checked before any deletion): refuses to delete the acting admin's
+        own account (:class:`CannotDeleteSelfError`) or the last active admin
+        (:class:`LastAdminCannotDeleteError`).
+
+        Returns False if the member does not exist.
+        """
+        from sqlalchemy import delete as sa_delete
+        from sqlalchemy import func as sa_func
+        from sqlalchemy import update as sa_update
+
+        from ai_api.auth import audit
+        from ai_api.models import (
+            ActorType,
+            AuditEventType,
+            CallRecord,
+            Credential,
+            CredentialAllocation,
+        )
+
         member = await self.get(member_id)
         if member is None:
             return False
-        # Refuse if any active allocations exist (FK is RESTRICT).
-        active_alloc = (
-            await self._db.execute(
-                select(Allocation).where(
-                    Allocation.member_id == member.id,
-                    Allocation.status == AllocationStatus.active,
+
+        # Guard 1: never delete yourself (lock-out protection).
+        if acting_admin_id is not None and acting_admin_id == member_id:
+            raise CannotDeleteSelfError(member_id)
+
+        # Guard 2: never delete the last remaining active admin.
+        if member.is_admin and member.status == MemberStatus.active:
+            others = await self._db.scalar(
+                select(sa_func.count()).select_from(Member).where(
+                    Member.is_admin.is_(True),
+                    Member.status == MemberStatus.active,
+                    Member.id != member_id,
                 )
             )
-        ).scalar_one_or_none()
-        if active_alloc is not None:
-            raise MemberHasActiveAllocations(member_id)
-        # Revoked allocations would also block FK; require admin to handle explicitly.
-        any_alloc = (
+            if (others or 0) == 0:
+                raise LastAdminCannotDeleteError(member_id)
+
+        # Collect the member's allocation + credential ids.
+        alloc_ids = list(
+            (
+                await self._db.execute(
+                    select(Allocation.id).where(Allocation.member_id == member_id)
+                )
+            ).scalars()
+        )
+        cred_ids = list(
+            (
+                await self._db.execute(
+                    select(Credential.id).where(Credential.member_id == member_id)
+                )
+            ).scalars()
+        )
+
+        # Orphan-retain call records: keep the rows, drop the allocation link
+        # (subject preserves attribution for audit).
+        if alloc_ids:
             await self._db.execute(
-                select(Allocation).where(Allocation.member_id == member.id)
+                sa_update(CallRecord)
+                .where(CallRecord.allocation_id.in_(alloc_ids))
+                .values(allocation_id=None)
             )
-        ).scalar_one_or_none()
-        if any_alloc is not None:
-            raise MemberHasActiveAllocations(member_id)
+        # Remove credential↔allocation links (by either side), then credentials,
+        # then allocations, then the member — children before parents (Postgres FK).
+        if cred_ids or alloc_ids:
+            await self._db.execute(
+                sa_delete(CredentialAllocation).where(
+                    or_(
+                        CredentialAllocation.credential_id.in_(cred_ids or [""]),
+                        CredentialAllocation.allocation_id.in_(alloc_ids or [""]),
+                    )
+                )
+            )
+        if cred_ids:
+            await self._db.execute(
+                sa_delete(Credential).where(Credential.id.in_(cred_ids))
+            )
+        if alloc_ids:
+            await self._db.execute(
+                sa_delete(Allocation).where(Allocation.id.in_(alloc_ids))
+            )
         await self._db.delete(member)
         await self._db.flush()
+
+        await audit.record(
+            self._db,
+            event_type=AuditEventType.member_deleted,
+            actor_type=ActorType.admin,
+            actor_id=actor,
+            target_type="member",
+            target_id=member_id,
+        )
         return True
