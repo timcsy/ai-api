@@ -1,6 +1,6 @@
 # ai-api Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-06-09
+Auto-generated from all feature plans. Last updated: 2026-06-10
 
 ## Active Technologies
 - Python 3.11+（同 Phase 1） (002-auth-membership)
@@ -58,6 +58,8 @@ Auto-generated from all feature plans. Last updated: 2026-06-09
 - PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表、不新增 migration**——`agent_compatible` 為查詢層唯讀計算欄（讀既有 `model_catalog.capabilities` 的 `responses` 標記）。 (037-application-catalog)
 - Python 3.11+（後端為主）/ TypeScript strict + React 19（前端僅範例顯示） + FastAPI、SQLAlchemy 2.x async、`litellm`（library form：`aembedding` 既有函式）；前端 shadcn/ui（皆既有，**不新增套件**） (038-embeddings-endpoint)
 - PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表、不新增 migration**——embedding 呼叫沿用既有 `CallRecord` + token 計費（`PriceList`）。 (038-embeddings-endpoint)
+- Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Pydantic v2、既有 `auth/invitations`（後端）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件** (039-member-batch-admin)
+- PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表、不新增 migration**——所有連帶刪除以 ORM 顯式處理，沿用既有 `members`/`allocations`/`credentials`/`credential_allocations`/`call_records`/`audit_events` schema (039-member-batch-admin)
 
 - Python 3.11+ + LiteLLM（proxy core）、FastAPI（admin API）、 (001-gateway-core)
 
@@ -78,9 +80,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 039-member-batch-admin: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Pydantic v2、既有 `auth/invitations`（後端）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件**
 - 038-embeddings-endpoint: Added Python 3.11+（後端為主）/ TypeScript strict + React 19（前端僅範例顯示） + FastAPI、SQLAlchemy 2.x async、`litellm`（library form：`aembedding` 既有函式）；前端 shadcn/ui（皆既有，**不新增套件**）
 - 037-application-catalog: Added TypeScript strict + React 19 + Vite 6（前端為主）/ Python 3.11+（後端僅 1 個既有端點加衍生欄） + React Router、TanStack Query、shadcn/ui（前端）；FastAPI、SQLAlchemy 2.x async（後端）。皆既有，**不新增套件。**
-- 036-admin-model-test: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端），皆既有不變 + FastAPI、SQLAlchemy 2.x async、Pydantic v2、`litellm`（library form：`acompletion`/`aresponses`/`aembedding`/`aspeech`/`aimage_generation`，皆既有套件內函式）；TanStack Query、shadcn/ui（前端）。**不新增套件。**
 
 
 <!-- MANUAL ADDITIONS START -->

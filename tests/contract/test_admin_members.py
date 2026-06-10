@@ -112,9 +112,12 @@ async def test_patch_member_status(
 
 
 @pytest.mark.asyncio
-async def test_delete_member_with_allocations_409(
+async def test_delete_member_with_allocations_safe_deletes(
     app_client: AsyncClient, admin_headers: dict[str, str]
 ) -> None:
+    """Phase 30 behaviour change: a member with allocations is now SAFE-deleted
+    (allocations/credentials removed, usage orphan-retained) instead of blocked
+    with 409. See specs/039-member-batch-admin."""
     created = (
         await app_client.post(
             "/admin/members",
@@ -129,7 +132,11 @@ async def test_delete_member_with_allocations_409(
         json={"member_id": created["id"], "resource_model": "gpt-4o-mini"},
     )
     r = await app_client.delete(f"/admin/members/{created['id']}", headers=admin_headers)
-    assert r.status_code == 409
+    assert r.status_code == 204
+    # member is gone
+    assert (
+        await app_client.get(f"/admin/members/{created['id']}", headers=admin_headers)
+    ).status_code == 404
 
 
 @pytest.mark.asyncio

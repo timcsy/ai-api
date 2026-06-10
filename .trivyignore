@@ -38,3 +38,13 @@ CVE-2026-40356
 # runtime. apk upgrade --no-cache (already in Dockerfile.frontend) will pick up
 # the fix automatically once Alpine publishes 2.13.9-r1.
 CVE-2026-6732
+
+# ---- 2026-06-10: backend distroless base (PR #76) ----
+# libssl3 (openssl 3.0.x) — crafted PKCS#7 / S-MIME signed message parsing flaw.
+# Unreachable: this service uses libssl only as a TLS *client* (HTTPS to trusted
+# providers — Azure/OpenAI/Anthropic — and Postgres); it never parses
+# attacker-controlled PKCS#7 or S/MIME signed content, so the vulnerable path is
+# not exercised. Comes from the distroless debian-12 base, NOT our deps; no apt
+# to patch in place. Fixed upstream in 3.0.20-1~deb12u2 — clears via the next
+# distroless `:nonroot` rebuild.
+CVE-2026-45447

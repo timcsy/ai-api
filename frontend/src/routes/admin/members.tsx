@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -77,6 +79,9 @@ export function AdminMembersPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [createOpen, setCreateOpen] = React.useState(false);
+  const [batchCreateOpen, setBatchCreateOpen] = React.useState(false);
+  const [batchDeleteOpen, setBatchDeleteOpen] = React.useState(false);
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [confirm, setConfirm] = React.useState<
     | { kind: "demote"; member: AdminMember }
     | { kind: "promote"; member: AdminMember }
@@ -85,6 +90,14 @@ export function AdminMembersPage() {
     | { kind: "delete"; member: AdminMember }
     | null
   >(null);
+
+  const toggleOne = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const query = useQuery<AdminMember[], ApiError>({
     queryKey: ["admin", "members"],
@@ -121,6 +134,36 @@ export function AdminMembersPage() {
     },
   });
 
+  interface BulkDeleteResult {
+    deleted: number;
+    failed: number;
+    results: { member_id: string; status: string; reason: string | null }[];
+  }
+  const bulkDeleteMut = useMutation<BulkDeleteResult, ApiError, string[]>({
+    mutationFn: (ids) =>
+      api<BulkDeleteResult>("/admin/members/bulk-delete", {
+        method: "POST",
+        body: JSON.stringify({ member_ids: ids }),
+      }),
+    onSuccess: (r) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "members"] });
+      setSelected(new Set());
+      setBatchDeleteOpen(false);
+      const reasons = r.results
+        .filter((x) => x.status === "failed")
+        .map((x) => x.reason)
+        .filter(Boolean);
+      toast({
+        title: `已刪除 ${r.deleted} 位${r.failed ? `，${r.failed} 位失敗` : ""}`,
+        description: reasons.length ? `失敗原因：${reasons.join("、")}` : undefined,
+        variant: r.failed ? "destructive" : "default",
+      });
+    },
+    onError: (err) => {
+      toast({ title: "批次刪除失敗", description: err.message, variant: "destructive" });
+    },
+  });
+
   const performConfirmed = async () => {
     if (!confirm) return;
     const { kind, member } = confirm;
@@ -136,8 +179,25 @@ export function AdminMembersPage() {
     <div className="container mx-auto py-8 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">成員管理</h1>
-        <Button onClick={() => setCreateOpen(true)}>新增成員</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setBatchCreateOpen(true)}>批次新增</Button>
+          <Button onClick={() => setCreateOpen(true)}>新增成員</Button>
+        </div>
       </div>
+
+      {selected.size > 0 && (
+        <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2">
+          <span className="text-sm">已選 {selected.size} 位</span>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
+              清除選取
+            </Button>
+            <Button variant="destructive" size="sm" onClick={() => setBatchDeleteOpen(true)}>
+              批次刪除
+            </Button>
+          </div>
+        </div>
+      )}
 
       {query.isLoading && <p className="text-muted-foreground">載入中…</p>}
       {query.error && (
@@ -150,6 +210,19 @@ export function AdminMembersPage() {
         <Table className="responsive-table">
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  aria-label="全選"
+                  checked={
+                    query.data.length > 0 && selected.size === query.data.length
+                  }
+                  onCheckedChange={(c) =>
+                    setSelected(
+                      c ? new Set(query.data!.map((m) => m.id)) : new Set(),
+                    )
+                  }
+                />
+              </TableHead>
               <TableHead>Email</TableHead>
               <TableHead>登入方式</TableHead>
               <TableHead>狀態</TableHead>
@@ -161,7 +234,14 @@ export function AdminMembersPage() {
           </TableHeader>
           <TableBody>
             {query.data.map((m) => (
-              <TableRow key={m.id}>
+              <TableRow key={m.id} data-state={selected.has(m.id) ? "selected" : undefined}>
+                <TableCell data-label="選取">
+                  <Checkbox
+                    aria-label={`選取 ${m.email}`}
+                    checked={selected.has(m.id)}
+                    onCheckedChange={() => toggleOne(m.id)}
+                  />
+                </TableCell>
                 <TableCell className="font-medium" data-label="Email">
                   <Link to={`/admin/member/${m.id}`} className="block max-w-[180px] truncate text-primary hover:underline">
                     {m.email}
@@ -228,7 +308,7 @@ export function AdminMembersPage() {
             ))}
             {query.data.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                   尚無成員
                 </TableCell>
               </TableRow>
@@ -242,9 +322,21 @@ export function AdminMembersPage() {
       <AlertDialog open={!!confirm} onOpenChange={(open) => !open && setConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>確認操作</AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirm && `對 ${confirm.member.email} 執行：${confirm.kind}`}
+            <AlertDialogTitle>
+              {confirm?.kind === "delete" ? "確認刪除成員" : "確認操作"}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              {confirm?.kind === "delete" ? (
+                <div className="space-y-2">
+                  <p>
+                    將刪除成員 <strong>{confirm.member.email}</strong>，並一併撤回並移除其
+                    <strong>所有分配與應用金鑰</strong>。
+                  </p>
+                  <p>該成員正在使用的金鑰會<strong>立即失效</strong>；過往<strong>用量紀錄會保留</strong>供稽核。此操作無法復原。</p>
+                </div>
+              ) : (
+                <span>{confirm && `對 ${confirm.member.email} 執行：${confirm.kind}`}</span>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -253,6 +345,30 @@ export function AdminMembersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={batchDeleteOpen} onOpenChange={setBatchDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>批次刪除 {selected.size} 位成員</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>將對選取的 <strong>{selected.size}</strong> 位成員執行安全刪除，一併移除各自的分配與應用金鑰。</p>
+                <p>正在使用的金鑰會<strong>立即失效</strong>；過往<strong>用量紀錄會保留</strong>。刪不掉的（如自己 / 最後一位管理員）會略過並回報。此操作無法復原。</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void bulkDeleteMut.mutateAsync(Array.from(selected))}
+            >
+              確認刪除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <BatchCreateMembersDialog open={batchCreateOpen} onOpenChange={setBatchCreateOpen} />
     </div>
   );
 }
@@ -348,6 +464,113 @@ function MemberTagsCell({ memberId }: { memberId: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+interface BulkCreateResult {
+  created: number;
+  exists: number;
+  invalid: number;
+  duplicate: number;
+  results: { email: string; status: string; invitation_url: string | null }[];
+}
+
+const BULK_STATUS_LABEL: Record<string, string> = {
+  created: "已建立",
+  exists: "已存在",
+  invalid: "格式錯",
+  duplicate: "重複",
+};
+
+function BatchCreateMembersDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [emails, setEmails] = React.useState("");
+  const [result, setResult] = React.useState<BulkCreateResult | null>(null);
+
+  const mut = useMutation<BulkCreateResult, ApiError, string>({
+    mutationFn: (text) =>
+      api<BulkCreateResult>("/admin/members/bulk-create", {
+        method: "POST",
+        body: JSON.stringify({ emails: text }),
+      }),
+    onSuccess: (r) => {
+      setResult(r);
+      queryClient.invalidateQueries({ queryKey: ["admin", "members"] });
+    },
+    onError: (e) => toast({ title: "批次建立失敗", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        onOpenChange(o);
+        if (!o) {
+          setEmails("");
+          setResult(null);
+        }
+      }}
+    >
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>批次新增成員（本地帳號）</DialogTitle>
+          <DialogDescription>
+            每行一個 email，逐筆建立 local_password 成員並各自產生邀請連結。
+          </DialogDescription>
+        </DialogHeader>
+        <Textarea
+          value={emails}
+          onChange={(e) => setEmails(e.target.value)}
+          rows={6}
+          placeholder={"每行一個 email\nalice@example.com\nbob@example.com"}
+        />
+        <DialogFooter>
+          <Button
+            disabled={!emails.trim() || mut.isPending}
+            onClick={() => mut.mutate(emails)}
+          >
+            批次建立
+          </Button>
+        </DialogFooter>
+
+        {result && (
+          <div className="space-y-2 border-t pt-3">
+            <p className="text-sm text-muted-foreground">
+              已建立 {result.created}・已存在 {result.exists}・格式錯 {result.invalid}・重複 {result.duplicate}
+            </p>
+            <ul className="space-y-1 text-sm">
+              {result.results.map((r, i) => (
+                <li key={`${r.email}-${i}`} className="flex items-center justify-between gap-2">
+                  <span className="font-mono break-all">{r.email}</span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    <Badge variant={r.status === "created" ? "default" : "secondary"}>
+                      {BULK_STATUS_LABEL[r.status] ?? r.status}
+                    </Badge>
+                    {r.invitation_url && (
+                      <a
+                        href={r.invitation_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline text-xs"
+                      >
+                        邀請連結
+                      </a>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
