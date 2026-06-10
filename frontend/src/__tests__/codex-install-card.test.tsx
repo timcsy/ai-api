@@ -30,6 +30,20 @@ describe("<CodexInstallCard />", () => {
     );
   });
 
+  it("warns Windows users to use PowerShell, not cmd", async () => {
+    const user = userEvent.setup();
+    render(<CodexInstallCard baseUrl="https://ai.example.com/" />);
+
+    // No PowerShell/cmd warning while on the unix tab.
+    await user.click(screen.getByRole("button", { name: "macOS / Linux" }));
+    expect(screen.queryByText(/PowerShell/)).not.toBeInTheDocument();
+
+    // Switching to Windows surfaces the "use PowerShell, not cmd" hint.
+    await user.click(screen.getByRole("button", { name: "Windows" }));
+    expect(screen.getAllByText(/PowerShell/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/命令提示字元/).length).toBeGreaterThan(0);
+  });
+
   it("explains what happens for members who already have Codex installed", async () => {
     const user = userEvent.setup();
     render(<CodexInstallCard baseUrl="https://ai.example.com/" />);

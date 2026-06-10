@@ -13,6 +13,7 @@ New-Item -ItemType Directory -Force -Path $CodexHome | Out-Null
 # ---------------------------------------------------------------------------
 # 1. Install the Codex CLI (standalone binary from GitHub Releases; no Node).
 # ---------------------------------------------------------------------------
+$CodexCli = $true
 if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
   Write-Host "Installing Codex CLI..."
   $BinDir = Join-Path $HOME ".local\bin"
@@ -22,12 +23,16 @@ if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
   try {
     Invoke-WebRequest -Uri $Url -OutFile $Zip
     Expand-Archive -Path $Zip -DestinationPath $BinDir -Force
+    if (";$env:PATH;" -notlike "*;$BinDir;*") { $env:PATH = "$BinDir;$env:PATH" }
   } catch {
-    Write-Host "ERROR: could not download Codex. Check your network / antivirus (SmartScreen), then re-run."
-    exit 1
+    # Fail-soft: don't abort. The CLI only stores the token (step 4) + self-tests;
+    # steps 2-3 (config + device-flow) work without it. We finish and hand over the key.
+    Write-Host "NOTE: 無法下載／安裝 Codex CLI（可能被網路／防毒 SmartScreen 擋住）；會繼續完成其餘設定，稍後可手動安裝。"
+    $CodexCli = $false
   }
-  if (";$env:PATH;" -notlike "*;$BinDir;*") { $env:PATH = "$BinDir;$env:PATH" }
 }
+# Even if we tried, the binary may not actually be runnable — re-check.
+if (-not (Get-Command codex -ErrorAction SilentlyContinue)) { $CodexCli = $false }
 
 # ---------------------------------------------------------------------------
 # 2. Write config.toml MERGE-style: only our provider block + default provider.
@@ -88,10 +93,10 @@ while (-not $token) {
 $defaultModel = if ($resp.model) { [string]$resp.model } else { "" }
 
 # ---------------------------------------------------------------------------
-# 4. Store the credential in auth.json (no env var) and verify.
+# 4. Pin the default model (no CLI needed — also helps the desktop App), then
+#    store the credential via the CLI and verify. If the CLI is unavailable,
+#    hand the member their key + how to finish instead of failing.
 # ---------------------------------------------------------------------------
-$token | codex login --with-api-key | Out-Null
-
 # Pin Codex's default model to the one this key grants, so plain `codex` uses
 # your model instead of Codex's built-in default. Switch anytime with /model.
 if ($defaultModel) {
@@ -102,10 +107,25 @@ if ($defaultModel) {
   Write-Host "Default model set to $defaultModel (switch anytime with /model)."
 }
 
-Write-Host "Verifying connection..."
-try {
-  codex exec --skip-git-repo-check "say only: ok" | Out-Null
-  Write-Host "OK - just run 'codex' from any new terminal."
-} catch {
-  Write-Host "Installed, but the test call did not confirm. Try running 'codex' yourself."
+if ($CodexCli) {
+  $token | codex login --with-api-key | Out-Null
+  Write-Host "Verifying connection..."
+  try {
+    codex exec --skip-git-repo-check "say only: ok" | Out-Null
+    Write-Host "OK - just run 'codex' from any new terminal."
+  } catch {
+    Write-Host "Installed, but the test call did not confirm. Try running 'codex' yourself."
+  }
+} else {
+  # Fail-soft: CLI missing, but config + a real key are ready. Hand over the key.
+  Write-Host ""
+  Write-Host "WARNING: Codex CLI 沒有裝成功，但你的設定（$Config）和金鑰都已經備好了。"
+  Write-Host "  你的平台金鑰（只顯示這一次，請立刻複製保存）："
+  Write-Host ""
+  Write-Host "    $token"
+  Write-Host ""
+  Write-Host "  之後二選一就能用："
+  Write-Host "  1) 把 Codex CLI 裝好後，用上面的金鑰執行（把 <KEY> 換成金鑰）："
+  Write-Host "       `$env:KEY='<KEY>'; `$env:KEY | codex login --with-api-key"
+  Write-Host "  2) Codex 桌面 App：在 App 設定填入上面的金鑰當 API key（provider 已指向本平台）。"
 }
