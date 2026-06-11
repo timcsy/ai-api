@@ -115,16 +115,50 @@ def metadata_from_entry(entry: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def price_from_entry(entry: dict[str, Any]) -> dict[str, str | None] | None:
-    """Suggested per-1k price from a litellm entry, or None if no input cost."""
-    inp = _per_1k(entry.get("input_cost_per_token"))
-    if inp is None:
+# Phase 31: non-token unit cost keys litellm uses, mapped to our billing unit.
+# Checked only when there's no token input cost (token billing takes precedence —
+# e.g. Azure gpt-image is token-billed despite being an image model).
+_UNIT_COST_KEYS: tuple[tuple[str, str], ...] = (
+    ("page", "ocr_cost_per_page"),
+    ("query", "input_cost_per_query"),
+    ("character", "input_cost_per_character"),
+    ("image", "output_cost_per_image"),
+    ("second", "input_cost_per_second"),
+)
+
+
+def _money(raw: Any) -> str | None:
+    """A litellm per-unit cost (already in USD, NOT per-token) → clean string."""
+    if raw is None:
         return None
-    return {
-        "input_per_1k": inp,
-        "output_per_1k": _per_1k(entry.get("output_cost_per_token")) or "0",
-        "cached_input_per_1k": _per_1k(entry.get("cache_read_input_token_cost")),
-    }
+    try:
+        return f"{Decimal(str(raw)).normalize():f}"
+    except (ValueError, ArithmeticError):
+        return None
+
+
+def price_from_entry(entry: dict[str, Any]) -> dict[str, str | None] | None:
+    """Suggested price from a litellm entry: token per-1k, or a non-token unit
+    price (page/query/character/image/second). None if neither is present."""
+    inp = _per_1k(entry.get("input_cost_per_token"))
+    if inp is not None:
+        return {
+            "input_per_1k": inp,
+            "output_per_1k": _per_1k(entry.get("output_cost_per_token")) or "0",
+            "cached_input_per_1k": _per_1k(entry.get("cache_read_input_token_cost")),
+        }
+    # No token input cost → look for a non-token unit price (OCR/rerank/TTS/…).
+    for unit, key in _UNIT_COST_KEYS:
+        per_unit = _money(entry.get(key))
+        if per_unit is not None:
+            return {
+                "input_per_1k": "0",
+                "output_per_1k": "0",
+                "cached_input_per_1k": None,
+                "price_unit": unit,
+                "price_per_unit": per_unit,
+            }
+    return None
 
 
 def lookup(key: str, registry: dict[str, Any] | None = None) -> dict[str, Any] | None:

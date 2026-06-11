@@ -53,6 +53,9 @@ class SuggestedPrice(BaseModel):
     input_per_1k: str
     output_per_1k: str
     cached_input_per_1k: str | None = None
+    # Phase 31: non-token unit suggestion (page/query/character/image/second).
+    price_unit: str | None = None
+    price_per_unit: str | None = None
 
 
 class ModelCatalogCreate(BaseModel):
@@ -389,6 +392,8 @@ async def admin_create_model(
             input_per_1k=payload.suggested_price.input_per_1k,
             output_per_1k=payload.suggested_price.output_per_1k,
             cached_input_per_1k=payload.suggested_price.cached_input_per_1k,
+            price_unit=payload.suggested_price.price_unit,
+            price_per_unit=payload.suggested_price.price_per_unit,
             effective_from=now,
             source_note=f"litellm@{litellm_registry.current_version()}",
         )
