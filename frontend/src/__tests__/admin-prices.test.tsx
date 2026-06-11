@@ -76,6 +76,28 @@ describe("<AdminPricesPage />", () => {
     expect(posted.model).toBe("gpt-5.4-mini");
   });
 
+  it("sends per-page price (price_unit/price_per_unit) for non-token models", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, ROWS)); // list
+    let posted: Record<string, unknown> = {};
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      posted = JSON.parse((init?.body as string) ?? "{}");
+      return jsonResponse(201, {});
+    });
+    renderPage();
+    await screen.findByText("azure/gpt-5.4-mini");
+
+    fireEvent.click(screen.getByText("設定價格"));
+    // token inputs 0, per-page filled
+    fireEvent.change(screen.getByPlaceholderText("0.15"), { target: { value: "0" } });
+    fireEvent.change(screen.getByPlaceholderText("0.60"), { target: { value: "0" } });
+    fireEvent.change(screen.getByPlaceholderText("0.003"), { target: { value: "0.003" } });
+    fireEvent.click(screen.getByText("新增"));
+
+    await waitFor(() => expect(posted.price_unit).toBe("page"));
+    expect(posted.price_per_unit).toBe("0.003");
+  });
+
   it("brings in LiteLLM suggested price (replaces the old hardcoded templates)", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
     fetchMock.mockResolvedValueOnce(jsonResponse(200, ROWS)); // list

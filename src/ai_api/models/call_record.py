@@ -64,6 +64,10 @@ class CallRecord(Base):
     cached_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Phase 3a: point-in-time cost. NULL when no PriceList match was found.
     cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
+    # Phase 29 ②: non-token metering. unit NULL ⇒ token (use *_tokens columns).
+    # For non-token calls (e.g. OCR) unit="page" + quantity=pages; token cols NULL.
+    quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    unit: Mapped[str | None] = mapped_column(String(16), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (

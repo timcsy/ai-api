@@ -31,4 +31,13 @@ describe("<ApiUsageExample />", () => {
     expect(screen.getByText(/messages/)).toBeInTheDocument();
     expect(screen.queryByText(/向量（embedding）模型/)).not.toBeInTheDocument();
   });
+
+  // Phase 29 ②
+  it("shows /ocr example for OCR models", () => {
+    render(<ApiUsageExample model="azure/mistral-document-ai" isOcr />);
+    expect(screen.getByText(/文件辨識（OCR）模型/)).toBeInTheDocument();
+    expect(screen.getAllByText(/\/ocr/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/document/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/messages/)).not.toBeInTheDocument();
+  });
 });

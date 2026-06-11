@@ -32,6 +32,8 @@ class RecordsService:
         total_tokens: int | None = None,
         reasoning_tokens: int | None = None,
         cached_tokens: int | None = None,
+        quantity: int | None = None,
+        unit: str | None = None,
         error_message: str | None = None,
         cost_usd: Decimal | None = None,
     ) -> CallRecord:
@@ -50,6 +52,8 @@ class RecordsService:
             total_tokens=total_tokens,
             reasoning_tokens=reasoning_tokens,
             cached_tokens=cached_tokens,
+            quantity=quantity,
+            unit=unit,
             cost_usd=cost_usd,
             error_message=redact_string(error_message) if error_message else None,
         )

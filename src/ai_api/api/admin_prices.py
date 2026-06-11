@@ -42,6 +42,10 @@ class PriceCreateRequest(BaseModel):
     input_per_1k: str
     output_per_1k: str
     cached_input_per_1k: str | None = None
+    # Phase 29 ②: non-token unit price (e.g. price_unit="page"). If price_unit is
+    # given, price_per_unit is required.
+    price_unit: str | None = None
+    price_per_unit: str | None = None
     effective_from: datetime
     source_note: str | None = None
 
@@ -51,6 +55,11 @@ async def create_price(
     payload: PriceCreateRequest = Body(...),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
+    if payload.price_unit and not payload.price_per_unit:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_err("bad_request", "price_unit requires price_per_unit"),
+        )
     try:
         return await pricing.create_version(
             session,
@@ -59,6 +68,8 @@ async def create_price(
             input_per_1k=payload.input_per_1k,
             output_per_1k=payload.output_per_1k,
             cached_input_per_1k=payload.cached_input_per_1k,
+            price_unit=payload.price_unit,
+            price_per_unit=payload.price_per_unit,
             effective_from=payload.effective_from,
             source_note=payload.source_note,
         )

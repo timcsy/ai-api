@@ -179,3 +179,36 @@ async def test_history(app_client: AsyncClient, admin_headers: dict[str, str]) -
     current = [v for v in versions if v["is_current"]]
     assert len(current) == 1
     assert current[0]["effective_from"].startswith("2026-05-01")
+
+
+# ---------- Phase 29 ② (040): per-unit (page) price ----------
+
+@pytest.mark.asyncio
+async def test_create_per_page_price(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
+    r = await app_client.post(
+        "/admin/prices", headers=admin_headers,
+        json={"provider": "azure_ai", "model": "mistral-document-ai",
+              "input_per_1k": "0", "output_per_1k": "0",
+              "price_unit": "page", "price_per_unit": "0.003",
+              "effective_from": "2026-06-01T00:00:00+00:00"},
+    )
+    assert r.status_code == 201, r.text
+    hist = (await app_client.get(
+        "/admin/prices/history?provider=azure_ai&model=mistral-document-ai",
+        headers=admin_headers,
+    )).json()
+    assert hist[0]["price_unit"] == "page"
+    assert Decimal(hist[0]["price_per_unit"]) == Decimal("0.003")
+
+
+@pytest.mark.asyncio
+async def test_per_unit_requires_price(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
+    r = await app_client.post(
+        "/admin/prices", headers=admin_headers,
+        json={"provider": "azure_ai", "model": "ocr-y",
+              "input_per_1k": "0", "output_per_1k": "0",
+              "price_unit": "page",  # no price_per_unit
+              "effective_from": "2026-06-01T00:00:00+00:00"},
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"]["error"]["code"] == "bad_request"

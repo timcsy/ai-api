@@ -24,6 +24,9 @@ class Price:
     model: str
     effective_from: datetime
     cached_input_per_1k: Decimal | None = None
+    # Phase 29 ②: non-token unit price. price_unit NULL ⇒ token billing.
+    price_unit: str | None = None
+    price_per_unit: Decimal | None = None
 
 
 async def lookup_price_for_call(
@@ -50,6 +53,8 @@ async def lookup_price_for_call(
         model=row.model,
         effective_from=row.effective_from,
         cached_input_per_1k=row.cached_input_per_1k_tokens_usd,
+        price_unit=row.price_unit,
+        price_per_unit=row.price_per_unit_usd,
     )
 
 
@@ -81,6 +86,17 @@ def calculate_cost(
         + (cached / Decimal(1000)) * cached_rate
         + (ct / Decimal(1000)) * price.output_per_1k
     )
+
+
+def calculate_unit_cost(quantity: int | None, price_per_unit: Decimal | None) -> Decimal:
+    """Phase 29 ②: cost for a non-token metered call = quantity x per-unit price.
+
+    Returns Decimal(0) when quantity or price is missing/zero (sustains the
+    existing 'unpriced → cost 0' convention for non-token units).
+    """
+    if not quantity or price_per_unit is None:
+        return Decimal(0)
+    return Decimal(quantity) * price_per_unit
 
 
 # ---------------------------------------------------------------------------
@@ -141,6 +157,12 @@ async def list_catalog_prices(db: AsyncSession, now: datetime) -> list[dict[str,
             "cached_input_per_1k": (
                 _price_str(current.cached_input_per_1k_tokens_usd)
                 if current.cached_input_per_1k_tokens_usd is not None
+                else None
+            ),
+            "price_unit": current.price_unit,
+            "price_per_unit": (
+                _price_str(current.price_per_unit_usd)
+                if current.price_per_unit_usd is not None
                 else None
             ),
             "effective_from": current.effective_from.isoformat(),
@@ -230,6 +252,10 @@ async def list_history(db: AsyncSession, provider: str, model: str) -> list[dict
                 if v.cached_input_per_1k_tokens_usd is not None
                 else None
             ),
+            "price_unit": v.price_unit,
+            "price_per_unit": (
+                _price_str(v.price_per_unit_usd) if v.price_per_unit_usd is not None else None
+            ),
             "effective_from": v.effective_from.isoformat(),
             "source_note": v.source_note,
             "created_at": v.created_at.isoformat(),
@@ -249,6 +275,8 @@ async def create_version(
     output_per_1k: str | Decimal,
     effective_from: datetime,
     cached_input_per_1k: str | Decimal | None = None,
+    price_unit: str | None = None,
+    price_per_unit: str | Decimal | None = None,
     source_note: str | None = None,
     created_by: str = "admin",
 ) -> dict[str, Any]:
@@ -261,9 +289,14 @@ async def create_version(
             if cached_input_per_1k is not None and str(cached_input_per_1k) != ""
             else None
         )
+        per_unit = (
+            Decimal(str(price_per_unit))
+            if price_per_unit is not None and str(price_per_unit) != ""
+            else None
+        )
     except (InvalidOperation, ValueError) as exc:
         raise InvalidPriceError("unit price is not a valid number") from exc
-    if inp < 0 or outp < 0 or (cached is not None and cached < 0):
+    if inp < 0 or outp < 0 or (cached is not None and cached < 0) or (per_unit is not None and per_unit < 0):
         raise InvalidPriceError("unit price must be non-negative")
     if effective_from.tzinfo is None:
         effective_from = effective_from.replace(tzinfo=UTC)
@@ -275,6 +308,8 @@ async def create_version(
         input_per_1k_tokens_usd=inp,
         output_per_1k_tokens_usd=outp,
         cached_input_per_1k_tokens_usd=cached,
+        price_unit=price_unit or None,
+        price_per_unit_usd=per_unit,
         effective_from=effective_from,
         created_at=datetime.now(UTC),
         created_by=created_by,
@@ -307,6 +342,10 @@ async def create_version(
             _price_str(row.cached_input_per_1k_tokens_usd)
             if row.cached_input_per_1k_tokens_usd is not None
             else None
+        ),
+        "price_unit": row.price_unit,
+        "price_per_unit": (
+            _price_str(row.price_per_unit_usd) if row.price_per_unit_usd is not None else None
         ),
         "effective_from": row.effective_from.isoformat(),
         "source_note": row.source_note,

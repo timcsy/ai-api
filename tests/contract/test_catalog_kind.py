@@ -51,9 +51,12 @@ async def test_catalog_detail_kind_embedding_vs_chat(
         await s.commit()
     await _seed("azure/text-embedding-3", mode="embedding")
     await _seed("azure/gpt-x", mode="chat")
+    await _seed("azure/mistral-document-ai", mode="ocr")
     await _login(app_client, admin_headers)
 
     emb = (await app_client.get("/catalog/models/azure/text-embedding-3")).json()
     chat = (await app_client.get("/catalog/models/azure/gpt-x")).json()
+    ocr = (await app_client.get("/catalog/models/azure/mistral-document-ai")).json()
     assert emb["kind"] == "embedding"
     assert chat["kind"] == "chat"
+    assert ocr["kind"] == "ocr"
