@@ -77,15 +77,18 @@ def test_always_returns_one_of_six():
 
 # --- helpers ---
 def test_is_billable():
-    assert is_billable("image") and is_billable("tts")
-    assert not is_billable("chat") and not is_billable("embedding")
-    assert not is_billable("stt") and not is_billable("unknown")
+    # binary/document + media-generating kinds cost real money on a minimal test
+    for k in ("image", "tts", "ocr", "stt", "image_edit", "search"):
+        assert is_billable(k)
+    for k in ("chat", "embedding", "moderation", "rerank", "unknown"):
+        assert not is_billable(k)
 
 
 def test_is_supported():
-    # auto-testable IFF a recipe exists (model_test.RECIPES)
-    for k in ("chat", "embedding", "tts", "image", "moderation", "rerank"):
+    # auto-testable IFF a recipe exists (model_test.RECIPES). Every inference kind
+    # now has a real recipe (ocr/stt/image_edit/search send a minimal fixture).
+    for k in ("chat", "embedding", "tts", "image", "moderation", "rerank",
+              "ocr", "stt", "search", "image_edit"):
         assert is_supported(k)
-    # no recipe → honestly not auto-testable (was a fake 0ms pass before the fix)
-    for k in ("stt", "unknown", "ocr", "search", "image_edit"):
-        assert not is_supported(k)
+    # only 'unknown' has no recipe → honestly not auto-testable (never a fake pass)
+    assert not is_supported("unknown")

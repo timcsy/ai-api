@@ -758,12 +758,11 @@ async def admin_test_model(
     # Not auto-testable (no recipe): explain, don't call. Derived from the recipe
     # table so it can't fake-pass a kind we don't actually know how to test.
     recipe = RECIPES.get(kind)
-    if recipe is None:
-        label = "語音轉文字" if kind == "stt" else "此"
+    if recipe is None:  # only 'unknown' has no recipe now
         await _audit(False, reason="unsupported")
         return {
             "ok": False, "slug": slug, "kind": kind, "supported": False,
-            "message": f"{label}類型尚不支援自動測試",
+            "message": "此類型尚不支援自動測試",
         }
 
     # Billable kinds require explicit acknowledgement before any upstream call.

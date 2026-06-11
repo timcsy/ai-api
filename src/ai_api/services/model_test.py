@@ -16,11 +16,32 @@ import) so test mocks on `ai_api.proxy.upstream.*` are honoured.
 """
 from __future__ import annotations
 
+import base64
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
 from ai_api.proxy import upstream
+
+# --- Minimal fixtures for binary / document test recipes ---------------------
+# These are *format*-valid: a real 1x1 PNG and a real silent WAV, so a passing
+# test means upstream accepted a well-formed request. Whether a SPECIFIC model
+# accepts this minimal input can only be confirmed against a live provider —
+# local tests mock `upstream.*`, so they verify dispatch, not provider behaviour.
+_PNG_1X1 = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="
+)
+_WAV_SILENCE = base64.b64decode(
+    "UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YaAAAAAAAAAAAAAAAAAAAAAA"
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+)
+# OCR document: a base64 image data-URL (Mistral document-ai accepts image_url docs).
+_OCR_DOCUMENT = {
+    "type": "image_url",
+    "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==",
+}
 
 
 @dataclass(frozen=True)
@@ -30,9 +51,8 @@ class TestRecipe:
 
 
 # kind → how to test it. NO entry ⇒ not auto-testable (honest "unsupported").
-# Omitted on purpose: ocr / image_edit (need a sample document/image to send),
-# search (routed by search_provider, not model), stt (needs an audio file),
-# unknown. They show "尚不支援自動測試" instead of a fake pass.
+# Only `unknown` is omitted now (a mode we can't map to any real call); every
+# inference kind below makes a minimal real upstream call.
 RECIPES: dict[str, TestRecipe] = {
     "chat": TestRecipe(
         # Generous max_tokens: reasoning models spend the budget on reasoning, so a
@@ -47,6 +67,26 @@ RECIPES: dict[str, TestRecipe] = {
     "image": TestRecipe(lambda c: upstream.aimage_generation(prompt="a red dot", n=1, **c), billable=True),
     "moderation": TestRecipe(lambda c: upstream.amoderation(input="ping", **c)),
     "rerank": TestRecipe(lambda c: upstream.arerank(query="ping", documents=["a", "b"], **c)),
+    # --- binary / document kinds: billable, send a minimal valid fixture ---
+    "ocr": TestRecipe(lambda c: upstream.aocr(document=_OCR_DOCUMENT, **c), billable=True),
+    "stt": TestRecipe(
+        lambda c: upstream.atranscription(file=("ping.wav", _WAV_SILENCE), **c), billable=True
+    ),
+    "image_edit": TestRecipe(
+        lambda c: upstream.aimage_edit(
+            image=("ping.png", _PNG_1X1), prompt="make the background white", **c
+        ),
+        billable=True,
+    ),
+    # search routes by `search_provider` (not `model`) — remap the common dict
+    # explicitly since the wrapper has no `model` parameter to **c into.
+    "search": TestRecipe(
+        lambda c: upstream.asearch(
+            search_provider=c["model"], query="ping",
+            api_key=c["api_key"], api_base=c["api_base"], api_version=c["api_version"],
+        ),
+        billable=True,
+    ),
 }
 
 
