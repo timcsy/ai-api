@@ -83,7 +83,9 @@ def test_is_billable():
 
 
 def test_is_supported():
-    for k in ("chat", "embedding", "tts", "image"):
+    # auto-testable IFF a recipe exists (model_test.RECIPES)
+    for k in ("chat", "embedding", "tts", "image", "moderation", "rerank"):
         assert is_supported(k)
-    for k in ("stt", "unknown"):
+    # no recipe → honestly not auto-testable (was a fake 0ms pass before the fix)
+    for k in ("stt", "unknown", "ocr", "search", "image_edit"):
         assert not is_supported(k)

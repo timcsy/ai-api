@@ -730,10 +730,10 @@ async def admin_test_model(
     (model_tested), not recorded as a member CallRecord."""
     import time
 
-    from ai_api.proxy import upstream
     from ai_api.proxy.allowlist import parse_provider
     from ai_api.proxy.preflight import _resolve_credential
-    from ai_api.services.model_kind import is_billable, is_supported, model_kind
+    from ai_api.services.model_kind import model_kind
+    from ai_api.services.model_test import RECIPES
     from ai_api.services.provider_credentials import (
         ProviderCredentialService,
         ProviderUnavailableError,
@@ -755,8 +755,10 @@ async def admin_test_model(
             details={"kind": kind, "ok": ok, **extra},
         )
 
-    # Unsupported kinds: explain, don't call.
-    if not is_supported(kind):
+    # Not auto-testable (no recipe): explain, don't call. Derived from the recipe
+    # table so it can't fake-pass a kind we don't actually know how to test.
+    recipe = RECIPES.get(kind)
+    if recipe is None:
         label = "語音轉文字" if kind == "stt" else "此"
         await _audit(False, reason="unsupported")
         return {
@@ -765,7 +767,7 @@ async def admin_test_model(
         }
 
     # Billable kinds require explicit acknowledgement before any upstream call.
-    if is_billable(kind) and not payload.acknowledge_billable:
+    if recipe.billable and not payload.acknowledge_billable:
         return {"ok": False, "slug": slug, "kind": kind, "needs_confirmation": True, "billable": True}
 
     provider, _ = parse_provider(slug)
@@ -789,23 +791,8 @@ async def admin_test_model(
     }
     started = time.perf_counter()
     try:
-        if kind == "chat":
-            # Generous cap: reasoning models (gpt-5/o-series) spend the completion
-            # budget on reasoning tokens, so a tiny cap → "could not finish, raise
-            # max_tokens" even though the model is reachable. Normal models still
-            # answer "ping" briefly and stop, so the real cost stays tiny.
-            await upstream.acompletion(
-                messages=[{"role": "user", "content": "ping"}], max_tokens=2048, **common
-            )
-        elif kind == "embedding":
-            await upstream.aembedding(input="ping", **common)
-        elif kind == "tts":
-            await upstream.aspeech(input="hi", voice="alloy", **common)
-        elif kind == "image":
-            # Don't pin a size: newer image models (gpt-image-*) reject tiny sizes
-            # ("below the current minimum pixel budget"). The model's default size
-            # is always valid; let it apply. n=1 is universally supported.
-            await upstream.aimage_generation(prompt="a red dot", n=1, **common)
+        # Data-driven dispatch: one real minimal call per the kind's recipe.
+        await recipe.call(common)
     except Exception as e:  # test result IS the response — never 5xx
         await _audit(False, error_type="upstream_error")
         return {
