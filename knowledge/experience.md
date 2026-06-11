@@ -552,3 +552,19 @@
 - **解決方式**：spec 前花 5 分鐘 `python -c "import litellm; print(litellm.model_cost[...])"` 把「這個模型實際用什麼單位計費 / 回傳長怎樣」印出來，再決定用哪個端點當證明消費者、計量欄取哪個。
 - **教訓**：呼應「採用前先驗證能力邊界」「採用 SDK 前先印一次真實回傳值」——但更前置到 **spec 設計層**：別用「這類模型應該是 X 計費」的種類直覺去選證明對象與設計 schema。一次 `print(model_cost)` 就改寫了整個 spec 的端點選擇，省下做完才發現「圖片其實是 token、白做」的整輪工。
 - **來源**：`specs/040-ocr-billing-units/research.md` R1/R3；階段 29②
+
+### binary I/O 端點：輸出非串流就在 handler 內記帳、multipart 上傳要 `python-multipart`
+
+- **理論說**：把 TTS（回音檔）/STT（收音檔）當成跟 chat/embedding 一樣的 JSON proxy，計費照舊放在共用流程。
+- **實際發生**：階段 29③ 加 TTS/STT 才碰到兩個 binary 形態的現實：(1) `litellm.aspeech` 回 `HttpxBinaryResponseContent`（要讀 `.content` bytes、用 `Response(media_type="audio/mpeg")` 回，**不是 JSON**）；(2) FastAPI 的 `Form`/`UploadFile`（STT multipart 上傳）在 import/route 階段就 `RuntimeError: Form data requires "python-multipart"`——**該套件沒裝**。`litellm` 既有不代表 multipart 解析既有。
+- **解決方式**：(1) TTS 音訊體積小 → **非串流**：一次讀 `.content`、在 handler 主體內就 `record_call`（不放 finally），client 必定還連著（避開階段 11 串流 CancelledError 坑）；錯誤路徑仍回 JSON。(2) 把 `python-multipart` 加進依賴（FastAPI 官方 optional dep，multipart 上傳沒它做不到）——這是個誠實的 Constitution Deviation，PR 明列理由。
+- **教訓**：新增「非 JSON I/O」端點時，**形態本身就是新依賴面**：binary 輸出要選串流 vs 一次讀（小資料選後者、計費綁在資料到手點）；multipart 上傳要確認 `python-multipart` 在依賴裡。「litellm 函式既有 + 計費層既有」≠「整條 I/O 既有」——HTTP 層的輸入解析/輸出形態是另一軸，要各自驗一次（`inspect` 回傳型別 + 真的跑一次 route）。
+- **來源**：`src/ai_api/proxy/audio.py`（TTS `Response` / STT `UploadFile`）、`pyproject.toml`（`python-multipart`）；階段 29③
+
+### STT per-second 計量沒 duration 來源就別硬上——用 token 計費、per-second 延後
+
+- **理論說**：whisper 類 STT 以「每秒音訊」計價（litellm `input_cost_per_second`），所以 STT 端點按音訊秒數計費。
+- **實際發生**：`inspect` `litellm.TranscriptionResponse` → 只有 `text` + `usage`，**沒有 `duration` 欄**。要算秒數得自己解析上傳音檔的長度——mp3 需第三方音訊庫（stdlib `wave` 只認 WAV），違反「能不加套件就不加」。
+- **解決方式**：STT 改走 **token 計費**（`usage` 有 token 就 `calculate_cost`，如 `azure/gpt-4o-transcribe`；whisper 類無 usage → cost 0），per-second **延後**（標記為「需音訊長度來源/新依賴」的後續）。spec 的 Assumptions 明寫此限制。
+- **教訓**：呼應「採用前印真實回傳值」——計費單位的「數量來源」也要先驗證存不存在。回應沒帶你要的計量欄位時，**降級到回應真的有的單位**（token）+ 誠實標記原單位延後，比為了一個單位硬拉一個音訊庫進來划算。先別為「規格上該有的單位」付一個新依賴的代價。
+- **來源**：`specs/041-multi-endpoint-complete/research.md` R4、`src/ai_api/proxy/audio.py` STT 計費；階段 29③
