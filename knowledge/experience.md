@@ -576,3 +576,11 @@
 - **解決方式**：把該測試的代表換成「**目前仍未支援**」的 mode（video_generation / realtime / vector_store）。並記住：**改任何「列舉對映/分類」後，重跑完整 `pytest tests/`**（不只改動點附近的單元測試）——尤其有測試以「某個分類的反例」立論時。
 - **教訓**：當一個測試以「X 是某類別的反例」立論（unknown mode、未支援能力、空集合…），它對「該類別的成員集合」有**隱性依賴**；每次擴張那個集合就可能讓反例失效。這類測試該用「結構上永遠在類別外」的代表（如註定不做的 mode），或改成不依賴特定成員。流程面：**動列舉/對映 → 全套件重跑**，別只跑改動點旁的測試（呼應「本機關卡範圍要對齊 CI」——這次是「測試廣度」沒對齊）。
 - **來源**：`tests/integration/test_admin_model_test.py` `test_unknown_mode_unsupported`、`services/model_kind.py`；階段 29③→31（PR #79 第二輪紅）
+
+### 「能不能測這個種類」與「實際怎麼測」必須同源——能力查詢從 recipe 表衍生，別另立常數
+
+- **理論說**：`is_supported(kind)` 回「這個種類能不能自動測」用一個常數判斷（如 `kind not in {stt,unknown}`），測試 dispatch 另寫一個 `if/elif` 真打上游——兩邊各自維護就好。
+- **實際發生**：admin「測試模型」對 OCR（及 rerank/search/moderation/image_edit）回「**通過 延遲 0 ms**」——根本沒打上游。根因:`is_supported` 定義是「不在 {stt,unknown}」（所以說 OCR 支援），但 dispatch 的 `if/elif` 只有 chat/embedding/tts/image 四個分支。階段 29②③ 把 ocr/rerank… 種類加進來後，`is_supported` 說「支援」、卻沒有對應分支會跑 → 呼叫**靜默 no-op** → 回傳「通過 0ms」的假綠。兩套東西 drift 了:一套說「能測」，另一套根本沒有對應的測法。
+- **解決方式**:建 `services/model_test.py` 一張 `RECIPES` 表（kind → 怎麼測:最小真實呼叫 + billable 旗標）當**單一真理**;`is_testable`/`is_billable` 都從表**衍生**;`model_kind.is_supported/is_billable` 改委派給它;`admin_test_model` 改用 `recipe = RECIPES.get(kind); await recipe.call(common)` 取代 if/elif。沒 recipe 的 kind 自動「尚不支援自動測試」，**絕不假通過**。順手把 moderation/rerank 補成真測試（它們之前也假通過）。
+- **教訓**：當「**能不能做 X**」（capability 查詢）與「**怎麼做 X**」（實際執行）由兩處各自維護，它們**一定會 drift**——而 drift 的失敗模式是最惡的「靜默假成功」（no-op 看起來像通過）。讓 capability 查詢**從執行的定義衍生**（`is_testable(k) := k in RECIPES`），兩者就**結構上不可能不一致**:加一個種類沒寫 recipe → 自動誠實回「不支援」，而不是假通過。資料驅動的「一張表 = 唯一真理」勝過「平行維護的兩個清單」。呼應 Principle 7 演進性:data-over-code。
+- **來源**：`src/ai_api/services/model_test.py`（RECIPES）、`services/model_kind.py`（委派）、`api/admin_catalog.py`（recipe dispatch）;階段 31 後續修復（PR #82，rev 90）
