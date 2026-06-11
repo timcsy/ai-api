@@ -76,7 +76,7 @@ async def test_ocr_200_billed_per_page(app_client: AsyncClient, admin_headers: d
     rec = await _last_record(CallOutcome.success)
     assert rec is not None
     assert rec.unit == "page" and rec.quantity == 3
-    assert rec.cost_usd == Decimal("0.009")  # 3 × 0.003
+    assert rec.cost_usd == Decimal("0.009")  # 3 x 0.003
     assert rec.allocation_id == alloc["id"]
 
 
