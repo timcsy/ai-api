@@ -24,16 +24,76 @@ export function ApiUsageExample({
   supportsResponses = false,
   isEmbedding = false,
   isOcr = false,
+  kind,
 }: {
   model: string;
   supportsResponses?: boolean;
   isEmbedding?: boolean;
   isOcr?: boolean;
+  kind?: string;
 }) {
   const { toast } = useToast();
   const [tab, setTab] = React.useState("curl");
   const base = apiBaseUrl();
   const m = model || "<model-slug>";
+
+  // Phase 29 ③: image / rerank / TTS / STT — one compact "how to call" card each.
+  const endpointInfo: Record<string, { path: string; desc: string; curl: string }> = {
+    image: {
+      path: "/images/generations", desc: "圖片生成模型",
+      curl: `curl -X POST ${base}/images/generations \\
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \\
+  -d '{ "model": "${m}", "prompt": "a red dot" }'`,
+    },
+    rerank: {
+      path: "/rerank", desc: "重排序（rerank）模型，依相關度排序候選文件",
+      curl: `curl -X POST ${base}/rerank \\
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \\
+  -d '{ "model": "${m}", "query": "你的問題", "documents": ["文件A", "文件B"] }'`,
+    },
+    tts: {
+      path: "/audio/speech", desc: "語音合成（TTS）模型，回傳音檔（audio/mpeg）",
+      curl: `curl -X POST ${base}/audio/speech \\
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \\
+  -d '{ "model": "${m}", "input": "你好", "voice": "alloy" }' --output speech.mp3`,
+    },
+    stt: {
+      path: "/audio/transcriptions", desc: "語音轉文字（STT）模型，上傳音檔取回文字",
+      curl: `curl -X POST ${base}/audio/transcriptions \\
+  -H "Authorization: Bearer $TOKEN" \\
+  -F "model=${m}" -F "file=@audio.mp3"`,
+    },
+  };
+  if (kind && endpointInfo[kind]) {
+    const info = endpointInfo[kind]!;
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <CardTitle className="text-lg">如何呼叫</CardTitle>
+              <CardDescription>
+                這是{info.desc}，端點 <code className="text-xs break-all">{base}{info.path}</code>；
+                把 <code className="text-xs">$TOKEN</code> 換成你的金鑰 token。
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline" size="sm" className="shrink-0"
+              onClick={async () => {
+                const ok = await copyToClipboard(info.curl);
+                toast({ title: ok ? "已複製" : "複製失敗", variant: ok ? "default" : "destructive" });
+              }}
+            >
+              複製
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto">{info.curl}</pre>
+        </CardContent>
+      </Card>
+    );
+  }
 
   // Phase 29 ②: OCR models call /v1/ocr with {model, document}.
   if (isOcr) {

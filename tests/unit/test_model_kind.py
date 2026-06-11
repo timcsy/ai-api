@@ -29,7 +29,7 @@ def _m(*, mode=None, modality_input=None, modality_output=None):
         ("image_generation", "image"),
         ("audio_speech", "tts"),
         ("audio_transcription", "stt"),
-        ("rerank", "unknown"),
+        ("rerank", "rerank"),
         ("moderation", "unknown"),
     ],
 )

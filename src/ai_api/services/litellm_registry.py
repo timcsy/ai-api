@@ -96,7 +96,11 @@ def _capabilities(entry: dict[str, Any]) -> list[str]:
         caps.append("structured-output")
     if entry.get("supports_computer_use"):
         caps.append("computer-use")
-    return caps or ["chat"]
+    # Phase 29 ③: catalog honesty — do NOT bottom out to ["chat"]. chat-able modes
+    # already appended "chat" above; non-chat models (ocr/embedding/image/audio/
+    # rerank) with no chat-style flags get [] instead of a fake ["chat"], so the
+    # admin "能力" column stops lying about their type (kind shows the real type).
+    return caps
 
 
 def metadata_from_entry(entry: dict[str, Any]) -> dict[str, Any]:

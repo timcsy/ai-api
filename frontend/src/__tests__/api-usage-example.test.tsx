@@ -40,4 +40,17 @@ describe("<ApiUsageExample />", () => {
     expect(screen.getAllByText(/document/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/messages/)).not.toBeInTheDocument();
   });
+
+  // Phase 29 ③
+  it.each([
+    ["image", /images\/generations/, /prompt/],
+    ["rerank", /\/rerank/, /documents/],
+    ["tts", /audio\/speech/, /voice/],
+    ["stt", /audio\/transcriptions/, /file=@/],
+  ])("shows the right example for kind=%s", (kind, pathRe, bodyRe) => {
+    render(<ApiUsageExample model="azure/m" kind={kind as string} />);
+    expect(screen.getAllByText(pathRe as RegExp).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(bodyRe as RegExp).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/messages/)).not.toBeInTheDocument();
+  });
 });
