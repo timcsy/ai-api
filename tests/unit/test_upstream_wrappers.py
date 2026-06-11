@@ -36,3 +36,25 @@ async def test_aimage_generation_passes_prompt_and_version():
         )
     kw = m.call_args.kwargs
     assert kw["prompt"] == "a red dot" and kw["api_version"] == "2024-02-01" and kw["size"] == "256x256"
+
+
+@pytest.mark.asyncio
+async def test_aocr_remaps_azure_to_azure_ai():
+    # litellm OCR supports azure_ai/ (Azure AI Foundry) but NOT azure/ (Azure
+    # OpenAI). Mistral Document AI lives on Foundry — same endpoint/key, reached
+    # via the azure_ai/ prefix — so aocr must remap azure/ → azure_ai/.
+    with patch("litellm.aocr", new=AsyncMock(return_value="ok")) as m:
+        await upstream.aocr(
+            model="azure/mistral-document-ai-2512", document={"x": 1},
+            api_key="k", api_base="https://x", api_version="2024-02-01",
+        )
+    kw = m.call_args.kwargs
+    assert kw["model"] == "azure_ai/mistral-document-ai-2512"
+    assert kw["api_base"] == "https://x" and kw["api_key"] == "k"
+
+
+@pytest.mark.asyncio
+async def test_aocr_leaves_non_azure_provider_untouched():
+    with patch("litellm.aocr", new=AsyncMock(return_value="ok")) as m:
+        await upstream.aocr(model="mistral/mistral-ocr-latest", document={"x": 1}, api_key="k")
+    assert m.call_args.kwargs["model"] == "mistral/mistral-ocr-latest"

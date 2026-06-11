@@ -123,7 +123,15 @@ async def aocr(
     **kwargs: Any,
 ) -> Any:
     """Call upstream OCR via litellm (Phase 29 ②: /v1/ocr). `document` is a JSON
-    dict (URL or base64) — no multipart/binary."""
+    dict (URL or base64) — no multipart/binary.
+
+    litellm OCR supports azure_ai/ (Azure AI Foundry), mistral/ and vertex_ai/ —
+    but NOT azure/ (Azure OpenAI): it raises "OCR is not supported for provider:
+    azure". Azure's Mistral Document AI lives on Foundry, reachable on the SAME
+    endpoint/key via the azure_ai/ prefix, so remap azure/ → azure_ai/ here (the
+    single place both the /v1/ocr endpoint and the admin test recipe go through)."""
+    if model.startswith("azure/"):
+        model = "azure_ai/" + model[len("azure/"):]
     return await litellm.aocr(
         model=model, document=document, **_extra(api_key, api_base, api_version, kwargs)
     )
