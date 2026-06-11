@@ -153,18 +153,59 @@ async def test_tts_confirmed_passes_voice(app_client: AsyncClient, admin_headers
     assert m.call_args.kwargs.get("voice")
 
 
-# ---------------- US4: unsupported ----------------
+# ---------------- US4: binary/document kinds (billable real tests) ----------------
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_stt_unsupported_does_not_call(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
+async def test_stt_confirmed_calls(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
+    """STT now has a recipe (sends a minimal silent WAV) → billable real test."""
     await _seed("azure/whisper", mode="audio_transcription")
     await _provider(app_client, admin_headers)
-    with patch("ai_api.proxy.upstream.acompletion", new=AsyncMock()) as c:
-        r = await app_client.post("/admin/catalog/models/azure/whisper/test", headers=admin_headers)
+    with patch("ai_api.proxy.upstream.atranscription", new=AsyncMock(return_value={"text": ""})) as m:
+        # billable → no acknowledge means needs_confirmation, no upstream call
+        r0 = await app_client.post("/admin/catalog/models/azure/whisper/test", headers=admin_headers)
+        assert r0.json().get("needs_confirmation") is True and not m.await_count
+        r = await app_client.post(
+            "/admin/catalog/models/azure/whisper/test", headers=admin_headers,
+            json={"acknowledge_billable": True},
+        )
     assert r.status_code == 200, r.text
     b = r.json()
-    assert b["ok"] is False and b["kind"] == "stt" and b["supported"] is False and b["message"]
-    c.assert_not_called()
+    assert b["ok"] is True and b["kind"] == "stt" and "latency_ms" in b
+    m.assert_awaited_once()
+    assert m.call_args.kwargs.get("file")  # a (filename, bytes) fixture was sent
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_image_edit_confirmed_calls(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
+    await _seed("azure/img-edit", mode="image_edit")
+    await _provider(app_client, admin_headers)
+    with patch("ai_api.proxy.upstream.aimage_edit", new=AsyncMock(return_value={"data": []})) as m:
+        r = await app_client.post(
+            "/admin/catalog/models/azure/img-edit/test", headers=admin_headers,
+            json={"acknowledge_billable": True},
+        )
+    assert r.status_code == 200, r.text
+    assert r.json()["ok"] is True and r.json()["kind"] == "image_edit"
+    m.assert_awaited_once()
+    assert m.call_args.kwargs.get("image")  # a (filename, bytes) fixture was sent
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_search_confirmed_calls(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
+    """Search routes by search_provider (not model) → recipe remaps the slug."""
+    await _seed("azure/web-search", mode="search")
+    await _provider(app_client, admin_headers)
+    with patch("ai_api.proxy.upstream.asearch", new=AsyncMock(return_value={"results": []})) as m:
+        r = await app_client.post(
+            "/admin/catalog/models/azure/web-search/test", headers=admin_headers,
+            json={"acknowledge_billable": True},
+        )
+    assert r.status_code == 200, r.text
+    assert r.json()["ok"] is True and r.json()["kind"] == "search"
+    m.assert_awaited_once()
+    assert m.call_args.kwargs.get("search_provider") == "azure/web-search"
 
 
 @pytest.mark.integration
@@ -184,15 +225,25 @@ async def test_unknown_mode_unsupported(app_client: AsyncClient, admin_headers: 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_ocr_not_auto_testable(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
-    """The exact bug: ocr had no test branch but is_supported said 'supported' →
-    fake '通過 0ms'. Now ocr has no recipe → honest 'unsupported', no fake pass."""
+async def test_ocr_confirmed_calls(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
+    """The exact bug was: ocr had no test branch but is_supported said 'supported'
+    → fake '通過 0ms'. Now ocr has a real recipe (sends a minimal PNG document) →
+    billable real test, never a fake pass."""
     await _seed("azure/mistral-doc-ocr", mode="ocr")
     await _provider(app_client, admin_headers)
-    r = await app_client.post("/admin/catalog/models/azure/mistral-doc-ocr/test", headers=admin_headers)
+    with patch("ai_api.proxy.upstream.aocr", new=AsyncMock(return_value={"pages": []})) as m:
+        # billable → needs acknowledgement before any upstream call
+        r0 = await app_client.post("/admin/catalog/models/azure/mistral-doc-ocr/test", headers=admin_headers)
+        assert r0.json().get("needs_confirmation") is True and not m.await_count
+        r = await app_client.post(
+            "/admin/catalog/models/azure/mistral-doc-ocr/test", headers=admin_headers,
+            json={"acknowledge_billable": True},
+        )
     assert r.status_code == 200, r.text
     b = r.json()
-    assert b["ok"] is False and b["supported"] is False and "尚不支援" in b["message"]
+    assert b["ok"] is True and b["kind"] == "ocr" and "latency_ms" in b
+    m.assert_awaited_once()
+    assert m.call_args.kwargs.get("document")  # a document fixture was sent
 
 
 @pytest.mark.integration
