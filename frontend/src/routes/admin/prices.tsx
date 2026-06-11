@@ -71,6 +71,11 @@ type Unit = PriceUnit;
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleString("zh-TW");
 
+// Phase 31: non-token billing unit labels.
+const UNIT_ZH: Record<string, string> = {
+  page: "頁", query: "查詢", character: "字元", image: "張", second: "秒",
+};
+
 /** Local "now" formatted for a <input type="datetime-local"> (YYYY-MM-DDTHH:mm). */
 function localNowForInput(): string {
   const d = new Date();
@@ -271,7 +276,8 @@ function AddPriceDialog({
   const [input, setInput] = React.useState("");
   const [output, setOutput] = React.useState("");
   const [cached, setCached] = React.useState("");
-  const [perPage, setPerPage] = React.useState("");  // Phase 29 ②: non-token (page) price
+  const [perPage, setPerPage] = React.useState("");  // Phase 29 ②: non-token unit price value
+  const [perUnit, setPerUnit] = React.useState("page");  // Phase 31: the unit (page/query/character/image/second)
   const [effective, setEffective] = React.useState("");
   const [note, setNote] = React.useState("");
 
@@ -285,6 +291,7 @@ function AddPriceDialog({
       setOutput(state.currentOut ? per1kToPer1m(state.currentOut) : "");
       setCached(state.currentCached ? per1kToPer1m(state.currentCached) : "");
       setPerPage("");
+      setPerUnit("page");
       setEffective(localNowForInput());
       setNote("");
     }
@@ -305,10 +312,20 @@ function AddPriceDialog({
     setLitellmBusy(true);
     try {
       const s = await api<{
-        suggested_price: { input_per_1k: string; output_per_1k: string; cached_input_per_1k: string | null } | null;
+        suggested_price: {
+          input_per_1k: string; output_per_1k: string; cached_input_per_1k: string | null;
+          price_unit?: string | null; price_per_unit?: string | null;
+        } | null;
       }>(`/admin/catalog/litellm/suggest/${p}/${m}`);
       if (!s.suggested_price) {
         toast({ title: "LiteLLM 無此模型的建議價，請手填" });
+        return;
+      }
+      // Phase 31: non-token suggestion (OCR per-page, rerank per-query, …)
+      if (s.suggested_price.price_unit && s.suggested_price.price_per_unit) {
+        setPerUnit(s.suggested_price.price_unit);
+        setPerPage(s.suggested_price.price_per_unit);
+        toast({ title: `已帶入每${UNIT_ZH[s.suggested_price.price_unit] ?? s.suggested_price.price_unit}建議價` });
         return;
       }
       setUnit("per_1m");
@@ -334,7 +351,7 @@ function AddPriceDialog({
           cached_input_per_1k: cached
             ? unit === "per_1m" ? per1mToPer1k(cached) : cached.trim()
             : null,
-          price_unit: perPage.trim() ? "page" : null,
+          price_unit: perPage.trim() ? perUnit : null,
           price_per_unit: perPage.trim() || null,
           effective_from: new Date(effective).toISOString(),
           source_note: note || null,
@@ -421,11 +438,23 @@ function AddPriceDialog({
           )}
 
           <div>
-            <Label htmlFor="p-perpage">每頁價（USD / page，OCR 等非 token 模型；可選）</Label>
-            <Input id="p-perpage" className="mt-1 font-mono" placeholder="0.003"
-              value={perPage} onChange={(e) => setPerPage(e.target.value)} />
+            <Label htmlFor="p-perpage">每{UNIT_ZH[perUnit] ?? perUnit}價（USD，非 token 模型；可選）</Label>
+            <div className="flex gap-2 mt-1">
+              <Select value={perUnit} onValueChange={setPerUnit}>
+                <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="page">每頁</SelectItem>
+                  <SelectItem value="query">每查詢</SelectItem>
+                  <SelectItem value="character">每字元</SelectItem>
+                  <SelectItem value="image">每張</SelectItem>
+                  <SelectItem value="second">每秒</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input id="p-perpage" className="font-mono flex-1" placeholder="0.003"
+                value={perPage} onChange={(e) => setPerPage(e.target.value)} />
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
-              非 token 模型（如 OCR）依「頁」計費，填此欄；token 欄可填 0。一筆價格只用一種單位。
+              非 token 模型（OCR=頁、rerank/search=查詢、TTS=字元、圖片編輯=張）依該單位計費，填此欄；token 欄可填 0。一筆價格只用一種單位。可按上方「從 LiteLLM 帶入建議價」自動填。
             </p>
           </div>
 
