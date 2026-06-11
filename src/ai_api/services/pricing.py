@@ -221,6 +221,11 @@ async def current_price_map(
             }
             if cur.cached_input_per_1k_tokens_usd is not None:
                 entry["cached_input_per_1k"] = _price_str(cur.cached_input_per_1k_tokens_usd)
+            # Phase 29 ②/③: surface the non-token unit price too (page/query/…) so
+            # the catalog display can show the right unit, not a fake "per-1M".
+            if cur.price_unit is not None and cur.price_per_unit_usd is not None:
+                entry["price_unit"] = cur.price_unit
+                entry["price_per_unit"] = _price_str(cur.price_per_unit_usd)
             out[key] = entry
     return out
 

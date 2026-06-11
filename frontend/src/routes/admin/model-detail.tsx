@@ -80,7 +80,13 @@ interface CatalogModel {
   denied_tags: string[];
   self_service_enabled: boolean;
   self_service_default_quota: number | null;
-  price: { input_per_1k: string; output_per_1k: string; cached_input_per_1k?: string } | null;
+  price: {
+    input_per_1k: string;
+    output_per_1k: string;
+    cached_input_per_1k?: string;
+    price_unit?: string;
+    price_per_unit?: string;
+  } | null;
   visibility?: Visibility;
   litellm_sync?: {
     base_model_key: string;
@@ -104,6 +110,11 @@ const KIND_LABEL: Record<string, string> = {
   search: "網路搜尋（search）",
   image_edit: "圖片編輯（image edit）",
   unknown: "未知",
+};
+
+// Phase 29②/③: non-token billing unit labels (for the price row).
+const UNIT_LABEL: Record<string, string> = {
+  page: "每頁", query: "每查詢", character: "每字元", image: "每張", second: "每秒",
 };
 
 export function AdminModelDetailPage() {
@@ -336,9 +347,11 @@ export function AdminModelDetailPage() {
               <FieldSourceBadge source={model.litellm_sync?.field_sources?.capabilities} />
             </div>
             <div className="col-span-3">
-              <span className="text-muted-foreground">價格（每 1M）：</span>
-              {model.price
-                ? <span className="font-mono">輸入 ${per1kToPer1m(model.price.input_per_1k)} / 輸出 ${per1kToPer1m(model.price.output_per_1k)}{model.price.cached_input_per_1k && ` / 快取輸入 $${per1kToPer1m(model.price.cached_input_per_1k)}`}</span>
+              <span className="text-muted-foreground">價格：</span>
+              {model.price?.price_unit && model.price.price_per_unit
+                ? <span className="font-mono">${model.price.price_per_unit} / {UNIT_LABEL[model.price.price_unit] ?? model.price.price_unit}</span>
+                : model.price
+                ? <span className="font-mono">輸入 ${per1kToPer1m(model.price.input_per_1k)} / 輸出 ${per1kToPer1m(model.price.output_per_1k)}{model.price.cached_input_per_1k && ` / 快取輸入 $${per1kToPer1m(model.price.cached_input_per_1k)}`} <span className="text-muted-foreground">（每 1M tokens）</span></span>
                 : <span className="text-amber-700">未定價</span>}
               <Link to="/admin/model/prices" className="ml-2 text-xs text-primary hover:underline">管理價目 →</Link>
             </div>
