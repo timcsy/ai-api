@@ -65,3 +65,19 @@ async def test_per_unit_point_in_time(app_client: AsyncClient) -> None:
         )
     assert early is not None and early.price_per_unit == Decimal("0.003")
     assert late is not None and late.price_per_unit == Decimal("0.005")
+
+
+@pytest.mark.asyncio
+async def test_current_price_map_surfaces_per_unit(app_client: AsyncClient) -> None:
+    """Phase 29②/③ fix: catalog display source must carry the non-token unit price
+    (was a missed sink — admin model detail showed 'per-1M / 未定價' for OCR)."""
+    from datetime import datetime as _dt
+
+    from ai_api.services.pricing import current_price_map
+    await _seed_page_price("azure_ai", "doc-ocr", _dt.now(UTC) - timedelta(days=1), "0.003")
+    sm = get_sessionmaker()
+    async with sm() as s:
+        pm = await current_price_map(s, _dt.now(UTC))
+    entry = pm[("azure_ai", "doc-ocr")]
+    assert entry["price_unit"] == "page"
+    assert Decimal(entry["price_per_unit"]) == Decimal("0.003")

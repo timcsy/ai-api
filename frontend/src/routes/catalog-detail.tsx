@@ -55,8 +55,19 @@ interface ModelDetail {
   status: string;
   deprecation_note: string | null;
   example_request: { curl?: string; body?: unknown; [k: string]: unknown };
-  price: { input_per_1k: string; output_per_1k: string; cached_input_per_1k?: string } | null;
+  price: {
+    input_per_1k: string;
+    output_per_1k: string;
+    cached_input_per_1k?: string;
+    price_unit?: string;
+    price_per_unit?: string;
+  } | null;
 }
+
+// Phase 29②/③: non-token billing unit labels (for the price card).
+const UNIT_LABEL: Record<string, string> = {
+  page: "每頁", query: "每查詢", character: "每字元", image: "每張", second: "每秒",
+};
 
 export function CatalogDetailPage() {
   // /catalog/* — splat captures everything after /catalog/
@@ -203,10 +214,19 @@ export function CatalogDetailPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">價格</CardTitle>
-          <CardDescription>USD / 1M tokens（計費以呼叫當時的價目計算）</CardDescription>
+          <CardDescription>
+            {m.price?.price_unit
+              ? "USD / 計量單位（計費以呼叫當時的價目計算）"
+              : "USD / 1M tokens（計費以呼叫當時的價目計算）"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {m.price ? (
+          {m.price?.price_unit && m.price.price_per_unit ? (
+            <div className="text-sm">
+              <div className="text-xs text-muted-foreground">{UNIT_LABEL[m.price.price_unit] ?? m.price.price_unit}</div>
+              <div className="font-mono text-lg tabular-nums">${m.price.price_per_unit}</div>
+            </div>
+          ) : m.price ? (
             <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
               <div>
                 <div className="text-xs text-muted-foreground">輸入</div>
