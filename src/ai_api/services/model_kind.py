@@ -19,9 +19,6 @@ Kind = Literal[
     "moderation", "search", "image_edit", "unknown",
 ]
 
-_BILLABLE: frozenset[str] = frozenset({"image", "tts"})
-_UNSUPPORTED: frozenset[str] = frozenset({"stt", "unknown"})
-
 # litellm mode → our kind
 _MODE_TO_KIND: dict[str, Kind] = {
     "chat": "chat",
@@ -70,10 +67,15 @@ def model_kind(model: Any) -> Kind:
 
 
 def is_billable(kind: str) -> bool:
-    """Kinds whose minimal test still costs real money (image gen, TTS)."""
-    return kind in _BILLABLE
+    """Whether the minimal auto-test costs real money. Derived from the test-recipe
+    table (the single source of truth) so it can't drift from what's actually run."""
+    from ai_api.services.model_test import is_billable as _is_billable
+    return _is_billable(kind)
 
 
 def is_supported(kind: str) -> bool:
-    """Kinds we can auto-test this version (everything except stt / unknown)."""
-    return kind not in _UNSUPPORTED
+    """Whether this kind can be auto-tested — IFF a test recipe exists for it.
+    Derived from the recipe table, so adding a kind without a recipe is honestly
+    'unsupported', never a silent fake pass."""
+    from ai_api.services.model_test import is_testable
+    return is_testable(kind)

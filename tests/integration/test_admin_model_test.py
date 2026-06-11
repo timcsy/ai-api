@@ -178,3 +178,32 @@ async def test_unknown_mode_unsupported(app_client: AsyncClient, admin_headers: 
     r = await app_client.post("/admin/catalog/models/azure/video-x/test", headers=admin_headers)
     assert r.status_code == 200, r.text
     assert r.json()["kind"] == "unknown" and r.json()["supported"] is False
+
+
+# ---------------- Phase 31 follow-up: recipe table = single source of truth ----------------
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_ocr_not_auto_testable(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
+    """The exact bug: ocr had no test branch but is_supported said 'supported' →
+    fake '通過 0ms'. Now ocr has no recipe → honest 'unsupported', no fake pass."""
+    await _seed("azure/mistral-doc-ocr", mode="ocr")
+    await _provider(app_client, admin_headers)
+    r = await app_client.post("/admin/catalog/models/azure/mistral-doc-ocr/test", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    b = r.json()
+    assert b["ok"] is False and b["supported"] is False and "尚不支援" in b["message"]
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_moderation_real_test(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
+    """A recipe was added for moderation → it now actually calls upstream (real test)."""
+    await _seed("azure/text-moderation", mode="moderation")
+    await _provider(app_client, admin_headers)
+    with patch("ai_api.proxy.upstream.amoderation", new=AsyncMock(return_value={"ok": 1})) as mock:
+        r = await app_client.post("/admin/catalog/models/azure/text-moderation/test", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    b = r.json()
+    assert b["ok"] is True and b["kind"] == "moderation" and "latency_ms" in b
+    mock.assert_awaited_once()  # it really called upstream (not a 0ms no-op)
