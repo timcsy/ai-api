@@ -568,3 +568,11 @@
 - **解決方式**：STT 改走 **token 計費**（`usage` 有 token 就 `calculate_cost`，如 `azure/gpt-4o-transcribe`；whisper 類無 usage → cost 0），per-second **延後**（標記為「需音訊長度來源/新依賴」的後續）。spec 的 Assumptions 明寫此限制。
 - **教訓**：呼應「採用前印真實回傳值」——計費單位的「數量來源」也要先驗證存不存在。回應沒帶你要的計量欄位時，**降級到回應真的有的單位**（token）+ 誠實標記原單位延後，比為了一個單位硬拉一個音訊庫進來划算。先別為「規格上該有的單位」付一個新依賴的代價。
 - **來源**：`specs/041-multi-endpoint-complete/research.md` R4、`src/ai_api/proxy/audio.py` STT 計費；階段 29③
+
+### 改 model_kind 的 mode→kind 對映後，要重跑全套件——admin model-test 有個「未知 mode」整合測試會撞
+
+- **理論說**：給 `model_kind._MODE_TO_KIND` 加一個對映（如 `moderation→moderation`），只影響該類型的判定，跑相關單元測試即可。
+- **實際發生**：階段 31 加了 moderation/search/image_edit 三個 mode→kind，本機跑 `test_model_kind.py`（單元）綠就推；但 CI 紅在 `tests/integration/test_admin_model_test.py::test_unknown_mode_unsupported`——它**拿某個「當時還未知」的 mode 當『unknown』的代表**來斷言「admin 測試按鈕對未知種類回 supported=False」。每次有 mode 從 unknown 變成 known，這個測試的代表就失效（階段 29③ 把 rerank 變 known 時改用 moderation，階段 31 又把 moderation 變 known）。而且它是 **integration（testcontainers Postgres）**，本機若沒在「加對映後」重跑完整 `pytest tests/` 就漏掉。
+- **解決方式**：把該測試的代表換成「**目前仍未支援**」的 mode（video_generation / realtime / vector_store）。並記住：**改任何「列舉對映/分類」後，重跑完整 `pytest tests/`**（不只改動點附近的單元測試）——尤其有測試以「某個分類的反例」立論時。
+- **教訓**：當一個測試以「X 是某類別的反例」立論（unknown mode、未支援能力、空集合…），它對「該類別的成員集合」有**隱性依賴**；每次擴張那個集合就可能讓反例失效。這類測試該用「結構上永遠在類別外」的代表（如註定不做的 mode），或改成不依賴特定成員。流程面：**動列舉/對映 → 全套件重跑**，別只跑改動點旁的測試（呼應「本機關卡範圍要對齊 CI」——這次是「測試廣度」沒對齊）。
+- **來源**：`tests/integration/test_admin_model_test.py` `test_unknown_mode_unsupported`、`services/model_kind.py`；階段 29③→31（PR #79 第二輪紅）
