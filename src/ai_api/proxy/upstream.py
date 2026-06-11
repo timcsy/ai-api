@@ -111,3 +111,19 @@ async def aimage_generation(
     return await litellm.aimage_generation(
         model=model, prompt=prompt, **_extra(api_key, api_base, api_version, kwargs)
     )
+
+
+async def aocr(
+    *,
+    model: str,
+    document: Any,
+    api_key: str,
+    api_base: str | None = None,
+    api_version: str | None = None,
+    **kwargs: Any,
+) -> Any:
+    """Call upstream OCR via litellm (Phase 29 ②: /v1/ocr). `document` is a JSON
+    dict (URL or base64) — no multipart/binary."""
+    return await litellm.aocr(
+        model=model, document=document, **_extra(api_key, api_base, api_version, kwargs)
+    )

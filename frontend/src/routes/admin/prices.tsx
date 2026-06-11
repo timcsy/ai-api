@@ -271,6 +271,7 @@ function AddPriceDialog({
   const [input, setInput] = React.useState("");
   const [output, setOutput] = React.useState("");
   const [cached, setCached] = React.useState("");
+  const [perPage, setPerPage] = React.useState("");  // Phase 29 ②: non-token (page) price
   const [effective, setEffective] = React.useState("");
   const [note, setNote] = React.useState("");
 
@@ -283,6 +284,7 @@ function AddPriceDialog({
       setInput(state.currentIn ? per1kToPer1m(state.currentIn) : "");
       setOutput(state.currentOut ? per1kToPer1m(state.currentOut) : "");
       setCached(state.currentCached ? per1kToPer1m(state.currentCached) : "");
+      setPerPage("");
       setEffective(localNowForInput());
       setNote("");
     }
@@ -332,6 +334,8 @@ function AddPriceDialog({
           cached_input_per_1k: cached
             ? unit === "per_1m" ? per1mToPer1k(cached) : cached.trim()
             : null,
+          price_unit: perPage.trim() ? "page" : null,
+          price_per_unit: perPage.trim() || null,
           effective_from: new Date(effective).toISOString(),
           source_note: note || null,
         }),
@@ -415,6 +419,15 @@ function AddPriceDialog({
               {cached && ` / cached $${per1mToPer1k(cached)}`}
             </p>
           )}
+
+          <div>
+            <Label htmlFor="p-perpage">每頁價（USD / page，OCR 等非 token 模型；可選）</Label>
+            <Input id="p-perpage" className="mt-1 font-mono" placeholder="0.003"
+              value={perPage} onChange={(e) => setPerPage(e.target.value)} />
+            <p className="text-xs text-muted-foreground mt-1">
+              非 token 模型（如 OCR）依「頁」計費，填此欄；token 欄可填 0。一筆價格只用一種單位。
+            </p>
+          </div>
 
           <div>
             <Label htmlFor="p-eff">生效時間</Label>

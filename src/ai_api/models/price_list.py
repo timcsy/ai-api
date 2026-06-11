@@ -23,6 +23,11 @@ class PriceList(Base):
     cached_input_per_1k_tokens_usd: Mapped[Decimal | None] = mapped_column(
         Numeric(12, 8), nullable=True
     )
+    # Phase 29 ②: non-token billing. price_unit NULL ⇒ token (use per-1k columns
+    # above). For non-token models (e.g. OCR) price_unit="page" + per-unit price;
+    # the token columns are then 0 (irrelevant for page-billed models).
+    price_unit: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    price_per_unit_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 8), nullable=True)
     effective_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_by: Mapped[str] = mapped_column(String(128), nullable=False)
