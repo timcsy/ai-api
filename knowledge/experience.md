@@ -584,3 +584,11 @@
 - **解決方式**:建 `services/model_test.py` 一張 `RECIPES` 表（kind → 怎麼測:最小真實呼叫 + billable 旗標）當**單一真理**;`is_testable`/`is_billable` 都從表**衍生**;`model_kind.is_supported/is_billable` 改委派給它;`admin_test_model` 改用 `recipe = RECIPES.get(kind); await recipe.call(common)` 取代 if/elif。沒 recipe 的 kind 自動「尚不支援自動測試」，**絕不假通過**。順手把 moderation/rerank 補成真測試（它們之前也假通過）。
 - **教訓**：當「**能不能做 X**」（capability 查詢）與「**怎麼做 X**」（實際執行）由兩處各自維護，它們**一定會 drift**——而 drift 的失敗模式是最惡的「靜默假成功」（no-op 看起來像通過）。讓 capability 查詢**從執行的定義衍生**（`is_testable(k) := k in RECIPES`），兩者就**結構上不可能不一致**:加一個種類沒寫 recipe → 自動誠實回「不支援」，而不是假通過。資料驅動的「一張表 = 唯一真理」勝過「平行維護的兩個清單」。呼應 Principle 7 演進性:data-over-code。
 - **來源**：`src/ai_api/services/model_test.py`（RECIPES）、`services/model_kind.py`（委派）、`api/admin_catalog.py`（recipe dispatch）;階段 31 後續修復（PR #82，rev 90）
+
+### 新端點光「壞 token→401」不算驗過——provider 路由不符會潛伏到第一次真打
+
+- **理論說**：新增 `/v1/ocr` 後,線上 smoke「壞 token→401」就代表端點上線可用了。
+- **實際發生**：階段 29② 的 `/v1/ocr` 對 `azure/mistral-document-ai-2512` **從來沒能跑通**——litellm OCR 只支援 `azure_ai/`〔Azure AI Foundry〕、`mistral/`、`vertex_ai/`,**不支援 `azure/`**〔Azure OpenAI〕,會 raise `OCR is not supported for provider: azure`。但 catalog 把模型登記成 `azure/…`、`upstream_model` 就直接帶 `azure/` 前綴 → 每次 OCR 呼叫都被擋。這個 bug 潛伏了好幾個 rev,因為「壞 token→401」在**進到 litellm 之前**就被 auth 擋下回 401,根本沒觸發 provider 路由那段;直到 rev 91「測試模型」按鈕對它**真打一次**才浮現。
+- **解決方式**：`upstream.aocr` 把 `azure/` → `azure_ai/` 重映〔同一 endpoint/key,Foundry 用 azure_ai 前綴可達〕——這是 `/v1/ocr` 端點與測試 recipe 的**唯一共同通道,一處改兩處修**。並學到:新增端點的線上驗證,「壞 token→401」只證明「路由有掛上、auth 有擋」,**證明不了「帶正確憑證真打會通」**——後者要對至少一個真模型真打一次〔或用 admin 測試按鈕〕,尤其牽涉 litellm provider 能力差異〔同一家雲的 `azure/` vs `azure_ai/` 支援的端點不同〕時。
+- **教訓**：401 smoke 與「真打通過」是**兩個不同的保證**:前者測「閘門在不在」,後者測「閘門後面的路通不通」。只做前者會把「auth 正確擋下」誤當成「端點可用」。呼應「採用前先驗證能力邊界」——litellm 同一 provider 家族對不同端點〔chat/ocr/…〕的支援度不一致,`azure` 能 chat 不能 ocr,要用 `azure_ai`。**端點驗收清單該有一條:帶真憑證對一個真模型成功跑一次,不能只靠 401。** admin「測試模型」按鈕正是把這條變成隨手可做的動作——它揭露此 bug 就是它的價值證明。
+- **來源**：`src/ai_api/proxy/upstream.py` `aocr` azure→azure_ai 重映、litellm `ocr/main.py` `get_provider_ocr_config`〔只認 azure_ai/mistral/vertex〕;階段 31 後續〔PR #84,rev 92〕,由 rev 91「補真分支」的 OCR 測試實打揭露
