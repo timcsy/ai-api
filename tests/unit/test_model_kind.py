@@ -30,7 +30,10 @@ def _m(*, mode=None, modality_input=None, modality_output=None):
         ("audio_speech", "tts"),
         ("audio_transcription", "stt"),
         ("rerank", "rerank"),
-        ("moderation", "unknown"),
+        ("moderation", "moderation"),
+        ("search", "search"),
+        ("image_edit", "image_edit"),
+        ("video_generation", "unknown"),
     ],
 )
 def test_kind_by_litellm_mode(mode, expected):

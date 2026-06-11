@@ -44,7 +44,9 @@ interface ModelDetail {
     state: "available" | "unavailable" | "unknown";
     source: "tested" | "manual" | null;
   };
-  kind?: "chat" | "embedding" | "tts" | "image" | "stt" | "ocr" | "rerank" | "unknown";
+  kind?:
+    | "chat" | "embedding" | "tts" | "image" | "stt" | "ocr" | "rerank"
+    | "moderation" | "search" | "image_edit" | "unknown";
   context_window: number;
   cost_tier: string;
   recommended_for: string[];
