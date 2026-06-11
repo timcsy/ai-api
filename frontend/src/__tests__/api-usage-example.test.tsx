@@ -47,6 +47,9 @@ describe("<ApiUsageExample />", () => {
     ["rerank", /\/rerank/, /documents/],
     ["tts", /audio\/speech/, /voice/],
     ["stt", /audio\/transcriptions/, /file=@/],
+    ["moderation", /\/moderations/, /input/],
+    ["search", /\/search/, /query/],
+    ["image_edit", /images\/edits/, /image=@/],
   ])("shows the right example for kind=%s", (kind, pathRe, bodyRe) => {
     render(<ApiUsageExample model="azure/m" kind={kind as string} />);
     expect(screen.getAllByText(pathRe as RegExp).length).toBeGreaterThan(0);

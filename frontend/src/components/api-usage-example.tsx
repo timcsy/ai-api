@@ -63,6 +63,24 @@ export function ApiUsageExample({
   -H "Authorization: Bearer $TOKEN" \\
   -F "model=${m}" -F "file=@audio.mp3"`,
     },
+    moderation: {
+      path: "/moderations", desc: "內容審核（moderation）模型，回傳安全分類",
+      curl: `curl -X POST ${base}/moderations \\
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \\
+  -d '{ "model": "${m}", "input": "要審核的文字" }'`,
+    },
+    search: {
+      path: "/search", desc: "網路搜尋（search）模型，依相關度回傳搜尋結果",
+      curl: `curl -X POST ${base}/search \\
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \\
+  -d '{ "model": "${m}", "query": "你要搜尋的問題" }'`,
+    },
+    image_edit: {
+      path: "/images/edits", desc: "圖片編輯（image edit）模型，上傳圖片 + 提示取回編輯後圖片",
+      curl: `curl -X POST ${base}/images/edits \\
+  -H "Authorization: Bearer $TOKEN" \\
+  -F "model=${m}" -F "image=@input.png" -F "prompt=make it red"`,
+    },
   };
   if (kind && endpointInfo[kind]) {
     const info = endpointInfo[kind]!;

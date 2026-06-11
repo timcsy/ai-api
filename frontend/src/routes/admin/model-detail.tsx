@@ -100,6 +100,9 @@ const KIND_LABEL: Record<string, string> = {
   stt: "語音轉文字（STT）",
   ocr: "文件辨識（OCR）",
   rerank: "重排序（rerank）",
+  moderation: "內容審核（moderation）",
+  search: "網路搜尋（search）",
+  image_edit: "圖片編輯（image edit）",
   unknown: "未知",
 };
 

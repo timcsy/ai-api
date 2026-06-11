@@ -14,7 +14,10 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-Kind = Literal["chat", "embedding", "tts", "image", "stt", "ocr", "rerank", "unknown"]
+Kind = Literal[
+    "chat", "embedding", "tts", "image", "stt", "ocr", "rerank",
+    "moderation", "search", "image_edit", "unknown",
+]
 
 _BILLABLE: frozenset[str] = frozenset({"image", "tts"})
 _UNSUPPORTED: frozenset[str] = frozenset({"stt", "unknown"})
@@ -29,6 +32,9 @@ _MODE_TO_KIND: dict[str, Kind] = {
     "audio_transcription": "stt",
     "ocr": "ocr",
     "rerank": "rerank",
+    "moderation": "moderation",
+    "search": "search",
+    "image_edit": "image_edit",
 }
 
 

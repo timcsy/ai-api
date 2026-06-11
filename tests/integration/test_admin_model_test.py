@@ -170,10 +170,11 @@ async def test_stt_unsupported_does_not_call(app_client: AsyncClient, admin_head
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_unknown_mode_unsupported(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
-    # 'moderation' is a genuinely-unknown mode for the admin test button (rerank
-    # is now a known kind as of Phase 29 ③, so it no longer serves as 'unknown').
-    await _seed("azure/moderation-x", mode="moderation")
+    # 'video_generation' is a genuinely-unknown mode for the admin test button
+    # (moderation/rerank/etc. became known kinds in Phase 29③/31; only the not-yet-
+    # supported modes — video/realtime/vector_store — remain 'unknown').
+    await _seed("azure/video-x", mode="video_generation")
     await _provider(app_client, admin_headers)
-    r = await app_client.post("/admin/catalog/models/azure/moderation-x/test", headers=admin_headers)
+    r = await app_client.post("/admin/catalog/models/azure/video-x/test", headers=admin_headers)
     assert r.status_code == 200, r.text
     assert r.json()["kind"] == "unknown" and r.json()["supported"] is False

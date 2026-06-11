@@ -64,6 +64,8 @@ Auto-generated from all feature plans. Last updated: 2026-06-11
 - PostgreSQL（生產）/ SQLite（dev、CI）；**新 migration `0019`**——`price_list` 加 `price_unit`(nullable)+`price_per_unit_usd`(nullable)；`call_records` 加 `quantity`(nullable)+`unit`(nullable)。**純加欄**（token 欄不動、不改 nullability，避開 SQLite ALTER COLUMN 重建） (040-ocr-billing-units)
 - Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI（含 `UploadFile` multipart）、SQLAlchemy 2.x async、Pydantic v2、`litellm`（`aimage_generation`/`arerank`/`aspeech`/`atranscription` library form）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件** (041-multi-endpoint-complete)
 - PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表、不新增 migration**——沿用增量②（0019）的 `call_records.quantity/unit` 與 `price_list.price_unit/price_per_unit_usd`，新單位（query / character）為字串值 (041-multi-endpoint-complete)
+- Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端少量範例） + FastAPI（含 `UploadFile` multipart，既有）、SQLAlchemy 2.x async、Pydantic v2、`litellm`（`amoderation`/`asearch`/`aimage_edit` 既有函式）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件** (042-endpoint-registry)
+- PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表/欄/migration**——沿用 0019 的 `call_records.{quantity,unit}` 與 `price_list.{price_unit,price_per_unit_usd}`，新單位 `image`/`query` 為字串值 (042-endpoint-registry)
 
 - Python 3.11+ + LiteLLM（proxy core）、FastAPI（admin API）、 (001-gateway-core)
 
@@ -84,9 +86,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 042-endpoint-registry: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端少量範例） + FastAPI（含 `UploadFile` multipart，既有）、SQLAlchemy 2.x async、Pydantic v2、`litellm`（`amoderation`/`asearch`/`aimage_edit` 既有函式）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件**
 - 041-multi-endpoint-complete: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI（含 `UploadFile` multipart）、SQLAlchemy 2.x async、Pydantic v2、`litellm`（`aimage_generation`/`arerank`/`aspeech`/`atranscription` library form）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件**
 - 040-ocr-billing-units: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2、`litellm`（library：`aocr` 既有函式）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件**
-- 039-member-batch-admin: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Pydantic v2、既有 `auth/invitations`（後端）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件**
 
 
 <!-- MANUAL ADDITIONS START -->

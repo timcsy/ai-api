@@ -160,3 +160,53 @@ async def atranscription(
     return await litellm.atranscription(
         model=model, file=file, **_extra(api_key, api_base, api_version, kwargs)
     )
+
+
+async def amoderation(
+    *,
+    model: str,
+    input: Any,
+    api_key: str,
+    api_base: str | None = None,
+    api_version: str | None = None,
+    **kwargs: Any,
+) -> Any:
+    """Call upstream moderation via litellm (Phase 31: /v1/moderations). JSON in/out."""
+    return await litellm.amoderation(
+        model=model, input=input, **_extra(api_key, api_base, api_version, kwargs)
+    )
+
+
+async def asearch(
+    *,
+    search_provider: str,
+    query: Any,
+    api_key: str,
+    api_base: str | None = None,
+    api_version: str | None = None,
+    **kwargs: Any,
+) -> Any:
+    """Call upstream web search via litellm (Phase 31: /v1/search). Note: routed by
+    `search_provider` (not `model`) — the EndpointSpec maps the slug onto it."""
+    return await litellm.asearch(
+        search_provider=search_provider, query=query,
+        **_extra(api_key, api_base, api_version, kwargs),
+    )
+
+
+async def aimage_edit(
+    *,
+    model: str,
+    image: Any,
+    prompt: str | None = None,
+    api_key: str,
+    api_base: str | None = None,
+    api_version: str | None = None,
+    **kwargs: Any,
+) -> Any:
+    """Call upstream image edit via litellm (Phase 31: /v1/images/edits). `image`
+    is a (filename, bytes) tuple from a multipart upload."""
+    return await litellm.aimage_edit(
+        model=model, image=image, prompt=prompt,
+        **_extra(api_key, api_base, api_version, kwargs),
+    )
