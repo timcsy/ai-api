@@ -113,6 +113,9 @@ def _to_dict(m: ModelCatalog, price: dict[str, str] | None = None) -> dict[str, 
         "capabilities": list(m.capabilities),
         # Phase 25: derived responses support (axis ③) for the admin panel.
         "responses_support": responses_support.get_support(m.capabilities),
+        # Phase 29 ③: model type (kind) — honest type for the admin "類型" display
+        # (axis-orthogonal to capabilities). Same value as test_kind.
+        "kind": _mk.model_kind(m),
         # Phase 26: derived test kind for the "test model" button.
         "test_kind": _mk.model_kind(m),
         "test_billable": _mk.is_billable(_mk.model_kind(m)),

@@ -70,6 +70,7 @@ interface CatalogModel {
     source: "tested" | "manual" | null;
   };
   test_kind?: "chat" | "embedding" | "tts" | "image" | "stt" | "unknown";
+  kind?: string;
   test_billable?: boolean;
   test_supported?: boolean;
   recommended_for: string[];
@@ -89,6 +90,18 @@ interface CatalogModel {
     raw: Record<string, unknown> | null;
   } | null;
 }
+
+// Phase 29 ③: model type (kind) labels — shown separately from 能力 (axis-orthogonal).
+const KIND_LABEL: Record<string, string> = {
+  chat: "對話（chat）",
+  embedding: "向量（embedding）",
+  image: "圖片生成",
+  tts: "語音合成（TTS）",
+  stt: "語音轉文字（STT）",
+  ocr: "文件辨識（OCR）",
+  rerank: "重排序（rerank）",
+  unknown: "未知",
+};
 
 export function AdminModelDetailPage() {
   const location = useLocation();
@@ -299,6 +312,10 @@ export function AdminModelDetailPage() {
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
             <div><span className="text-muted-foreground">供應商：</span>{model.provider}</div>
+            <div>
+              <span className="text-muted-foreground">類型：</span>
+              {KIND_LABEL[model.kind ?? "chat"] ?? model.kind ?? "—"}
+            </div>
             <div><span className="text-muted-foreground">Cost tier：</span>{model.cost_tier}</div>
             <div>
               <span className="text-muted-foreground">Context window：</span>

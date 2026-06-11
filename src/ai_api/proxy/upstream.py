@@ -127,3 +127,36 @@ async def aocr(
     return await litellm.aocr(
         model=model, document=document, **_extra(api_key, api_base, api_version, kwargs)
     )
+
+
+async def arerank(
+    *,
+    model: str,
+    query: str,
+    documents: Any,
+    api_key: str,
+    api_base: str | None = None,
+    api_version: str | None = None,
+    **kwargs: Any,
+) -> Any:
+    """Call upstream rerank via litellm (Phase 29 ③: /v1/rerank). JSON in/out."""
+    return await litellm.arerank(
+        model=model, query=query, documents=documents,
+        **_extra(api_key, api_base, api_version, kwargs),
+    )
+
+
+async def atranscription(
+    *,
+    model: str,
+    file: Any,
+    api_key: str,
+    api_base: str | None = None,
+    api_version: str | None = None,
+    **kwargs: Any,
+) -> Any:
+    """Call upstream speech-to-text via litellm (Phase 29 ③: /v1/audio/transcriptions).
+    `file` is a (filename, bytes) tuple from a multipart upload."""
+    return await litellm.atranscription(
+        model=model, file=file, **_extra(api_key, api_base, api_version, kwargs)
+    )

@@ -52,11 +52,20 @@ async def test_catalog_detail_kind_embedding_vs_chat(
     await _seed("azure/text-embedding-3", mode="embedding")
     await _seed("azure/gpt-x", mode="chat")
     await _seed("azure/mistral-document-ai", mode="ocr")
+    await _seed("azure/cohere-rerank", mode="rerank")
     await _login(app_client, admin_headers)
 
     emb = (await app_client.get("/catalog/models/azure/text-embedding-3")).json()
     chat = (await app_client.get("/catalog/models/azure/gpt-x")).json()
     ocr = (await app_client.get("/catalog/models/azure/mistral-document-ai")).json()
+    rr = (await app_client.get("/catalog/models/azure/cohere-rerank")).json()
     assert emb["kind"] == "embedding"
     assert chat["kind"] == "chat"
     assert ocr["kind"] == "ocr"
+    assert rr["kind"] == "rerank"
+
+    # Phase 29 ③: admin model list also carries kind (for the "類型" display)
+    admin_rows = (await app_client.get("/admin/catalog/models", headers=admin_headers)).json()
+    by_slug = {r["slug"]: r for r in admin_rows}
+    assert by_slug["azure/mistral-document-ai"]["kind"] == "ocr"
+    assert by_slug["azure/cohere-rerank"]["kind"] == "rerank"

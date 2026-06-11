@@ -44,7 +44,7 @@ interface ModelDetail {
     state: "available" | "unavailable" | "unknown";
     source: "tested" | "manual" | null;
   };
-  kind?: "chat" | "embedding" | "tts" | "image" | "stt" | "ocr" | "unknown";
+  kind?: "chat" | "embedding" | "tts" | "image" | "stt" | "ocr" | "rerank" | "unknown";
   context_window: number;
   cost_tier: string;
   recommended_for: string[];
@@ -241,6 +241,7 @@ export function CatalogDetailPage() {
         supportsResponses={m.capabilities.includes("responses")}
         isEmbedding={m.kind === "embedding"}
         isOcr={m.kind === "ocr"}
+        kind={m.kind}
       />
 
       {m.official_doc_url && (
