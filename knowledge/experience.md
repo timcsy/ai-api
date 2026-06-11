@@ -536,3 +536,19 @@
 - **解決方式**：在 `MemberService.delete` 內以 **ORM 顯式**逐步處理整條連帶（`UPDATE call_records SET allocation_id=NULL` → 刪 credential_allocations → credentials → allocations → member），單一交易，**完全不依賴 DB ondelete**。並把這條的驗證寫成 **integration 測試（跑真 Postgres，FK 真強制）** 而非只在 SQLite contract 測，雙重保險。
 - **教訓**：凡「刪一個東西要連帶處理子資料」的邏輯，**在服務層顯式寫出每一步**，別把正確性託付給 DB 的 ondelete——只要測試 DB 與生產 DB 的 FK 強制行為不同（SQLite 預設關、Postgres 開），靠 DB cascade 就會 dev/prod drift 且測試測不出來。顯式做＝可攜、可測、可在每步插稽核。需要驗 DB 端真實行為時，補一支 Postgres integration 測試。
 - **來源**：`src/ai_api/services/members.py` `delete`；`tests/integration/test_member_safe_delete.py`；階段 30
+
+### 本機 lint 範圍要對齊 CI——CI 跑 `ruff check .`（含 tests/），別只檢 src
+
+- **理論說**：實作前 `ruff check src/ai_api` 綠就代表 lint 過了。
+- **實際發生**：階段 29② 本機只檢 `src/ai_api`，但 CI 的 `test` job 跑 **`ruff check .`**（整個 repo，含 `tests/`）。測試檔註解裡一個 `×`（乘號）被 `RUF003 ambiguous-char` 擋下，CI `test` 在 22 秒就紅（lint 在跑測試前），白等一輪。
+- **解決方式**：推之前跑 **`ruff check .`**（與 CI 同範圍），不要只檢 src。註解/字串用 ASCII（`x` 不用 `×`、`->` 不用箭頭）。
+- **教訓**：本機品質關卡的**範圍與指令要逐字對齊 CI**——CI 檢 `.`，你也檢 `.`；CI 檢 tests，你也檢 tests。範圍不一致時「本機綠」是假綠，最快的失敗（lint）反而最容易因範圍漏掉而浪費一輪 CI。
+- **來源**：CI `.github/workflows/ci.yml` 的 `ruff check .`；階段 29②（PR #77 第一輪紅）
+
+### 真實牌價會推翻「憑種類想當然」的計費假設——`inspect` litellm model_cost 再定 spec
+
+- **理論說**：圖片生成模型「當然」是按張/按 pixel 計費，所以用圖片端點來證明「非 token 計費一般化」剛好。
+- **實際發生**：spec 階段印了 litellm `model_cost`，發現本平台實際服務的 **Azure `gpt-image-1/2` 其實是 _token_ 計費**（`input_cost_per_token`/`output_cost_per_image_token`），dall-e-2 才 per-pixel、dall-e-3 才 per-image。用圖片端點根本不會觸發非 token 計費——證明不了一般化。改用 **OCR**（`azure_ai/mistral-document-ai` 的 `ocr_cost_per_page`，乾淨 per-page、JSON 進出無 binary）。同場也 `inspect` 確認 `OCRResponse.pages`（`len`＝頁數）才寫計量。
+- **解決方式**：spec 前花 5 分鐘 `python -c "import litellm; print(litellm.model_cost[...])"` 把「這個模型實際用什麼單位計費 / 回傳長怎樣」印出來，再決定用哪個端點當證明消費者、計量欄取哪個。
+- **教訓**：呼應「採用前先驗證能力邊界」「採用 SDK 前先印一次真實回傳值」——但更前置到 **spec 設計層**：別用「這類模型應該是 X 計費」的種類直覺去選證明對象與設計 schema。一次 `print(model_cost)` 就改寫了整個 spec 的端點選擇，省下做完才發現「圖片其實是 token、白做」的整輪工。
+- **來源**：`specs/040-ocr-billing-units/research.md` R1/R3；階段 29②
