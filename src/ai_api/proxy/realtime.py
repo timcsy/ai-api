@@ -529,16 +529,24 @@ async def handle_realtime(
 
 
 def _model_from_session_update(raw: str) -> str | None:
+    """Extract the requested model from the client's first frame. Tolerant of both
+    realtime shapes: a conversation `session.update` (model in `session.model`) and a
+    transcription `(transcription_)session.update` (model in
+    `session.input_audio_transcription.model`)."""
     try:
         ev = json.loads(raw)
     except (ValueError, TypeError):
         return None
-    if not isinstance(ev, dict) or ev.get("type") != "session.update":
+    if not isinstance(ev, dict) or ev.get("type") not in ("session.update", "transcription_session.update"):
         return None
     session = ev.get("session")
     if not isinstance(session, dict):
         return None
     model = session.get("model")
+    if not model:
+        iat = session.get("input_audio_transcription")
+        if isinstance(iat, dict):
+            model = iat.get("model")
     return model if isinstance(model, str) and model else None
 
 
