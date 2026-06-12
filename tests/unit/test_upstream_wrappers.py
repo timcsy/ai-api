@@ -60,7 +60,28 @@ async def test_aocr_leaves_non_azure_provider_untouched():
     assert m.call_args.kwargs["model"] == "mistral/mistral-ocr-latest"
 
 
-# --- Phase 32 (043): realtime WS smoke (admin "test model" recipe) -----------
+# --- Phase 32 (043): realtime WS URL + smoke (admin "test model" recipe) -----
+def test_build_realtime_url_azure_has_intent_and_apiversion():
+    from ai_api.proxy.upstream import _AZURE_REALTIME_API_VERSION, _build_realtime_url
+
+    url = _build_realtime_url("https://my-foundry.openai.azure.com", "azure/gpt-realtime-whisper")
+    assert url.startswith("wss://my-foundry.openai.azure.com/openai/realtime?")
+    assert "intent=transcription" in url            # REQUIRED or Azure → HTTP 400
+    # NO deployment= : with it, Azure routes to a conversation session the
+    # transcription model can't do (verified live). Model comes via session.update.
+    assert "deployment=" not in url
+    assert f"api-version={_AZURE_REALTIME_API_VERSION}" in url
+
+
+def test_build_realtime_url_openai_form():
+    from ai_api.proxy.upstream import _build_realtime_url
+
+    url = _build_realtime_url(None, "gpt-realtime-whisper", provider="openai")
+    # OpenAI: model goes in session.update, not the URL; just the intent.
+    assert url == "wss://api.openai.com/v1/realtime?intent=transcription"
+
+
+# --- realtime WS smoke (admin "test model" recipe) ---------------------------
 class _FakeSmokeWS:
     """A scripted upstream realtime WS for the smoke test (sent frames + recv queue)."""
 
@@ -92,10 +113,10 @@ async def test_realtime_smoke_ok_on_first_server_event():
             api_base="https://x", api_version="2024-10-01-preview",
         )
     assert out["ok"] is True and out["first_event"] == "transcription_session.created"
-    # provider derived from the slug prefix; handshake + audio append were sent.
+    # provider derived from the slug prefix; smoke just awaits the auto-created
+    # session event (Azure emits it on connect — no client send needed).
     assert opener.call_args.kwargs["provider"] == "azure"
-    assert any("session.update" in s for s in ws.sent)
-    assert any("input_audio_buffer.append" in s for s in ws.sent)
+    assert ws.sent == []
     assert ws.closed is True  # always closes the upstream WS
 
 
