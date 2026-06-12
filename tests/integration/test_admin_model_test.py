@@ -13,10 +13,18 @@ from ai_api.db import get_sessionmaker
 from ai_api.models import AuditEventType, ModelCatalog
 
 
-async def _seed(slug: str, *, mode: str | None = None, modality_input=None, modality_output=None) -> None:
+async def _seed(slug: str, *, mode: str | None = None, modality_input=None, modality_output=None,
+                supported_endpoints=None) -> None:
     sm = get_sessionmaker()
     now = datetime.now(UTC)
-    sync = {"raw": {"mode": mode}} if mode is not None else None
+    sync = None
+    if mode is not None or supported_endpoints is not None:
+        raw: dict = {}
+        if mode is not None:
+            raw["mode"] = mode
+        if supported_endpoints is not None:
+            raw["supported_endpoints"] = supported_endpoints
+        sync = {"raw": raw}
     async with sm() as s:
         s.add(ModelCatalog(
             slug=slug, provider=slug.split("/", 1)[0], display_name=slug, family="x",
@@ -212,7 +220,7 @@ async def test_search_confirmed_calls(app_client: AsyncClient, admin_headers: di
 @pytest.mark.asyncio
 async def test_realtime_confirmed_calls(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
     """Phase 32: realtime is testable via a WS smoke recipe (billable → needs ack)."""
-    await _seed("azure/gpt-realtime-whisper", mode="realtime")
+    await _seed("azure/gpt-realtime-whisper", mode="audio_transcription", supported_endpoints=["/v1/realtime"])
     await _provider(app_client, admin_headers)
     with patch(
         "ai_api.proxy.upstream.realtime_smoke",
@@ -237,7 +245,7 @@ async def test_realtime_confirmed_calls(app_client: AsyncClient, admin_headers: 
 @pytest.mark.asyncio
 async def test_realtime_upstream_error_reported(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
     """A failing WS smoke (e.g. bad deployment) surfaces as a test failure, not 5xx."""
-    await _seed("azure/gpt-realtime-whisper", mode="realtime")
+    await _seed("azure/gpt-realtime-whisper", mode="audio_transcription", supported_endpoints=["/v1/realtime"])
     await _provider(app_client, admin_headers)
     with patch(
         "ai_api.proxy.upstream.realtime_smoke",

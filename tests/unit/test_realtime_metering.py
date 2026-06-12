@@ -10,7 +10,9 @@ from ai_api.proxy.realtime import (
     RealtimeSession,
     duration_seconds,
     pcm_bytes_to_minutes,
+    pcm_bytes_to_seconds,
     session_minutes,
+    session_quantity,
 )
 
 
@@ -39,13 +41,36 @@ def test_minutes_respects_session_geometry() -> None:
     assert pcm_bytes_to_minutes(96000, sample_rate=16000) == 1
 
 
-def test_session_minutes_uses_session_state() -> None:
+def test_seconds_round_up() -> None:
+    rate = 24000
+    per_sec = rate * 2 * 1  # 48000 bytes/sec
+    assert pcm_bytes_to_seconds(0) == 0
+    assert pcm_bytes_to_seconds(per_sec) == 1
+    assert pcm_bytes_to_seconds(per_sec // 2) == 1          # 0.5s -> 1s (round up)
+    assert pcm_bytes_to_seconds(per_sec * 10) == 10
+    assert pcm_bytes_to_seconds(per_sec * 10 + 1) == 11     # a started second is billed
+
+
+def _sess(rate: int = 24000) -> RealtimeSession:
     from datetime import UTC, datetime
 
-    sess = RealtimeSession(
+    return RealtimeSession(
         allocation_id="a", subject="s", resource_model="azure/gpt-realtime-whisper",
         upstream_model="azure/gpt-realtime-whisper", provider="azure",
-        request_id="r", started_at=datetime.now(UTC), sample_rate=16000,
+        request_id="r", started_at=datetime.now(UTC), sample_rate=rate,
     )
+
+
+def test_session_minutes_uses_session_state() -> None:
+    sess = _sess(16000)
     sess.audio_bytes = 32000 * 90  # 90 seconds at 16 kHz pcm16 mono
     assert session_minutes(sess) == 2  # 90s → 2 min
+
+
+def test_session_quantity_follows_price_unit() -> None:
+    sess = _sess(24000)
+    sess.audio_bytes = 24000 * 2 * 10  # 10 seconds
+    assert session_quantity(sess, "second") == 10
+    assert session_quantity(sess, "minute") == 1      # 10s → 1 min (round up)
+    # any non-minute unit (incl. unknown) bills in seconds
+    assert session_quantity(sess, "anything-else") == 10

@@ -118,8 +118,37 @@ def pcm_bytes_to_minutes(
     return math.ceil(secs / 60)
 
 
+def pcm_bytes_to_seconds(
+    audio_bytes: int,
+    *,
+    sample_rate: int = _DEFAULT_SAMPLE_RATE,
+    bytes_per_sample: int = _DEFAULT_BYTES_PER_SAMPLE,
+    channels: int = _DEFAULT_CHANNELS,
+) -> int:
+    """Per-second billing quantity: round UP to the next whole second (litellm
+    prices gpt-realtime-whisper via ``input_cost_per_second``). 0 bytes → 0."""
+    secs = duration_seconds(audio_bytes, sample_rate, bytes_per_sample, channels)
+    if secs <= 0:
+        return 0
+    return math.ceil(secs)
+
+
 def session_minutes(sess: RealtimeSession) -> int:
     return pcm_bytes_to_minutes(
+        sess.audio_bytes,
+        sample_rate=sess.sample_rate,
+        bytes_per_sample=sess.bytes_per_sample,
+        channels=sess.channels,
+    )
+
+
+def session_quantity(sess: RealtimeSession, unit: str) -> int:
+    """Billable quantity in the unit the PriceList carries. litellm prices realtime
+    transcription per SECOND; admins may instead price per minute — bill in whichever
+    the price row uses so cost = quantity x per-unit lines up."""
+    if unit == "minute":
+        return session_minutes(sess)
+    return pcm_bytes_to_seconds(
         sess.audio_bytes,
         sample_rate=sess.sample_rate,
         bytes_per_sample=sess.bytes_per_sample,
@@ -309,14 +338,14 @@ def _outcome_for_close(close_reason: str) -> Any:
 
 
 async def _bill_session(sess: RealtimeSession) -> None:
-    """Write ONE CallRecord(unit="minute") for the accrued audio. Any close path
-    reaches here (FR-004). Uses a fresh session — the connection has no request
-    session. Never raises (billing must not crash teardown)."""
+    """Write ONE CallRecord for the accrued audio, in the unit the PriceList carries
+    (litellm prices realtime transcription per SECOND; admins may price per minute).
+    Any close path reaches here (FR-004). Uses a fresh session — the connection has no
+    request session. Never raises (billing must not crash teardown)."""
     from ai_api.db import get_sessionmaker
     from ai_api.services.pricing import calculate_unit_cost, lookup_price_for_call
     from ai_api.services.records import RecordsService
 
-    minutes = session_minutes(sess)
     outcome = _outcome_for_close(sess.close_reason)
     try:
         async with get_sessionmaker()() as s:
@@ -326,8 +355,12 @@ async def _bill_session(sess: RealtimeSession) -> None:
                 model=sess.upstream_model.split("/", 1)[-1],
                 call_time=sess.started_at,
             )
+            # Bill in the price's unit (second from litellm, or minute); default to
+            # second (litellm's native unit) when unpriced so the quantity is honest.
+            unit = price.price_unit if (price and price.price_unit in ("second", "minute")) else "second"
+            quantity = session_quantity(sess, unit)
             cost = (
-                calculate_unit_cost(minutes, price.price_per_unit)
+                calculate_unit_cost(quantity, price.price_per_unit)
                 if price is not None
                 else None
             )
@@ -339,8 +372,8 @@ async def _bill_session(sess: RealtimeSession) -> None:
                 started_at=sess.started_at,
                 status_code=200,
                 outcome=outcome,
-                quantity=minutes,
-                unit="minute",
+                quantity=quantity,
+                unit=unit,
                 cost_usd=cost,
                 error_message=(
                     "allocation revoked mid-connection" if sess.close_reason == "revoked" else None

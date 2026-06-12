@@ -57,9 +57,14 @@ def _append(seconds: float, rate: int = 24000) -> str:
     })
 
 
-async def _seed_catalog(slug: str, *, mode: str) -> None:
-    """Seed a catalog row whose litellm mode drives model_kind (realtime vs chat)."""
+async def _seed_catalog(slug: str, *, mode: str = "audio_transcription", realtime: bool = True) -> None:
+    """Seed a catalog row. Realtime models mirror litellm reality (PR #29775):
+    mode=audio_transcription + supported_endpoints listing /v1/realtime — the
+    capability axis that drives model_kind → realtime (NOT a litellm 'realtime' mode)."""
     now = datetime.now(UTC)
+    raw: dict = {"mode": mode}
+    if realtime:
+        raw["supported_endpoints"] = ["/v1/realtime", "/v1/realtime/transcription_sessions"]
     sm = get_sessionmaker()
     async with sm() as s:
         s.add(ModelCatalog(
@@ -70,7 +75,7 @@ async def _seed_catalog(slug: str, *, mode: str) -> None:
             status="active", deprecation_note=None, created_at=now, updated_at=now,
             default_access="open", allowed_tags=[], denied_tags=[],
             self_service_enabled=False, self_service_default_quota=None,
-            litellm_sync={"raw": {"mode": mode}},
+            litellm_sync={"raw": raw},
         ))
         await s.commit()
 
@@ -121,7 +126,7 @@ def _bearer(token: str) -> dict[str, str]:
 # --- T007: invalid / revoked key → close, no stream -------------------------
 @pytest.mark.asyncio
 async def test_invalid_key_closed_no_stream(app_client: AsyncClient, admin_headers):
-    await _seed_catalog(RT_MODEL, mode="realtime")
+    await _seed_catalog(RT_MODEL)
     client = FakeClientWS(_bearer("totally-invalid-token"), [_session_update()])
     upstream = FakeUpstreamWS()
     opener = fake_opener(upstream)
@@ -143,7 +148,7 @@ async def test_missing_bearer_closed(app_client: AsyncClient, admin_headers):
 
 @pytest.mark.asyncio
 async def test_revoked_allocation_closed(app_client: AsyncClient, admin_headers):
-    await _seed_catalog(RT_MODEL, mode="realtime")
+    await _seed_catalog(RT_MODEL)
     alloc = await _alloc(app_client, admin_headers)
     # Revoke it before connecting.
     r = await app_client.delete(f"/admin/allocations/{alloc['id']}", headers=admin_headers)
@@ -159,7 +164,7 @@ async def test_revoked_allocation_closed(app_client: AsyncClient, admin_headers)
 @pytest.mark.asyncio
 async def test_non_realtime_model_unsupported(app_client: AsyncClient, admin_headers):
     chat_model = "azure/gpt-4o-mini"
-    await _seed_catalog(chat_model, mode="chat")
+    await _seed_catalog(chat_model, mode="chat", realtime=False)
     await _seed_provider(app_client, admin_headers)
     alloc = await _alloc(app_client, admin_headers, model=chat_model)
     client = FakeClientWS(_bearer(alloc["token"]), [_session_update(model=chat_model)])
@@ -172,7 +177,7 @@ async def test_non_realtime_model_unsupported(app_client: AsyncClient, admin_hea
 # --- T009: valid connection + append → delta reaches client -----------------
 @pytest.mark.asyncio
 async def test_valid_connection_relays_delta(app_client: AsyncClient, admin_headers):
-    await _seed_catalog(RT_MODEL, mode="realtime")
+    await _seed_catalog(RT_MODEL)
     alloc = await _alloc(app_client, admin_headers)
     await _seed_provider(app_client, admin_headers)
     delta = json.dumps({
@@ -198,7 +203,7 @@ async def test_valid_connection_relays_delta(app_client: AsyncClient, admin_head
 # --- T015: clean close → one CallRecord(unit=minute), quantity matches ------
 @pytest.mark.asyncio
 async def test_clean_close_bills_one_minute_record(app_client: AsyncClient, admin_headers):
-    await _seed_catalog(RT_MODEL, mode="realtime")
+    await _seed_catalog(RT_MODEL)
     await _seed_price("0.017")
     alloc = await _alloc(app_client, admin_headers)
     await _seed_provider(app_client, admin_headers)
@@ -216,22 +221,48 @@ async def test_clean_close_bills_one_minute_record(app_client: AsyncClient, admi
 
 
 @pytest.mark.asyncio
-async def test_unpriced_realtime_zero_cost(app_client: AsyncClient, admin_headers):
-    await _seed_catalog(RT_MODEL, mode="realtime")
+async def test_unpriced_realtime_defaults_to_seconds(app_client: AsyncClient, admin_headers):
+    await _seed_catalog(RT_MODEL)
     alloc = await _alloc(app_client, admin_headers)
     await _seed_provider(app_client, admin_headers)
     client = FakeClientWS(_bearer(alloc["token"]),
                           [_session_update(), _append(30.0)], hold_open=False)
     await handle_realtime(client, open_upstream=fake_opener(FakeUpstreamWS(close_after=False)))
     rec = await _last(CallOutcome.success)
-    assert rec is not None and rec.unit == "minute" and rec.quantity == 1
+    # unpriced → default to litellm's native unit (second); 30s → 30
+    assert rec is not None and rec.unit == "second" and rec.quantity == 30
     assert rec.cost_usd is None  # no PriceList → unpriced (NULL), not a crash
+
+
+@pytest.mark.asyncio
+async def test_per_second_price_billed_in_seconds(app_client: AsyncClient, admin_headers):
+    """litellm prices gpt-realtime-whisper per SECOND — bill in seconds so the cost
+    lines up with the imported per-unit price (input_cost_per_second)."""
+    await _seed_catalog(RT_MODEL)
+    sm = get_sessionmaker()
+    async with sm() as s:
+        s.add(PriceList(
+            id=str(ULID()), provider="azure", model="gpt-realtime-whisper",
+            input_per_1k_tokens_usd=Decimal(0), output_per_1k_tokens_usd=Decimal(0),
+            price_unit="second", price_per_unit_usd=Decimal("0.0002833"),
+            effective_from=datetime.now(UTC) - timedelta(days=1),
+            created_at=datetime.now(UTC), created_by="test",
+        ))
+        await s.commit()
+    alloc = await _alloc(app_client, admin_headers)
+    await _seed_provider(app_client, admin_headers)
+    client = FakeClientWS(_bearer(alloc["token"]),
+                          [_session_update(), _append(10.0)], hold_open=False)
+    await handle_realtime(client, open_upstream=fake_opener(FakeUpstreamWS(close_after=False)))
+    rec = await _last(CallOutcome.success)
+    assert rec is not None and rec.unit == "second" and rec.quantity == 10
+    assert rec.cost_usd == Decimal("0.002833")  # 10 x 0.0002833
 
 
 # --- T016: abnormal abort (client hangs up mid-stream) → accrued bytes billed
 @pytest.mark.asyncio
 async def test_abnormal_abort_still_bills_accrued(app_client: AsyncClient, admin_headers):
-    await _seed_catalog(RT_MODEL, mode="realtime")
+    await _seed_catalog(RT_MODEL)
     await _seed_price("0.017")
     alloc = await _alloc(app_client, admin_headers)
     await _seed_provider(app_client, admin_headers)
@@ -246,7 +277,7 @@ async def test_abnormal_abort_still_bills_accrued(app_client: AsyncClient, admin
 # --- T020/T021: in-flight revoke / pause → close(revoked) within N + billed -
 @pytest.mark.asyncio
 async def test_inflight_revoke_closes_and_bills(app_client: AsyncClient, admin_headers):
-    await _seed_catalog(RT_MODEL, mode="realtime")
+    await _seed_catalog(RT_MODEL)
     await _seed_price("0.017")
     alloc = await _alloc(app_client, admin_headers)
     await _seed_provider(app_client, admin_headers)
@@ -277,7 +308,7 @@ async def test_inflight_revoke_closes_and_bills(app_client: AsyncClient, admin_h
 # --- Contract #7: no upstream key / endpoint ever reaches the client --------
 @pytest.mark.asyncio
 async def test_no_key_or_endpoint_leak(app_client: AsyncClient, admin_headers):
-    await _seed_catalog(RT_MODEL, mode="realtime")
+    await _seed_catalog(RT_MODEL)
     alloc = await _alloc(app_client, admin_headers)
     await _seed_provider(app_client, admin_headers)
     err = json.dumps({"type": "error", "error": {"code": "bad", "message": "upstream boom"}})
@@ -292,7 +323,7 @@ async def test_no_key_or_endpoint_leak(app_client: AsyncClient, admin_headers):
 
 @pytest.mark.asyncio
 async def test_upstream_connect_failure_no_leak_and_bills_zero(app_client: AsyncClient, admin_headers):
-    await _seed_catalog(RT_MODEL, mode="realtime")
+    await _seed_catalog(RT_MODEL)
     alloc = await _alloc(app_client, admin_headers)
     await _seed_provider(app_client, admin_headers)
 
@@ -304,6 +335,6 @@ async def test_upstream_connect_failure_no_leak_and_bills_zero(app_client: Async
     assert client.closed is not None and client.closed[0] == 1011  # internal
     blob = json.dumps(client.closed) + " ".join(client.sent)
     assert SECRET_KEY not in blob and "secret-foundry.services.ai.azure.com" not in blob
-    # Connect failed before any audio relayed → 0 minutes, still a record.
+    # Connect failed before any audio relayed → 0 (unpriced → default unit second).
     rec = await _last(CallOutcome.upstream_error)
-    assert rec is not None and rec.unit == "minute" and rec.quantity == 0
+    assert rec is not None and rec.unit == "second" and rec.quantity == 0
