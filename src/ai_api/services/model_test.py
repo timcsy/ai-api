@@ -17,6 +17,8 @@ import) so test mocks on `ai_api.proxy.upstream.*` are honoured.
 from __future__ import annotations
 
 import base64
+import io
+import wave
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
@@ -31,12 +33,21 @@ from ai_api.proxy import upstream
 _PNG_1X1 = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="
 )
-_WAV_SILENCE = base64.b64decode(
-    "UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YaAAAAAAAAAAAAAAAAAAAAAA"
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-    "AAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-)
+
+
+def _silent_wav(seconds: float = 0.3, rate: int = 16000) -> bytes:
+    """A short silent mono 16-bit WAV. Length matters: Azure whisper rejects
+    clips under 0.1s ("audio_too_short"), so default to 0.3s with margin."""
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(b"\x00\x00" * int(rate * seconds))
+    return buf.getvalue()
+
+
+_WAV_SILENCE = _silent_wav()
 # OCR document: a base64 image data-URL (Mistral document-ai accepts image_url docs).
 _OCR_DOCUMENT = {
     "type": "image_url",
