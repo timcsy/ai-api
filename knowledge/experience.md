@@ -592,3 +592,11 @@
 - **解決方式**：`upstream.aocr` 把 `azure/` → `azure_ai/` 重映〔同一 endpoint/key,Foundry 用 azure_ai 前綴可達〕——這是 `/v1/ocr` 端點與測試 recipe 的**唯一共同通道,一處改兩處修**。並學到:新增端點的線上驗證,「壞 token→401」只證明「路由有掛上、auth 有擋」,**證明不了「帶正確憑證真打會通」**——後者要對至少一個真模型真打一次〔或用 admin 測試按鈕〕,尤其牽涉 litellm provider 能力差異〔同一家雲的 `azure/` vs `azure_ai/` 支援的端點不同〕時。
 - **教訓**：401 smoke 與「真打通過」是**兩個不同的保證**:前者測「閘門在不在」,後者測「閘門後面的路通不通」。只做前者會把「auth 正確擋下」誤當成「端點可用」。呼應「採用前先驗證能力邊界」——litellm 同一 provider 家族對不同端點〔chat/ocr/…〕的支援度不一致,`azure` 能 chat 不能 ocr,要用 `azure_ai`。**端點驗收清單該有一條:帶真憑證對一個真模型成功跑一次,不能只靠 401。** admin「測試模型」按鈕正是把這條變成隨手可做的動作——它揭露此 bug 就是它的價值證明。
 - **來源**：`src/ai_api/proxy/upstream.py` `aocr` azure→azure_ai 重映、litellm `ocr/main.py` `get_provider_ocr_config`〔只認 azure_ai/mistral/vertex〕;階段 31 後續〔PR #84,rev 92〕,由 rev 91「補真分支」的 OCR 測試實打揭露
+
+### 通用 gateway（LiteLLM Proxy）功能跟你重疊 ≠ 該改用它——判準是「領域第一公民同不同軸」
+
+- **理論說**：LiteLLM Proxy 開箱就有 virtual key / budget / spend tracking / model access / rate limit / admin UI——功能清單跟我們自製 gateway 重疊一大半，那我們是不是在重造輪子、不如改用 Proxy form？（realtime 討論時被連續追問：為何不用 Proxy form？它真的做不到我們的分配管理嗎？）
+- **實際發生**：誠實盤點後確認 LiteLLM Proxy **能做到主線**——發 key、限 model、限額度（連 `model_max_budget` per-key-per-model 都有）、看花費、撤回、user/team 階層。但有幾樣塞不進它的模型：額度綁「**分配**」且跨同一成員多把 key 共用、自適應配額池（Σq=T 守恆）、異常偵測自動隔離 + service flag 豁免、scoped credential 的**成員自助 attenuation**（成員只在自己已被授予的分配內打包 key）、面向非技術成員的自助 UX + 課堂 tag rollup。根因：LiteLLM 的歸戶**第一公民是 key / user / team**，我們是**「分配」(member × model)**——同一件事、不同世界觀。
+- **解決方式**：build-vs-adopt **不以「功能清單重疊度」判，以「領域第一公民是否同軸」判**。同軸 → adopt（我們 library form 只呼叫 `acompletion`/`aresponses` 就是把 litellm 當邊緣 adapter）；不同軸 → 採用它等於要嘛放棄自己的領域模型、要嘛在它外面再套一層（雙核心、必 drift，違原則 5）。且對**已上線、已兌現價值**的系統，門檻再升一級：問題不是「它能不能做基本款」（通常能），而是「把已經服務了原則 6 + 配額池 + 課堂的這些，遷到它的 key/user/team 模型上重做，值不值」——幾乎都不值。
+- **教訓**：現成通用工具功能與你高度重疊時，最危險的不是「它不行」，而是**誤把「功能重疊」當成「該 adopt」**。真正該問的是：你的價值核心建在哪個第一公民上？它的呢？**不同軸時，adopt 它＝換掉你實作原則的地基，省下的是管線、賠掉的是領域貼合**（本案：Proxy 省掉 realtime WS 管線，卻接不回「歸戶到分配」這個真正的核心工作）。這延伸「build vs adopt 評估要在 specify 之前做」——形態選定後，**遇到該形態的誘人場景（如 realtime 之於 Proxy form）時，回到第一公民判準，別被單一功能拉走**重評整個地基。呼應原則 5（單一管理路徑；雙核心並行必 drift）+ 原則 7（library form ＝核心穩定、邊緣快變、單一 adapter 隔開；Proxy form 會讓快變的 litellm 變成核心，方向反了）。
+- **來源**：realtime 端點 build-vs-adopt 討論（2026-06-12，chat-only）；vision 階段 29 計費段「不採 litellm Proxy 的計費系統（不認得我們的『分配』模型）」、架構段「library only，不啟用 Proxy server form」；延伸自上方「build vs adopt 評估要在 specify 之前做」。
