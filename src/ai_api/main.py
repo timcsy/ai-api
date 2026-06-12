@@ -38,6 +38,7 @@ from ai_api.db import dispose_engine
 from ai_api.observability.logging import setup_logging
 from ai_api.observability.request_id import RequestIdMiddleware
 from ai_api.proxy.registry import build_router as build_proxy_registry_router
+from ai_api.proxy.realtime import router as realtime_router
 from ai_api.proxy.responses import router as responses_router
 from ai_api.proxy.router import router as proxy_router
 
@@ -99,6 +100,7 @@ def create_app() -> FastAPI:
     app.include_router(catalog.router, prefix="/catalog", tags=["catalog"])
     app.include_router(proxy_router, prefix="/v1", tags=["proxy"])  # chat (streaming)
     app.include_router(responses_router, prefix="/v1", tags=["proxy"])  # responses (streaming)
+    app.include_router(realtime_router, prefix="/v1", tags=["proxy"])  # realtime (live transcription WS)
     # Phase 31: all non-streaming inference endpoints come from the data-driven
     # registry (embeddings/ocr/images/rerank/audio + moderation/search/image_edit).
     app.include_router(build_proxy_registry_router(), prefix="/v1", tags=["proxy"])

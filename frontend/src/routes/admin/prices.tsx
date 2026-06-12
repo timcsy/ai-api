@@ -73,7 +73,7 @@ const fmtDate = (iso: string) => new Date(iso).toLocaleString("zh-TW");
 
 // Phase 31: non-token billing unit labels.
 const UNIT_ZH: Record<string, string> = {
-  page: "頁", query: "查詢", character: "字元", image: "張", second: "秒",
+  page: "頁", query: "查詢", character: "字元", image: "張", second: "秒", minute: "分鐘",
 };
 
 /** Local "now" formatted for a <input type="datetime-local"> (YYYY-MM-DDTHH:mm). */
@@ -448,13 +448,14 @@ function AddPriceDialog({
                   <SelectItem value="character">每字元</SelectItem>
                   <SelectItem value="image">每張</SelectItem>
                   <SelectItem value="second">每秒</SelectItem>
+                  <SelectItem value="minute">每分鐘</SelectItem>
                 </SelectContent>
               </Select>
               <Input id="p-perpage" className="font-mono flex-1" placeholder="0.003"
                 value={perPage} onChange={(e) => setPerPage(e.target.value)} />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              非 token 模型（OCR=頁、rerank/search=查詢、TTS=字元、圖片編輯=張）依該單位計費，填此欄；token 欄可填 0。一筆價格只用一種單位。可按上方「從 LiteLLM 帶入建議價」自動填。
+              非 token 模型（OCR=頁、rerank/search=查詢、TTS=字元、圖片編輯=張、即時字幕=分鐘）依該單位計費，填此欄；token 欄可填 0。一筆價格只用一種單位。可按上方「從 LiteLLM 帶入建議價」自動填。
             </p>
           </div>
 

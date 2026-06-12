@@ -202,6 +202,48 @@ async def asearch(
     )
 
 
+def _build_realtime_url(api_base: str | None, model: str, api_version: str | None) -> str:
+    """Build the Azure Foundry realtime WS URL from the resolved credential.
+
+    Azure OpenAI realtime: wss://<resource>.openai.azure.com/openai/realtime?
+    api-version=<v>&deployment=<deployment>. We derive the wss scheme from the
+    https api_base and carry the bare model (deployment) name. Validated against a
+    real Azure realtime endpoint in quickstart (T027) — CI uses a fake upstream.
+    """
+    base = (api_base or "").rstrip("/")
+    if base.startswith("https://"):
+        base = "wss://" + base[len("https://"):]
+    elif base.startswith("http://"):
+        base = "ws://" + base[len("http://"):]
+    deployment = model.split("/", 1)[-1]
+    version = api_version or "2024-10-01-preview"
+    return f"{base}/openai/realtime?api-version={version}&deployment={deployment}"
+
+
+async def open_realtime_ws(
+    *,
+    provider: str,
+    model: str,
+    api_key: str,
+    api_base: str | None = None,
+    api_version: str | None = None,
+) -> Any:
+    """Open a WebSocket to the upstream provider's realtime endpoint and return the
+    connection (has async `send`/`recv`/`close`). Injects the credential as the
+    `api-key` header (Azure) — the key/endpoint never reach the downstream client
+    (FR-006). Phase 32 (043): /v1/realtime live transcription relay.
+    """
+    import websockets
+
+    url = _build_realtime_url(api_base, model, api_version)
+    # Azure uses the `api-key` header; OpenAI-style uses Authorization: Bearer.
+    if provider == "openai":
+        headers = {"Authorization": f"Bearer {api_key}"}
+    else:
+        headers = {"api-key": api_key}
+    return await websockets.connect(url, additional_headers=headers)
+
+
 async def aimage_edit(
     *,
     model: str,

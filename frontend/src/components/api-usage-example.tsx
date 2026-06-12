@@ -81,6 +81,28 @@ export function ApiUsageExample({
   -H "Authorization: Bearer $TOKEN" \\
   -F "model=${m}" -F "image=@input.png" -F "prompt=make it red"`,
     },
+    realtime: {
+      path: "/realtime",
+      desc: "即時字幕（realtime）模型，用 WebSocket 串流音訊、即時收文字（OpenAI realtime transcription 相容）。用量按分鐘計",
+      // WebSocket — not curl. Replace https:// with wss:// in the endpoint URL.
+      curl: `# pip install websockets — 串麥克風 PCM、即時收字幕（把 https 換成 wss）
+import asyncio, base64, json, websockets
+
+async def main():
+    url = "${base}/realtime".replace("https://", "wss://").replace("http://", "ws://")
+    async with websockets.connect(url, additional_headers={"Authorization": "Bearer $TOKEN"}) as ws:
+        await ws.send(json.dumps({"type": "session.update", "session": {
+            "type": "transcription", "model": "${m}",
+            "audio": {"input": {"format": {"type": "audio/pcm", "rate": 24000}}}}}))
+        await ws.send(json.dumps({"type": "input_audio_buffer.append",
+                                  "audio": base64.b64encode(pcm_chunk).decode()}))
+        async for msg in ws:
+            ev = json.loads(msg)
+            if ev.get("type") == "conversation.item.input_audio_transcription.delta":
+                print(ev["delta"], end="", flush=True)
+
+asyncio.run(main())`,
+    },
   };
   if (kind && endpointInfo[kind]) {
     const info = endpointInfo[kind]!;

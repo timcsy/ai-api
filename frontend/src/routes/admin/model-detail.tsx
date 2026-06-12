@@ -109,6 +109,7 @@ const KIND_LABEL: Record<string, string> = {
   moderation: "內容審核（moderation）",
   search: "網路搜尋（search）",
   image_edit: "圖片編輯（image edit）",
+  realtime: "即時字幕（realtime）",
   unknown: "未知",
 };
 
