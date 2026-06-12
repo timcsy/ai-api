@@ -109,6 +109,7 @@ const KIND_LABEL: Record<string, string> = {
   moderation: "內容審核（moderation）",
   search: "網路搜尋（search）",
   image_edit: "圖片編輯（image edit）",
+  realtime: "即時字幕（realtime）",
   unknown: "未知",
 };
 
@@ -716,6 +717,10 @@ function EditBasicsDialog({
           <div>
             <Label htmlFor="b-cap">能力（逗號分隔）</Label>
             <Input id="b-cap" className="mt-1" placeholder="chat, vision, function-calling" value={capabilities} onChange={(e) => setCapabilities(e.target.value)} />
+            <p className="text-xs text-muted-foreground mt-1">
+              加 <code>realtime</code> 把模型標為「即時字幕」（走 /v1/realtime WS、可在此頁測試）；
+              手動加入、litellm 尚未帶入 supported_endpoints 時用得到。<code>realtime:blocked</code> 可強制關閉。
+            </p>
           </div>
           <div>
             <Label htmlFor="b-rec">適用情境（逗號分隔）</Label>

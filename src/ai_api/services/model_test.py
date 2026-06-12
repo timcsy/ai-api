@@ -98,6 +98,11 @@ RECIPES: dict[str, TestRecipe] = {
         ),
         billable=True,
     ),
+    # realtime is a bidirectional WS, not a one-shot call — the recipe is a minimal
+    # WS smoke (handshake + tiny silent append + await first server event). Passing
+    # proves egress/key/deployment/protocol; it IS the T027 reachability check from
+    # the UI. Billable (a couple seconds of audio).
+    "realtime": TestRecipe(lambda c: upstream.realtime_smoke(**c), billable=True),
 }
 
 

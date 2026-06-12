@@ -58,3 +58,55 @@ async def test_aocr_leaves_non_azure_provider_untouched():
     with patch("litellm.aocr", new=AsyncMock(return_value="ok")) as m:
         await upstream.aocr(model="mistral/mistral-ocr-latest", document={"x": 1}, api_key="k")
     assert m.call_args.kwargs["model"] == "mistral/mistral-ocr-latest"
+
+
+# --- Phase 32 (043): realtime WS smoke (admin "test model" recipe) -----------
+class _FakeSmokeWS:
+    """A scripted upstream realtime WS for the smoke test (sent frames + recv queue)."""
+
+    def __init__(self, events):
+        self.events = list(events)
+        self.sent = []
+        self.closed = False
+
+    async def send(self, data):
+        self.sent.append(data)
+
+    async def recv(self):
+        if self.events:
+            return self.events.pop(0)
+        raise RuntimeError("no more events")
+
+    async def close(self):
+        self.closed = True
+
+
+@pytest.mark.asyncio
+async def test_realtime_smoke_ok_on_first_server_event():
+    import json
+
+    ws = _FakeSmokeWS([json.dumps({"type": "transcription_session.created"})])
+    with patch("ai_api.proxy.upstream.open_realtime_ws", new=AsyncMock(return_value=ws)) as opener:
+        out = await upstream.realtime_smoke(
+            model="azure/gpt-realtime-whisper", api_key="k",
+            api_base="https://x", api_version="2024-10-01-preview",
+        )
+    assert out["ok"] is True and out["first_event"] == "transcription_session.created"
+    # provider derived from the slug prefix; handshake + audio append were sent.
+    assert opener.call_args.kwargs["provider"] == "azure"
+    assert any("session.update" in s for s in ws.sent)
+    assert any("input_audio_buffer.append" in s for s in ws.sent)
+    assert ws.closed is True  # always closes the upstream WS
+
+
+@pytest.mark.asyncio
+async def test_realtime_smoke_raises_on_error_event():
+    import json
+
+    ws = _FakeSmokeWS([json.dumps({"type": "error", "error": {"message": "deployment not found"}})])
+    with (
+        patch("ai_api.proxy.upstream.open_realtime_ws", new=AsyncMock(return_value=ws)),
+        pytest.raises(RuntimeError, match="deployment not found"),
+    ):
+        await upstream.realtime_smoke(model="azure/gpt-realtime-whisper", api_key="k")
+    assert ws.closed is True

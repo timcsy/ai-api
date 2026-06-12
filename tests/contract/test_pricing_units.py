@@ -81,3 +81,25 @@ async def test_current_price_map_surfaces_per_unit(app_client: AsyncClient) -> N
     entry = pm[("azure_ai", "doc-ocr")]
     assert entry["price_unit"] == "page"
     assert Decimal(entry["price_per_unit"]) == Decimal("0.003")
+
+
+@pytest.mark.asyncio
+async def test_minute_unit_for_realtime(app_client: AsyncClient) -> None:
+    """Phase 32: realtime transcription bills per-minute — same unit-billing path,
+    `minute` is just a new string unit value (no schema change)."""
+    now = datetime.now(UTC)
+    sm = get_sessionmaker()
+    async with sm() as s:
+        s.add(PriceList(
+            id=str(ULID()), provider="azure", model="gpt-realtime-whisper",
+            input_per_1k_tokens_usd=Decimal(0), output_per_1k_tokens_usd=Decimal(0),
+            price_unit="minute", price_per_unit_usd=Decimal("0.017"),
+            effective_from=now - timedelta(days=1), created_at=datetime.now(UTC), created_by="test",
+        ))
+        await s.commit()
+        price = await lookup_price_for_call(
+            s, provider="azure", model="gpt-realtime-whisper", call_time=now
+        )
+    assert price is not None and price.price_unit == "minute"
+    # 5 minutes x $0.017 = $0.085 (per-minute billing through the existing path)
+    assert calculate_unit_cost(5, price.price_per_unit) == Decimal("0.085")

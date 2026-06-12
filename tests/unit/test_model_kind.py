@@ -88,7 +88,47 @@ def test_is_supported():
     # auto-testable IFF a recipe exists (model_test.RECIPES). Every inference kind
     # now has a real recipe (ocr/stt/image_edit/search send a minimal fixture).
     for k in ("chat", "embedding", "tts", "image", "moderation", "rerank",
-              "ocr", "stt", "search", "image_edit"):
+              "ocr", "stt", "search", "image_edit", "realtime"):
         assert is_supported(k)
     # only 'unknown' has no recipe → honestly not auto-testable (never a fake pass)
     assert not is_supported("unknown")
+
+
+# --- Phase 32: realtime is a CAPABILITY (supported_endpoints / admin marker), not a mode ---
+def _cap(*, mode=None, supported_endpoints=None, capabilities=None):
+    raw = {}
+    if mode is not None:
+        raw["mode"] = mode
+    if supported_endpoints is not None:
+        raw["supported_endpoints"] = supported_endpoints
+    return SimpleNamespace(
+        litellm_sync={"raw": raw} if raw else None,
+        modality_input=["audio"], modality_output=["text"],
+        capabilities=capabilities or [],
+    )
+
+
+def test_realtime_from_supported_endpoints_overrides_stt():
+    # gpt-realtime-whisper: litellm mode=audio_transcription but /v1/realtime in
+    # supported_endpoints → realtime (capability beats the audio_transcription→stt map).
+    m = _cap(mode="audio_transcription",
+             supported_endpoints=["/v1/realtime", "/v1/realtime/transcription_sessions"])
+    assert model_kind(m) == "realtime"
+
+
+def test_realtime_from_admin_marker():
+    # Manual model (no litellm_sync): admin marks the `realtime` capability.
+    m = _cap(capabilities=["realtime"])
+    assert model_kind(m) == "realtime"
+
+
+def test_realtime_blocked_marker_forces_off():
+    m = _cap(mode="audio_transcription", supported_endpoints=["/v1/realtime"],
+             capabilities=["realtime:blocked"])
+    assert model_kind(m) == "stt"  # admin override wins → falls back to mode
+
+
+def test_plain_transcription_stays_stt():
+    # whisper-1: audio_transcription, NO /v1/realtime → batch STT, not realtime.
+    m = _cap(mode="audio_transcription")
+    assert model_kind(m) == "stt"

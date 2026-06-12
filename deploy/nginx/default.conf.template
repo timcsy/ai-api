@@ -42,6 +42,18 @@ server {
         proxy_set_header Connection "";
         proxy_http_version 1.1;
     }
+    # Realtime transcription is a bidirectional WebSocket (/v1/realtime). It needs
+    # the HTTP/1.1 Upgrade dance + no buffering + a long read timeout so the relay
+    # stays open while audio streams. Must precede the generic /v1 location.
+    location /v1/realtime {
+        proxy_pass http://${BACKEND_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 3600s;
+    }
     location /v1          { proxy_pass http://${BACKEND_UPSTREAM}; }
     location /docs        { proxy_pass http://${BACKEND_UPSTREAM}; }
     location /openapi.json { proxy_pass http://${BACKEND_UPSTREAM}; }
