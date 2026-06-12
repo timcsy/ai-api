@@ -32,8 +32,9 @@ _MODE_TO_KIND: dict[str, Kind] = {
     "moderation": "moderation",
     "search": "search",
     "image_edit": "image_edit",
-    # Phase 32: live transcription over WebSocket (gpt-realtime-whisper). Not a
-    # recipe-table "test model" kind — billed per-minute via the /v1/realtime relay.
+    # Phase 32: live transcription over WebSocket (gpt-realtime-whisper). Billed
+    # per-minute via the /v1/realtime relay; the admin "test model" recipe is a
+    # minimal WS smoke (handshake + tiny audio) that doubles as the T027 check.
     "realtime": "realtime",
 }
 

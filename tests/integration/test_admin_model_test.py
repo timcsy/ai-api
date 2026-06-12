@@ -210,10 +210,55 @@ async def test_search_confirmed_calls(app_client: AsyncClient, admin_headers: di
 
 @pytest.mark.integration
 @pytest.mark.asyncio
+async def test_realtime_confirmed_calls(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
+    """Phase 32: realtime is testable via a WS smoke recipe (billable → needs ack)."""
+    await _seed("azure/gpt-realtime-whisper", mode="realtime")
+    await _provider(app_client, admin_headers)
+    with patch(
+        "ai_api.proxy.upstream.realtime_smoke",
+        new=AsyncMock(return_value={"ok": True, "first_event": "session.created"}),
+    ) as m:
+        # billable → first call asks for confirmation, no upstream touched
+        r0 = await app_client.post(
+            "/admin/catalog/models/azure/gpt-realtime-whisper/test", headers=admin_headers
+        )
+        assert r0.json().get("needs_confirmation") is True and not m.await_count
+        r = await app_client.post(
+            "/admin/catalog/models/azure/gpt-realtime-whisper/test", headers=admin_headers,
+            json={"acknowledge_billable": True},
+        )
+    assert r.status_code == 200, r.text
+    assert r.json()["ok"] is True and r.json()["kind"] == "realtime"
+    m.assert_awaited_once()
+    assert m.call_args.kwargs.get("model") == "azure/gpt-realtime-whisper"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_realtime_upstream_error_reported(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
+    """A failing WS smoke (e.g. bad deployment) surfaces as a test failure, not 5xx."""
+    await _seed("azure/gpt-realtime-whisper", mode="realtime")
+    await _provider(app_client, admin_headers)
+    with patch(
+        "ai_api.proxy.upstream.realtime_smoke",
+        new=AsyncMock(side_effect=RuntimeError("realtime upstream error: deployment not found")),
+    ):
+        r = await app_client.post(
+            "/admin/catalog/models/azure/gpt-realtime-whisper/test", headers=admin_headers,
+            json={"acknowledge_billable": True},
+        )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is False and body["error_type"] == "upstream_error"
+    assert "deployment not found" in body["message"]
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
 async def test_unknown_mode_unsupported(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
     # 'video_generation' is a genuinely-unknown mode for the admin test button
-    # (moderation/rerank/etc. became known kinds in Phase 29③/31; only the not-yet-
-    # supported modes — video/realtime/vector_store — remain 'unknown').
+    # (moderation/rerank/etc. became known kinds in Phase 29③/31; realtime became
+    # testable in Phase 32; only modes like video/vector_store remain 'unknown').
     await _seed("azure/video-x", mode="video_generation")
     await _provider(app_client, admin_headers)
     r = await app_client.post("/admin/catalog/models/azure/video-x/test", headers=admin_headers)

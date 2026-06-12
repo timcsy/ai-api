@@ -88,7 +88,7 @@ def test_is_supported():
     # auto-testable IFF a recipe exists (model_test.RECIPES). Every inference kind
     # now has a real recipe (ocr/stt/image_edit/search send a minimal fixture).
     for k in ("chat", "embedding", "tts", "image", "moderation", "rerank",
-              "ocr", "stt", "search", "image_edit"):
+              "ocr", "stt", "search", "image_edit", "realtime"):
         assert is_supported(k)
     # only 'unknown' has no recipe → honestly not auto-testable (never a fake pass)
     assert not is_supported("unknown")

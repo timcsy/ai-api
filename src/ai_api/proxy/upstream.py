@@ -5,6 +5,10 @@ only translates the resolved credential into a litellm.acompletion call.
 """
 from __future__ import annotations
 
+import asyncio
+import base64
+import contextlib
+import json
 from typing import Any
 
 import litellm
@@ -242,6 +246,62 @@ async def open_realtime_ws(
     else:
         headers = {"api-key": api_key}
     return await websockets.connect(url, additional_headers=headers)
+
+
+async def realtime_smoke(
+    *,
+    model: str,
+    api_key: str,
+    api_base: str | None = None,
+    api_version: str | None = None,
+    timeout: float = 15.0,
+) -> dict[str, Any]:
+    """Phase 32 (043): minimal realtime WS smoke for the admin "test model" button.
+
+    Opens the upstream realtime WS, runs the session handshake + a tiny silent-audio
+    append, and waits for the first server event. A structured non-error event proves
+    egress (wss:443) + key + deployment + protocol are all good — i.e. the T027
+    protocol-reachability check, now runnable straight from the UI. Raises on any
+    `error` event, connect failure, or timeout, so the test honestly reports failure.
+    Billable: only a couple seconds of audio.
+    """
+    provider = model.split("/", 1)[0] if "/" in model else "azure"
+    deployment = model.split("/", 1)[-1]
+    ws = await open_realtime_ws(
+        provider=provider, model=model, api_key=api_key,
+        api_base=api_base, api_version=api_version,
+    )
+    try:
+        await ws.send(json.dumps({
+            "type": "session.update",
+            "session": {
+                "type": "transcription", "model": deployment,
+                "audio": {"input": {"format": {"type": "audio/pcm", "rate": 16000}}},
+            },
+        }))
+        pcm = b"\x00\x00" * int(16000 * 0.2)  # 0.2s silence, pcm16 mono 16 kHz
+        await ws.send(json.dumps({
+            "type": "input_audio_buffer.append",
+            "audio": base64.b64encode(pcm).decode(),
+        }))
+        try:
+            async with asyncio.timeout(timeout):
+                while True:
+                    raw = await ws.recv()
+                    ev = json.loads(raw) if isinstance(raw, str) else {}
+                    etype = ev.get("type")
+                    if etype == "error":
+                        msg = (ev.get("error") or {}).get("message") or "(no message)"
+                        raise RuntimeError(f"realtime upstream error: {msg}")
+                    # Any structured server event ⇒ the handshake/protocol works.
+                    return {"ok": True, "first_event": etype}
+        except TimeoutError as e:
+            raise RuntimeError(
+                f"realtime smoke timed out after {timeout}s with no server event"
+            ) from e
+    finally:
+        with contextlib.suppress(Exception):
+            await ws.close()
 
 
 async def aimage_edit(
