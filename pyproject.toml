@@ -25,6 +25,11 @@ dependencies = [
     # multipart form parsing — required by FastAPI for /v1/audio/transcriptions
     # (STT) audio file upload. FastAPI's official optional dependency.
     "python-multipart>=0.0.18",
+    # async WebSocket client — required to relay /v1/realtime (live transcription)
+    # directly to the upstream provider's realtime WS. Already present transitively
+    # via uvicorn[standard]; declared directly so it can't vanish on an upstream
+    # change (Constitution Deviation: justified — direct provider WS needs a client).
+    "websockets>=13.0",
 ]
 
 [project.optional-dependencies]

@@ -16,7 +16,7 @@ from typing import Any, Literal
 
 Kind = Literal[
     "chat", "embedding", "tts", "image", "stt", "ocr", "rerank",
-    "moderation", "search", "image_edit", "unknown",
+    "moderation", "search", "image_edit", "realtime", "unknown",
 ]
 
 # litellm mode → our kind
@@ -32,6 +32,9 @@ _MODE_TO_KIND: dict[str, Kind] = {
     "moderation": "moderation",
     "search": "search",
     "image_edit": "image_edit",
+    # Phase 32: live transcription over WebSocket (gpt-realtime-whisper). Not a
+    # recipe-table "test model" kind — billed per-minute via the /v1/realtime relay.
+    "realtime": "realtime",
 }
 
 
