@@ -204,3 +204,35 @@ async def test_me_allocations_agent_compatible(
     assert by_model["azure/agent"]["agent_compatible"] is True
     assert by_model["azure/plain"]["agent_compatible"] is False
     assert by_model["azure/ghost"]["agent_compatible"] is False
+
+
+# --- Phase 33 (046) US3: /me/allocations exposes cost cap + this-month spend --
+@pytest.mark.asyncio
+async def test_me_allocations_exposes_cost_cap_and_used(app_client: AsyncClient, admin_headers):
+    from decimal import Decimal
+
+    from ulid import ULID
+
+    from ai_api.models import CallOutcome, CallRecord
+
+    me = await _login(app_client, admin_headers, email="costview@x.com")
+    r = await app_client.post("/admin/allocations", headers=admin_headers, json={
+        "member_id": me["id"], "resource_model": "azure/gpt-x",
+        "quota_cost_usd_per_month": "5.00",
+    })
+    assert r.status_code == 201, r.text
+    aid = r.json()["id"]
+    sm = get_sessionmaker()
+    async with sm() as s:
+        now = datetime.now(UTC)
+        s.add(CallRecord(
+            id=str(ULID()), request_id="x", allocation_id=aid, subject="costview@x.com",
+            model="azure/gpt-x", started_at=now, finished_at=now, status_code=200,
+            outcome=CallOutcome.success, cost_usd=Decimal("1.20"),
+        ))
+        await s.commit()
+    rows = (await app_client.get("/me/allocations")).json()
+    row = next(x for x in rows if x["id"] == aid)
+    assert row["quota_cost_usd_per_month"] is not None
+    assert Decimal(row["quota_cost_usd_per_month"]) == Decimal("5.00")
+    assert Decimal(row["cost_used_this_month"]) == Decimal("1.20")

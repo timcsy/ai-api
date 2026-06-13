@@ -327,3 +327,36 @@ async def test_us2_rollback_on_conservation_failure(
     after = await _quotas()
     assert after == before  # quota unchanged
     assert await _rebalance_log_count() == 0
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_cost_cap_untouched_by_rebalance(app_client, monkeypatch) -> None:
+    """Phase 33 (046) SC-005: the adaptive pool only redistributes TOKEN quota; a
+    cost cap is an independent hard cap and must not be rebalanced."""
+    from decimal import Decimal
+
+    from sqlalchemy import update as sa_update
+
+    monkeypatch.setenv("POOL_TOTAL_TOKENS_PER_MONTH", "1000")
+    monkeypatch.setenv("POOL_FLOOR_PER_ALLOCATION", "100")
+    get_settings.cache_clear()
+
+    a_id = await _seed_member_and_allocation(email="ca@x.com", usage=50)
+    await _seed_member_and_allocation(email="cb@x.com", usage=30)
+    sm = get_sessionmaker()
+    async with sm() as s:
+        await s.execute(sa_update(Allocation).where(Allocation.id == a_id)
+                        .values(quota_cost_usd_per_month=Decimal("7.50")))
+        await s.commit()
+    async with sm() as s:
+        await apply_rebalance(s, trigger="admin:test")
+        await s.commit()
+
+    quotas = await _quotas()
+    assert quotas[a_id] is not None and quotas[a_id] > 0  # token quota WAS rebalanced
+    async with sm() as s:
+        cap = (await s.execute(
+            select(Allocation.quota_cost_usd_per_month).where(Allocation.id == a_id)
+        )).scalar_one()
+    assert cap == Decimal("7.50")  # cost cap UNCHANGED

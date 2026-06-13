@@ -25,7 +25,12 @@ from ai_api.services.provider_credentials import (
     ProviderUnavailableError,
     ResolvedCredential,
 )
-from ai_api.services.quota import current_month_usage, is_over_quota
+from ai_api.services.quota import (
+    current_month_cost,
+    current_month_usage,
+    is_over_cost_quota,
+    is_over_quota,
+)
 
 
 @dataclass
@@ -131,13 +136,26 @@ async def run_preflight(
             "allocation_paused", "allocation is paused", 403, allocation
         )
 
-    # Monthly quota.
+    # Monthly token quota.
     if allocation.quota_tokens_per_month is not None:
         usage = await current_month_usage(session, allocation.id)
         if is_over_quota(allocation, usage):
             return PreflightRejection(
                 "quota_exceeded",
                 f"monthly quota reached ({usage}/{allocation.quota_tokens_per_month} tokens)",
+                403,
+                allocation,
+            )
+
+    # Monthly cost quota (Phase 33): cross-unit USD spend cap, governs every endpoint
+    # (token + non-token) via the cost common denominator. Independent of the token
+    # cap — either one trips. Unpriced calls accrue 0, so they aren't governed here.
+    if allocation.quota_cost_usd_per_month is not None:
+        spent = await current_month_cost(session, allocation.id)
+        if is_over_cost_quota(allocation, spent):
+            return PreflightRejection(
+                "cost_quota_exceeded",
+                f"monthly cost cap reached (${spent} / ${allocation.quota_cost_usd_per_month})",
                 403,
                 allocation,
             )

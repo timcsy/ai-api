@@ -25,6 +25,7 @@ import math
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any, Protocol
 
 from fastapi import APIRouter, WebSocket
@@ -90,8 +91,13 @@ class RealtimeSession:
     sample_rate: int = _DEFAULT_SAMPLE_RATE
     bytes_per_sample: int = _DEFAULT_BYTES_PER_SAMPLE
     channels: int = _DEFAULT_CHANNELS
-    # normal | client_abort | upstream_error | revoked
+    # normal | client_abort | upstream_error | revoked | cost_exceeded
     close_reason: str = "normal"
+    # Phase 33 (046): in-connection cost-cap watch. Captured at connect from the
+    # allocation + point-in-time price. cost_cap None ⇒ no cost watch.
+    cost_cap: Decimal | None = None
+    price_unit: str | None = None
+    price_per_unit: Decimal | None = None
 
 
 # --- Pure metering helpers (T014/T017) --------------------------------------
@@ -154,6 +160,15 @@ def session_quantity(sess: RealtimeSession, unit: str) -> int:
         bytes_per_sample=sess.bytes_per_sample,
         channels=sess.channels,
     )
+
+
+def session_running_cost(sess: RealtimeSession) -> Decimal:
+    """Phase 33: cost accrued by THIS connection so far (in-flight, not yet billed).
+    0 if unpriced. Used by the in-connection cost-cap watch: committed + running."""
+    if sess.price_per_unit is None:
+        return Decimal(0)
+    unit = sess.price_unit if sess.price_unit in ("second", "minute") else "second"
+    return Decimal(session_quantity(sess, unit)) * sess.price_per_unit
 
 
 def _apply_format(sess: RealtimeSession, ev: dict[str, Any]) -> None:
@@ -244,16 +259,40 @@ async def _upstream_to_client(client: ClientWS, upstream: UpstreamWS, sess: Real
 CheckActive = Callable[[str], Awaitable[bool]]
 
 
+async def _allocation_over_cost(sess: RealtimeSession) -> bool:
+    """Phase 33: committed month cost + this connection's in-flight cost ≥ cap.
+    cost_cap None ⇒ never over. Fail-open on a transient DB error."""
+    if sess.cost_cap is None:
+        return False
+    from ai_api.db import get_sessionmaker
+    from ai_api.services.quota import current_month_cost
+
+    try:
+        async with get_sessionmaker()() as s:
+            committed = await current_month_cost(s, sess.allocation_id)
+    except Exception:
+        logger.exception("realtime cost re-check query failed; leaving connection up")
+        return False
+    return (committed + session_running_cost(sess)) >= sess.cost_cap
+
+
+# over_cost(sess) -> bool
+OverCost = Callable[[RealtimeSession], Awaitable[bool]]
+
+
 async def _revocation_watch(
     sess: RealtimeSession,
     *,
     stop: asyncio.Event,
     check_active: CheckActive,
     interval: float,
+    over_cost: OverCost = _allocation_over_cost,
 ) -> None:
     """Side-channel: every `interval` seconds re-check the allocation; if it is no
-    longer active (revoked / paused / quarantined) flip close_reason and signal the
-    relay to stop (FR-005). Does not touch the relay hot path."""
+    longer active (revoked / paused / quarantined) → close_reason=revoked, or if the
+    monthly cost cap is exceeded (committed + in-flight) → close_reason=cost_exceeded;
+    either flips close_reason and signals the relay to stop (FR-005/Phase 33). Does not
+    touch the relay hot path."""
     while not stop.is_set():
         try:
             await asyncio.wait_for(stop.wait(), timeout=interval)
@@ -269,6 +308,10 @@ async def _revocation_watch(
             sess.close_reason = "revoked"
             stop.set()
             return
+        if await over_cost(sess):
+            sess.close_reason = "cost_exceeded"
+            stop.set()
+            return
 
 
 async def run_relay(
@@ -278,6 +321,7 @@ async def run_relay(
     *,
     check_active: CheckActive,
     interval: float = REVOKE_RECHECK_SECONDS,
+    over_cost: OverCost = _allocation_over_cost,
 ) -> None:
     """Run both forwarding coroutines + the revocation watcher until any one ends,
     then tear the others down. Returns once the connection is fully closed."""
@@ -292,7 +336,9 @@ async def run_relay(
     t_up = asyncio.create_task(_forward_then_stop(_client_to_upstream(client, upstream, sess)))
     t_down = asyncio.create_task(_forward_then_stop(_upstream_to_client(client, upstream, sess)))
     t_watch = asyncio.create_task(
-        _revocation_watch(sess, stop=stop, check_active=check_active, interval=interval)
+        _revocation_watch(
+            sess, stop=stop, check_active=check_active, interval=interval, over_cost=over_cost
+        )
     )
 
     await stop.wait()
@@ -310,6 +356,8 @@ async def run_relay(
 def _close_code_for(close_reason: str) -> tuple[int, str]:
     if close_reason == "revoked":
         return WS_POLICY_VIOLATION, "allocation revoked"
+    if close_reason == "cost_exceeded":
+        return WS_POLICY_VIOLATION, "monthly cost cap reached"
     if close_reason == "upstream_error":
         return WS_INTERNAL, "upstream connection closed"
     return WS_NORMAL, "connection closed"
@@ -376,7 +424,9 @@ async def _bill_session(sess: RealtimeSession) -> None:
                 unit=unit,
                 cost_usd=cost,
                 error_message=(
-                    "allocation revoked mid-connection" if sess.close_reason == "revoked" else None
+                    "allocation revoked mid-connection" if sess.close_reason == "revoked"
+                    else "monthly cost cap reached mid-connection" if sess.close_reason == "cost_exceeded"
+                    else None
                 ),
             )
             await s.commit()
@@ -417,6 +467,7 @@ async def handle_realtime(
     *,
     open_upstream: OpenUpstream,
     check_active: CheckActive = _allocation_is_active,
+    over_cost: OverCost = _allocation_over_cost,
     revoke_interval: float = REVOKE_RECHECK_SECONDS,
 ) -> None:
     """Drive one realtime connection end-to-end. Injectable `open_upstream` /
@@ -475,6 +526,16 @@ async def handle_realtime(
             return
         allocation_id = result.allocation.id
         subject = result.allocation.subject_snapshot
+        # Phase 33: capture the cost cap + point-in-time price for the in-connection
+        # cost watch (a connection already over cap is rejected by preflight above).
+        cost_cap = result.allocation.quota_cost_usd_per_month
+        from ai_api.services.pricing import lookup_price_for_call
+        _price = await lookup_price_for_call(
+            s, provider=result.provider,
+            model=result.upstream_model.split("/", 1)[-1], call_time=started_at,
+        )
+        price_unit = _price.price_unit if _price is not None else None
+        price_per_unit = _price.price_per_unit if _price is not None else None
 
     resolved = result.resolved
     sess = RealtimeSession(
@@ -485,6 +546,9 @@ async def handle_realtime(
         provider=result.provider,
         request_id=request_id,
         started_at=started_at,
+        cost_cap=cost_cap,
+        price_unit=price_unit,
+        price_per_unit=price_per_unit,
     )
     # Meter the first frame too (it may already be an append in some clients).
     _meter_client_event(sess, first_raw)
@@ -517,7 +581,8 @@ async def handle_realtime(
             sess.close_reason = "upstream_error"
         else:
             await run_relay(
-                client, upstream, sess, check_active=check_active, interval=revoke_interval
+                client, upstream, sess, check_active=check_active,
+                over_cost=over_cost, interval=revoke_interval
             )
     finally:
         await _safe_close_upstream(upstream)

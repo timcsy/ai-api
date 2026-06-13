@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import cast
 
 from sqlalchemy import select
@@ -58,6 +59,7 @@ class AllocationService:
         created_by: str | None = None,
         subject: str | None = None,
         quota_tokens_per_month: int | None = None,
+        quota_cost_usd_per_month: Decimal | None = None,
         origin: AllocationOrigin = AllocationOrigin.admin,
     ) -> AllocationCreated:
         if not resource_model:
@@ -87,6 +89,7 @@ class AllocationService:
             created_by=created_by or self.BOOTSTRAP_ADMIN,
             note=note,
             quota_tokens_per_month=quota_tokens_per_month,
+            quota_cost_usd_per_month=quota_cost_usd_per_month,
             origin=origin,
         )
         self._s.add(allocation)

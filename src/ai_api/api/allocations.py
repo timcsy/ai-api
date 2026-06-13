@@ -1,6 +1,7 @@
 """Allocation admin endpoints."""
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -13,7 +14,8 @@ from ai_api.api.schemas import (
     CreateAllocationRequest,
     CredentialOut,
 )
-from ai_api.models import AllocationStatus
+from ai_api.auth import audit
+from ai_api.models import ActorType, AllocationStatus, AuditEventType
 from ai_api.services.allocations import AllocationService
 
 router = APIRouter(dependencies=[Depends(require_admin_token)])
@@ -44,6 +46,7 @@ def _to_out(a: Any, display_name: str | None = None) -> AllocationOut:
         note=a.note,
         token_prefix=_repr_token_prefix(a),
         quota_tokens_per_month=a.quota_tokens_per_month,
+        quota_cost_usd_per_month=a.quota_cost_usd_per_month,
         is_service_allocation=a.is_service_allocation,
     )
 
@@ -64,6 +67,7 @@ async def create_allocation(
             subject=payload.subject,
             resource_model=payload.resource_model,
             note=payload.note,
+            quota_cost_usd_per_month=payload.quota_cost_usd_per_month,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -202,11 +206,12 @@ async def patch_allocation(
 ) -> AllocationOut:
     """Update mutable allocation fields. Accepts:
     - quota_tokens_per_month (int | null) — null = unlimited
+    - quota_cost_usd_per_month (number | null) — null = no cost cap (Phase 33)
     - is_service_allocation (bool)
     - note (str)
     """
 
-    allowed = {"quota_tokens_per_month", "is_service_allocation", "note"}
+    allowed = {"quota_tokens_per_month", "quota_cost_usd_per_month", "is_service_allocation", "note"}
     unknown = set(payload.keys()) - allowed
     if unknown:
         raise HTTPException(
@@ -228,6 +233,30 @@ async def patch_allocation(
                 detail={"error": {"code": "bad_request", "message": "quota_tokens_per_month must be int >= 0 or null"}},
             )
         allocation.quota_tokens_per_month = v
+    if "quota_cost_usd_per_month" in payload:
+        cv = payload["quota_cost_usd_per_month"]
+        if cv is not None:
+            try:
+                cv = Decimal(str(cv))
+            except (ArithmeticError, ValueError, TypeError):
+                cv = Decimal(-1)
+            if cv < 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": {"code": "bad_request",
+                                      "message": "quota_cost_usd_per_month must be a number >= 0 or null"}},
+                )
+        allocation.quota_cost_usd_per_month = cv
+        # FR-008: cost-cap changes are audited (the only quota change with an audit
+        # event; token-cap edits historically have none).
+        await audit.record(
+            session,
+            event_type=AuditEventType.allocation_cost_quota_updated,
+            actor_type=ActorType.admin,
+            target_type="allocation",
+            target_id=allocation.id,
+            details={"quota_cost_usd_per_month": str(cv) if cv is not None else None},
+        )
     if "is_service_allocation" in payload:
         allocation.is_service_allocation = bool(payload["is_service_allocation"])
     if "note" in payload:

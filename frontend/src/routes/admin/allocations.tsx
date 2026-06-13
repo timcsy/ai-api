@@ -49,6 +49,7 @@ interface AdminAllocation {
   display_name?: string | null;
   status: string;
   quota_tokens_per_month: number | null;
+  quota_cost_usd_per_month: string | null;
   is_service_allocation: boolean;
   quota_locked: boolean;
   token_prefix: string;
@@ -86,6 +87,7 @@ export function AdminAllocationsPage() {
   const [showRevoked, setShowRevoked] = React.useState(false);
   const [quotaTarget, setQuotaTarget] = React.useState<AdminAllocation | null>(null);
   const [quotaValue, setQuotaValue] = React.useState("");
+  const [costValue, setCostValue] = React.useState("");
 
   const allocsQuery = useQuery<AdminAllocation[], ApiError>({
     queryKey: ["admin", "allocations"],
@@ -257,6 +259,7 @@ export function AdminAllocationsPage() {
                         onClick={() => {
                           setQuotaTarget(a);
                           setQuotaValue(a.quota_tokens_per_month != null ? String(a.quota_tokens_per_month) : "");
+                          setCostValue(a.quota_cost_usd_per_month != null ? String(Number(a.quota_cost_usd_per_month)) : "");
                         }}
                       >
                         調整配額
@@ -403,8 +406,9 @@ export function AdminAllocationsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>調整月度配額</DialogTitle>
-            <DialogDescription>留空＝無限額；否則填非負整數 tokens。</DialogDescription>
+            <DialogDescription>兩種上限可同時設、任一達到即擋；留空＝該項無上限。</DialogDescription>
           </DialogHeader>
+          <label className="text-sm font-medium">每月 token 上限</label>
           <Input
             type="number"
             min={0}
@@ -416,17 +420,41 @@ export function AdminAllocationsPage() {
           {quotaValue.trim() !== "" && !/^\d+$/.test(quotaValue.trim()) && (
             <p className="text-xs text-destructive">請填非負整數，或留空表示無限額。</p>
           )}
+          <label className="text-sm font-medium mt-2">每月花費上限（USD）</label>
+          <Input
+            type="number"
+            min={0}
+            step="0.01"
+            value={costValue}
+            placeholder="無上限"
+            aria-label="每月花費上限"
+            onChange={(e) => setCostValue(e.target.value)}
+          />
+          {costValue.trim() !== "" && !(Number(costValue) >= 0) && (
+            <p className="text-xs text-destructive">請填非負金額，或留空表示無上限。</p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            花費上限以 USD 統一治理所有端點（token / 頁 / 張 / 秒 / 分…）；只治理「已定價」的用量。
+          </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setQuotaTarget(null)}>取消</Button>
             <Button
-              disabled={quotaValue.trim() !== "" && !/^\d+$/.test(quotaValue.trim())}
+              disabled={
+                (quotaValue.trim() !== "" && !/^\d+$/.test(quotaValue.trim())) ||
+                (costValue.trim() !== "" && !(Number(costValue) >= 0))
+              }
               onClick={() => {
                 if (!quotaTarget) return;
                 const v = quotaValue.trim();
+                const c = costValue.trim();
                 if (v !== "" && !/^\d+$/.test(v)) return;
+                if (c !== "" && !(Number(c) >= 0)) return;
                 patchMut.mutate({
                   id: quotaTarget.id,
-                  body: { quota_tokens_per_month: v === "" ? null : Number(v) },
+                  body: {
+                    quota_tokens_per_month: v === "" ? null : Number(v),
+                    quota_cost_usd_per_month: c === "" ? null : Number(c),
+                  },
                 });
                 setQuotaTarget(null);
               }}

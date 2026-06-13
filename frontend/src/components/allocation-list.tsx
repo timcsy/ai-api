@@ -34,6 +34,8 @@ interface Allocation {
   revoked_at: string | null;
   token_prefix: string;
   quota_tokens_per_month?: number | null;
+  quota_cost_usd_per_month?: string | null;
+  cost_used_this_month?: string | null;
   price?: { input_per_1k: string; output_per_1k: string; cached_input_per_1k?: string } | null;
 }
 
@@ -225,6 +227,20 @@ export function AllocationList() {
                       <div>配額：無上限</div>
                     )
                   )}
+                  {a.status === "active" && a.quota_cost_usd_per_month != null && (() => {
+                    const used = Number(a.cost_used_this_month ?? 0);
+                    const cap = Number(a.quota_cost_usd_per_month);
+                    const near = cap > 0 && used / cap >= 0.8;
+                    return (
+                      <div className="space-y-1">
+                        <div className={near ? "text-destructive" : "text-foreground"}>
+                          本月花費 ${used.toFixed(2)} / 上限 ${cap.toFixed(2)}
+                          {near && "（接近上限）"}
+                        </div>
+                        <Progress value={cap > 0 ? Math.min(100, Math.round((used / cap) * 100)) : 0} />
+                      </div>
+                    );
+                  })()}
                   <div>
                     現價（每 1M）：
                     {a.price

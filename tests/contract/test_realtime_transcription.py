@@ -338,3 +338,36 @@ async def test_upstream_connect_failure_no_leak_and_bills_zero(app_client: Async
     # Connect failed before any audio relayed → 0 (unpriced → default unit second).
     rec = await _last(CallOutcome.upstream_error)
     assert rec is not None and rec.unit == "second" and rec.quantity == 0
+
+
+# --- Phase 33 (046) US2: in-connection cost-cap → close + bill --------------
+@pytest.mark.asyncio
+async def test_inflight_cost_cap_closes_and_bills(app_client: AsyncClient, admin_headers):
+    """A realtime connection whose accrued cost crosses the monthly cap is closed
+    mid-stream (policy violation) and the accrued time is still billed."""
+    await _seed_catalog(RT_MODEL)
+    await _seed_price("0.017")
+    alloc = await _alloc(app_client, admin_headers)
+    await _seed_provider(app_client, admin_headers)
+    client = FakeClientWS(_bearer(alloc["token"]),
+                          [_session_update(), _append(30.0)], hold_open=True)
+    upstream = FakeUpstreamWS(close_after=False)
+
+    ticks = {"n": 0}
+
+    async def over_cost_after_first_tick(sess) -> bool:
+        ticks["n"] += 1
+        return ticks["n"] >= 1  # first re-check already reports over the cost cap
+
+    await asyncio.wait_for(
+        handle_realtime(
+            client, open_upstream=fake_opener(upstream),
+            over_cost=over_cost_after_first_tick, revoke_interval=0.05,
+        ),
+        timeout=5,
+    )
+    assert client.closed is not None and client.closed[0] == 1008
+    assert client.closed[1] == "monthly cost cap reached"
+    rec = await _last(CallOutcome.success)
+    assert rec is not None and rec.unit == "minute" and rec.quantity == 1
+    assert rec.error_message == "monthly cost cap reached mid-connection"

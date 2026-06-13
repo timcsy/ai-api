@@ -64,6 +64,7 @@ def _alloc_public(
     price: dict[str, str] | None = None,
     display_name: str | None = None,
     agent_compatible: bool = False,
+    cost_used_this_month: str | None = None,
 ) -> dict[str, Any]:
     return {
         "id": a.id,
@@ -74,6 +75,11 @@ def _alloc_public(
         "status": a.status,
         "origin": a.origin,
         "quota_tokens_per_month": a.quota_tokens_per_month,
+        # Phase 33 (046): monthly USD spend cap + this-month spend (Decimal as str).
+        "quota_cost_usd_per_month": (
+            str(a.quota_cost_usd_per_month) if a.quota_cost_usd_per_month is not None else None
+        ),
+        "cost_used_this_month": cost_used_this_month,
         "created_at": a.created_at.isoformat(),
         "revoked_at": a.revoked_at.isoformat() if a.revoked_at else None,
         "token_prefix": _repr_token_prefix(a),
@@ -98,8 +104,11 @@ async def list_my_allocations(
 
     from ai_api.models import ModelCatalog
     from ai_api.services import pricing, responses_support
+    from ai_api.services.quota import current_month_cost
 
     allocations = await AllocationService(db).list(member_id=member.id)
+    # Phase 33: this-month spend per allocation (cross-unit USD), for the cost cap line.
+    cost_used = {a.id: str(await current_month_cost(db, a.id)) for a in allocations}
     price_map = await pricing.current_price_map(db, datetime.now(UTC))
     # slug → (display_name, capabilities) from the catalog (orphan slugs absent).
     rows = await db.execute(
@@ -117,6 +126,7 @@ async def list_my_allocations(
             pricing.price_for_slug(price_map, _provider_of(a.resource_model), a.resource_model),
             name_map.get(a.resource_model),
             agent_map.get(a.resource_model, False),
+            cost_used_this_month=cost_used.get(a.id),
         )
         for a in allocations
     ]
