@@ -26,9 +26,6 @@ from ulid import ULID
 from ai_api.config import get_settings
 from ai_api.db import get_sessionmaker
 from ai_api.models import (
-    Allocation,
-    AllocationOrigin,
-    AllocationStatus,
     Member,
     MemberProvider,
     MemberStatus,
