@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Annotated
 
 from pydantic import (
@@ -31,6 +32,8 @@ class CreateAllocationRequest(BaseModel):
     subject: SubjectStr | None = None
     resource_model: ResourceModelStr
     note: str | None = Field(default=None, max_length=500)
+    # Phase 33 (046): optional monthly USD spend cap. None = no cost cap.
+    quota_cost_usd_per_month: Decimal | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def _require_either(self) -> CreateAllocationRequest:
@@ -55,6 +58,8 @@ class AllocationOut(BaseModel):
     token_prefix: str | None = None  # Phase 18: representative credential prefix
     # Phase 3a
     quota_tokens_per_month: int | None = None
+    # Phase 33 (046): monthly USD spend cap (None = no cost cap)
+    quota_cost_usd_per_month: Decimal | None = None
     is_service_allocation: bool = False
 
     @computed_field  # type: ignore[prop-decorator]

@@ -58,6 +58,8 @@ class AuditEventType(enum.StrEnum):
     # Phase 019: allocation pause/resume (reversible, token-preserving)
     allocation_paused = "allocation_paused"
     allocation_resumed = "allocation_resumed"
+    # Phase 33 (046): cost-based monthly quota cap change
+    allocation_cost_quota_updated = "allocation_cost_quota_updated"
     # Phase 13: admin email notifications — event types that trigger admin emails
     responses_upstream_error_burst = "responses_upstream_error_burst"
     provider_credential_auth_failed = "provider_credential_auth_failed"

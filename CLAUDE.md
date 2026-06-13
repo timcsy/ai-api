@@ -1,6 +1,6 @@
 # ai-api Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-06-12
+Auto-generated from all feature plans. Last updated: 2026-06-13
 
 ## Active Technologies
 - Python 3.11+（同 Phase 1） (002-auth-membership)
@@ -68,6 +68,8 @@ Auto-generated from all feature plans. Last updated: 2026-06-12
 - PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表/欄/migration**——沿用 0019 的 `call_records.{quantity,unit}` 與 `price_list.{price_unit,price_per_unit_usd}`，新單位 `image`/`query` 為字串值 (042-endpoint-registry)
 - Python 3.11+（後端為主）/ TypeScript strict + React 19（前端僅目錄顯示 realtime 類型 + 連線範例，極少量） + FastAPI（WebSocket — starlette 內建，**專案首次使用**）、SQLAlchemy 2.x async、Pydantic v2（皆既有）；**`websockets`（直連 Azure realtime WS 的 async client，提為直接依賴——已隨 uvicorn/litellm 在 image，現宣告為直接依賴）**；既有 `proxy/preflight.py`、計費（`services/pricing.py` 的 `calculate_unit_cost`）、audit。**realtime 不經 litellm**（其 realtime 是 Proxy form / client 直連，違原則；借其 `RealTimeStreaming` 結構自寫薄 relay）。 (043-realtime-transcription)
 - PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表、不新增 migration**——沿用增量②（0019）的 `call_records.{quantity,unit}` 與 `price_list.{price_unit,price_per_unit_usd}`，新單位 `minute` 為字串值。 (043-realtime-transcription)
+- Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2（後端）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件** (046-cost-quota)
+- PostgreSQL（生產）/ SQLite（dev、CI）；**新 migration `0020`**——`allocations` 加一個 nullable 欄 `quota_cost_usd_per_month`（純加欄）。累計來源沿用既有 `call_records.cost_usd`（0019 已有）。 (046-cost-quota)
 
 - Python 3.11+ + LiteLLM（proxy core）、FastAPI（admin API）、 (001-gateway-core)
 
@@ -88,9 +90,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 046-cost-quota: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2（後端）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件**
 - 043-realtime-transcription: Added Python 3.11+（後端為主）/ TypeScript strict + React 19（前端僅目錄顯示 realtime 類型 + 連線範例，極少量） + FastAPI（WebSocket — starlette 內建，**專案首次使用**）、SQLAlchemy 2.x async、Pydantic v2（皆既有）；**`websockets`（直連 Azure realtime WS 的 async client，提為直接依賴——已隨 uvicorn/litellm 在 image，現宣告為直接依賴）**；既有 `proxy/preflight.py`、計費（`services/pricing.py` 的 `calculate_unit_cost`）、audit。**realtime 不經 litellm**（其 realtime 是 Proxy form / client 直連，違原則；借其 `RealTimeStreaming` 結構自寫薄 relay）。
 - 042-endpoint-registry: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端少量範例） + FastAPI（含 `UploadFile` multipart，既有）、SQLAlchemy 2.x async、Pydantic v2、`litellm`（`amoderation`/`asearch`/`aimage_edit` 既有函式）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件**
-- 041-multi-endpoint-complete: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI（含 `UploadFile` multipart）、SQLAlchemy 2.x async、Pydantic v2、`litellm`（`aimage_generation`/`arerank`/`aspeech`/`atranscription` library form）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件**
 
 
 <!-- MANUAL ADDITIONS START -->

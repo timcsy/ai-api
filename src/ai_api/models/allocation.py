@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai_api.db import Base
@@ -47,6 +48,11 @@ class Allocation(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Phase 3a
     quota_tokens_per_month: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Phase 33 (046): per-allocation monthly SPEND cap (USD). NULL ⇒ no cost cap.
+    # Governs all endpoints via the cost (USD) common denominator — token + non-token
+    # (page/image/second/minute/character). Independent hard cap; NOT rebalanced by
+    # the adaptive quota pool (which only redistributes quota_tokens_per_month).
+    quota_cost_usd_per_month: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
     is_service_allocation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Phase 3c
     quota_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

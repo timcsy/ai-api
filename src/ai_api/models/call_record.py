@@ -30,6 +30,7 @@ class CallOutcome(enum.StrEnum):
     rejected_quarantined = "rejected_quarantined"
     rejected_paused = "rejected_paused"
     rejected_quota_exceeded = "rejected_quota_exceeded"
+    rejected_cost_quota_exceeded = "rejected_cost_quota_exceeded"
     rejected_model_forbidden = "rejected_model_forbidden"
     rejected_model_unsupported = "rejected_model_unsupported"
     rejected_response_forbidden = "rejected_response_forbidden"

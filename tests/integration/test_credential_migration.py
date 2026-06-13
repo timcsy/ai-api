@@ -26,9 +26,6 @@ from ulid import ULID
 from ai_api.config import get_settings
 from ai_api.db import get_sessionmaker
 from ai_api.models import (
-    Allocation,
-    AllocationOrigin,
-    AllocationStatus,
     Member,
     MemberProvider,
     MemberStatus,
@@ -64,39 +61,31 @@ def test_migration_0015_preserves_existing_token(postgres_url: str) -> None:
         await engine.dispose()
 
     async def seed_old() -> None:
-        # members/allocations are unchanged by 0015 → ORM is safe; the credential
-        # must be inserted raw because at 0014 the table still has the old columns.
+        # member/allocation/credential MUST be inserted raw: the ORM reflects the
+        # HEAD schema (which has columns added in later migrations, e.g. 0020
+        # allocations.quota_cost_usd_per_month) that don't exist at 0014. Raw SQL
+        # lists only the 0014-era columns. (experience: "ORM reflects head schema".)
         engine = create_async_engine(postgres_url)
         sm = async_sessionmaker(engine, expire_on_commit=False)
         now = datetime.now(UTC)
         async with sm() as s:
-            s.add(
-                Member(
-                    id=member_id,
-                    email="legacy@example.com",
-                    provider=MemberProvider.external,
-                    display_name="legacy",
-                    status=MemberStatus.active,
-                    password_hash=None,
-                    created_at=now,
-                    disabled_at=None,
-                    created_by="test",
-                )
+            await s.execute(
+                text(
+                    "INSERT INTO members "
+                    "(id, email, provider, display_name, status, created_at, created_by) "
+                    "VALUES (:id, :email, 'external', 'legacy', 'active', :now, 'test')"
+                ),
+                {"id": member_id, "email": "legacy@example.com", "now": now},
             )
-            s.add(
-                Allocation(
-                    id=alloc_id,
-                    member_id=member_id,
-                    subject_snapshot="legacy@example.com",
-                    resource_model="azure/gpt-test",
-                    status=AllocationStatus.active,
-                    created_at=now,
-                    revoked_at=None,
-                    created_by="test",
-                    note=None,
-                    quota_tokens_per_month=None,
-                    origin=AllocationOrigin.admin,
-                )
+            await s.execute(
+                text(
+                    "INSERT INTO allocations "
+                    "(id, member_id, subject_snapshot, resource_model, status, "
+                    " created_at, created_by, is_service_allocation, quota_locked, origin) "
+                    "VALUES (:id, :mid, :subj, :rm, 'active', :now, 'test', false, false, 'admin')"
+                ),
+                {"id": alloc_id, "mid": member_id, "subj": "legacy@example.com",
+                 "rm": "azure/gpt-test", "now": now},
             )
             await s.flush()
             await s.execute(

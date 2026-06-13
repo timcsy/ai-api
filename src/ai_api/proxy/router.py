@@ -43,6 +43,7 @@ def _outcome_for_code(code: str) -> CallOutcome:
         "allocation_quarantined": CallOutcome.rejected_quarantined,
         "allocation_paused": CallOutcome.rejected_paused,
         "quota_exceeded": CallOutcome.rejected_quota_exceeded,
+        "cost_quota_exceeded": CallOutcome.rejected_cost_quota_exceeded,
         "model_forbidden": CallOutcome.rejected_model_forbidden,
         "model_not_responses_capable": CallOutcome.rejected_model_unsupported,
         "response_forbidden": CallOutcome.rejected_response_forbidden,
