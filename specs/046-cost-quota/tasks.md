@@ -101,7 +101,7 @@
 
 - [X] T020 [P] 整合測試：自適應配額池跑一輪後，各分配 `quota_cost_usd_per_month` **不變**（只 token 額度被再分配）（`tests/integration/test_quota_pool_rebalance.py`，SC-005）
 - [X] T021 全綠關卡：`ruff check .` + mypy + 完整 `pytest tests/` 零回歸 + 前端 tsc/vitest/build；**既有配額 contract 測試 git diff 為空**（SC-003）
-- [ ] T022 部署後煙霧（quickstart.md）：有 migration → `--set migrationJob.enabled=true`；`kubectl exec <pod> -- python3 -m alembic current` 顯 `0020`；admin 設一個低上限對自己分配真打驗一次（同步端點 + realtime 連線中各一）
+- [X] T022 部署後煙霧（quickstart.md）：有 migration → `--set migrationJob.enabled=true`；`kubectl exec <pod> -- python3 -m alembic current` 顯 `0020`；admin 設一個低上限對自己分配真打驗一次（同步端點 + realtime 連線中各一）
 
 ---
 

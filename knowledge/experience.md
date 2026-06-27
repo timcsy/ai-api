@@ -616,3 +616,11 @@
 - **解決方式**：`_build_realtime_url` 去 `deployment=`、加 `intent=transcription`、版本 `2025-04-01-preview`（env `AZURE_REALTIME_API_VERSION` 可覆寫）；`open_realtime_ws` 捕捉握手拒絕、`raise RuntimeError(status+body)`；smoke 改純連線等首事件（連上即 `transcription_session.created`，不必送 session.update）。**部署後在新 pod 內跑實際 `realtime_smoke` 對真 Azure 回 `{'ok':True}` 才算驗收**。
 - **教訓**：呼應「採用 SDK 前先印一次真實回傳值」「新端點光壞 token→401 不算驗過」——對**即時/串流/WebSocket 協定**再升一級：(a) 文件慣例（尤其跨 OpenAI↔Azure）常有端點別的細節差異（`deployment=` vs `intent=`、api-version 世代），**採用前用真憑證對真端點探測一次**，別只信文件；(b) 把 **provider 的拒絕 status+body 主動帶出**到錯誤訊息／日誌——裸 `HTTP 400` 無從下手，有 body 一次定位（這個診斷本身就是定位本 bug 的關鍵）；(c) WS/即時這類 CI 只能 mock 的邊界，真打驗證要排進部署煙霧——admin「測試模型」按鈕正是把它變成隨手可做的動作（它揭露此 bug 就是它的價值證明，同 `/v1/ocr` 那條）。
 - **來源**：`src/ai_api/proxy/upstream.py` `_build_realtime_url` / `open_realtime_ws` / `_realtime_reject_detail` / `realtime_smoke`；階段 32（spec 044，rev 95；測試按鈕真打 + cluster 內探測揭露）
+
+### 接不上的「續接請求」要明確拒絕，別靜默降級——無聲丟脈絡比報錯更糟
+
+- **理論說**：Responses 的 `previous_response_id` 接不上時（過期、或被 per-allocation 隔離擋下），為了讓客戶端「換 model 不報錯」，乾脆**寬容降級**——丟掉那個 previous id、當新一輪重開，UX 看起來比較順。
+- **實際發生**：VS Code GitHub Copilot 設 `apiType=responses`（走**伺服器端對話狀態** `store`+`previous_response_id`）。在**同一把金鑰下切換 model（＝切換分配）**續用同一對話 → 那個 `previous_response_id` 屬於舊分配 → 我們的 per-allocation 隔離回 `response_forbidden`；續用過期對話則回 `response_not_found`。一度想「寬容降級成新一輪」讓它不報錯。
+- **解決方式（抉擇）**：**維持明確吐錯，不做靜默降級**。根因：server-state 把「記憶」外包給伺服器、客戶端沒留 transcript，所以降級**救不回 context**——結果是「使用者以為續接、model 卻失憶」的**靜默錯誤**，比一個可操作的明確錯誤更糟。明確錯誤讓邊界可見：使用者知道「換 model／過期 ＝ 開新對話」。對策是把**錯誤訊息做得可操作**（講清楚「請開新對話」），而非把錯誤藏起來。
+- **教訓**：當一個「續接／還原／沿用既有狀態」的請求**無法被忠實履行**時，**寧可明確拒絕（fail loud）也不要靜默降級到一個「看起來成功、實際丟了東西」的狀態**。判準：降級後是否**無聲損失**使用者預期的資料／脈絡？是 → 該吐錯（呼應「靜默假成功是最惡失敗模式」recipe-table 假通過、原則 2 可追蹤性：跨分配不串味）。延伸架構觀：**伺服器端對話狀態是便利選項、有固有取捨**；可攜的正道是 **stateless**（客戶端持有並重播 context，如 Codex `store=false`、OpenRouter、Chat Completions）——順 UX 來自「客戶端自己記」，非伺服器。故我們對外**鼓勵 stateless**，server-state（store=true）支援但定位為便利選項，並老實標明「伺服器端對話記憶是 per-分配的，跨 model 帶脈絡得靠客戶端重播」。
+- **來源**：`src/ai_api/proxy/responses.py` `resolve_for_continuation`（`response_not_found`／`response_forbidden`，維持拒絕）；GitHub Copilot `apiType=responses` 同金鑰跨分配切換實測（2026-06-27，chat 討論）；延伸自「能不能測 ⟺ 有沒有 recipe（靜默假成功）」與原則 2 可追蹤性。
