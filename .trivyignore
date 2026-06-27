@@ -64,3 +64,11 @@ CVE-2026-48818
 # major-bump blocker as above). Mitigated by being behind the frontend nginx +
 # NetworkPolicy; will clear when the starlette/FastAPI bump (階段 35) lands.
 CVE-2026-54283
+
+# ---- 2026-06-27: frontend image (PR #92) ----
+# libexpat (2.7.5-r0) DoS via crafted XML in nginx-unprivileged:1.27-alpine base.
+# Unreachable: the frontend nginx serves a static SPA + reverse-proxies HTTP only,
+# never parses XML; libexpat is a transitive Alpine base dep, not invoked at runtime
+# (same class as the libxml2 entry above). apk upgrade --no-cache (already in
+# Dockerfile.frontend) picks up the fix once Alpine publishes 2.8.1-r0.
+CVE-2026-45186
