@@ -1,7 +1,8 @@
 import type { ComponentType } from "react";
 
 import { CodexAppDetail } from "@/components/codex-app-detail";
-import { ApiLogo, CodexLogo } from "@/components/app-logos";
+import { ApiLogo, CodexLogo, CopilotLogo } from "@/components/app-logos";
+import { CopilotAppDetail } from "@/components/copilot-app-detail";
 import { DirectApiDetail } from "@/components/direct-api-detail";
 
 export interface Application {
@@ -21,6 +22,13 @@ export const APPLICATIONS: Application[] = [
     blurb: "OpenAI 的 agent 工具——CLI / IDE 擴充 / 桌面 App 都能接上本平台。",
     Logo: CodexLogo,
     Detail: CodexAppDetail,
+  },
+  {
+    id: "copilot",
+    name: "GitHub Copilot",
+    blurb: "VS Code 的 AI 助理——指向本平台的 OpenAI 相容端點，用你的金鑰即可。",
+    Logo: CopilotLogo,
+    Detail: CopilotAppDetail,
   },
   {
     id: "api",

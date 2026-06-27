@@ -73,6 +73,7 @@ ignore = ["E501", "S101", "B008", "S105", "N818"]  # B008/S105/N818: FastAPI Dep
 "src/ai_api/services/notifications.py" = ["RUF001"]  # Chinese user-facing messages
 "src/ai_api/api/admin_notifications.py" = ["RUF001"]  # Chinese user-facing messages
 "src/ai_api/api/usage.py" = ["RUF001"]  # Chinese quarantine-reason message (fullwidth comma)
+"src/ai_api/proxy/responses.py" = ["RUF001"]  # Chinese continuation-reject message (開新對話)
 
 [tool.mypy]
 python_version = "3.11"

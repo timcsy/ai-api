@@ -71,6 +71,8 @@ Auto-generated from all feature plans. Last updated: 2026-06-27
 - Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2（後端）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件** (046-cost-quota)
 - PostgreSQL（生產）/ SQLite（dev、CI）；**新 migration `0020`**——`allocations` 加一個 nullable 欄 `quota_cost_usd_per_month`（純加欄）。累計來源沿用既有 `call_records.cost_usd`（0019 已有）。 (046-cost-quota)
 - TypeScript strict + React 19 + Vite 6（**僅前端**；Python 後端不動） + TanStack Query、shadcn/ui、既有共用元件 `ApiUsageExample`、`applications.tsx` 註冊表——**皆既有，不新增套件** (049-usage-discoverability)
+- Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Pydantic v2（後端）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件** (050-openai-models-copilot)
+- PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表、不新增 migration**——`/v1/models` 純讀既有 `credentials` / `credential_allocations` / `allocations` / `model_catalog` (050-openai-models-copilot)
 
 - Python 3.11+ + LiteLLM（proxy core）、FastAPI（admin API）、 (001-gateway-core)
 
@@ -91,9 +93,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 050-openai-models-copilot: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Pydantic v2（後端）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件**
 - 049-usage-discoverability: Added TypeScript strict + React 19 + Vite 6（**僅前端**；Python 後端不動） + TanStack Query、shadcn/ui、既有共用元件 `ApiUsageExample`、`applications.tsx` 註冊表——**皆既有，不新增套件**
 - 046-cost-quota: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2（後端）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件**
-- 043-realtime-transcription: Added Python 3.11+（後端為主）/ TypeScript strict + React 19（前端僅目錄顯示 realtime 類型 + 連線範例，極少量） + FastAPI（WebSocket — starlette 內建，**專案首次使用**）、SQLAlchemy 2.x async、Pydantic v2（皆既有）；**`websockets`（直連 Azure realtime WS 的 async client，提為直接依賴——已隨 uvicorn/litellm 在 image，現宣告為直接依賴）**；既有 `proxy/preflight.py`、計費（`services/pricing.py` 的 `calculate_unit_cost`）、audit。**realtime 不經 litellm**（其 realtime 是 Proxy form / client 直連，違原則；借其 `RealTimeStreaming` 結構自寫薄 relay）。
 
 
 <!-- MANUAL ADDITIONS START -->
