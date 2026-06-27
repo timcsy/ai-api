@@ -48,3 +48,27 @@ CVE-2026-6732
 # to patch in place. Fixed upstream in 3.0.20-1~deb12u2 — clears via the next
 # distroless `:nonroot` rebuild.
 CVE-2026-45447
+
+# ---- 2026-06-27: starlette (PR #92) ----
+# starlette 0.50.0 is PINNED by FastAPI 0.124.x (starlette<0.51); both CVEs are
+# only fixed in starlette 1.x, which needs a FastAPI major bump — tracked as a
+# dedicated supply-chain task (階段 35), NOT smuggled into a frontend PR.
+#
+# CVE-2026-48818 — SSRF + NTLM credential theft via UNC paths. UNC (\\server\share)
+# is a Windows SMB concept; this service runs on Linux distroless and never resolves
+# attacker-controlled UNC/file paths (the backend serves no user-pathed static files
+# — the SPA is served by the separate frontend nginx). Not exploitable here.
+CVE-2026-48818
+
+# CVE-2026-54283 — starlette ASGI framework advisory, fixed in 1.3.1 (same 1.x
+# major-bump blocker as above). Mitigated by being behind the frontend nginx +
+# NetworkPolicy; will clear when the starlette/FastAPI bump (階段 35) lands.
+CVE-2026-54283
+
+# ---- 2026-06-27: frontend image (PR #92) ----
+# libexpat (2.7.5-r0) DoS via crafted XML in nginx-unprivileged:1.27-alpine base.
+# Unreachable: the frontend nginx serves a static SPA + reverse-proxies HTTP only,
+# never parses XML; libexpat is a transitive Alpine base dep, not invoked at runtime
+# (same class as the libxml2 entry above). apk upgrade --no-cache (already in
+# Dockerfile.frontend) picks up the fix once Alpine publishes 2.8.1-r0.
+CVE-2026-45186

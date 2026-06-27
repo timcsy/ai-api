@@ -35,7 +35,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
+import { UsageExplorer } from "@/components/usage-explorer";
+import { apiBaseUrl } from "@/lib/api-base";
 import { ApiError, api } from "@/lib/api-client";
+import { useCatalogModels } from "@/lib/catalog-models";
 import { copyToClipboard } from "@/lib/clipboard";
 
 interface AllocationRef {
@@ -90,6 +93,23 @@ export function AppCredentialsCard() {
     queryFn: () => api<Allocation[]>("/me/allocations"),
   });
   const activeAllocs = (allocsQuery.data ?? []).filter((a) => a.status === "active");
+  // Phase 34 (049): catalog meta to render the right "how to call" example per model.
+  const catalog = useCatalogModels();
+  const [howToTarget, setHowToTarget] = React.useState<AppCredential | null>(null);
+
+  function explorerModelsFor(c: AppCredential) {
+    return c.allocations
+      .filter((a) => a.status === "active")
+      .map((a) => {
+        const meta = catalog.bySlug.get(a.resource_model);
+        return {
+          slug: a.resource_model,
+          label: a.display_name ?? meta?.displayName ?? a.resource_model,
+          kind: meta?.kind,
+          supportsResponses: meta?.supportsResponses ?? false,
+        };
+      });
+  }
 
   const [createOpen, setCreateOpen] = React.useState(false);
   const [newName, setNewName] = React.useState("");
@@ -245,6 +265,7 @@ export function AppCredentialsCard() {
                   <TableCell className="text-right" data-label="操作">
                     {c.status === "active" ? (
                       <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => setHowToTarget(c)}>如何使用</Button>
                         <Button variant="ghost" size="sm" onClick={() => openEdit(c)}>編輯</Button>
                         <Button variant="ghost" size="sm" disabled={rotateMut.isPending} onClick={() => rotateMut.mutate(c.id)}>重新產生</Button>
                         <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setRevokeTarget(c)}>撤回</Button>
@@ -346,6 +367,25 @@ export function AppCredentialsCard() {
               {patchMut.isPending ? "儲存中…" : "儲存"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Phase 34 (049): how to use THIS key — pick a model (this key's scope) → example */}
+      <Dialog open={!!howToTarget} onOpenChange={(o) => !o && setHowToTarget(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>如何使用「{howToTarget?.name}」</DialogTitle>
+            <DialogDescription>
+              端點 <code className="text-xs break-all">{apiBaseUrl()}</code>；範例中的{" "}
+              <code className="text-xs">$TOKEN</code> 換成你建立這把金鑰時拿到的 token（只顯示過一次）。
+            </DialogDescription>
+          </DialogHeader>
+          {howToTarget && (
+            <UsageExplorer
+              models={explorerModelsFor(howToTarget)}
+              emptyHint="這把金鑰目前沒有可用的模型（可能已被撤回或尚未授予）。請在「編輯」加入模型，或請管理員授予。"
+            />
+          )}
         </DialogContent>
       </Dialog>
 

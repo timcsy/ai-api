@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 readme = "README.md"
 dependencies = [
     "litellm>=1.55,<2",
-    "cryptography>=43.0.0",
+    "cryptography>=48.0.1",  # 48.0.1: rebuilt wheel patches bundled OpenSSL (GHSA-537c-gmf6-5ccf)
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
     "sqlalchemy[asyncio]>=2.0.36",

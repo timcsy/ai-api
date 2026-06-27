@@ -265,6 +265,9 @@ export function CatalogDetailPage() {
         isOcr={m.kind === "ocr"}
         kind={m.kind}
       />
+      <p className="text-sm text-muted-foreground">
+        想接 Codex 等工具？<Link to="/apps" className="underline underline-offset-4">看應用 →</Link>
+      </p>
 
       {m.official_doc_url && (
         <p className="text-sm">
