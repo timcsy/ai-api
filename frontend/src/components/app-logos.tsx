@@ -9,6 +9,22 @@ export function CodexLogo({ className = "h-8 w-8" }: { className?: string }) {
   );
 }
 
+/** Phase 36 (050): GitHub Copilot tile — a simple assistant/goggles glyph
+ * (single-color currentColor, nominative use). Swap for an official asset if
+ * one is provided. */
+export function CopilotLogo({ className = "h-8 w-8" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3v3" />
+      <rect x="3" y="9" width="18" height="10" rx="4" />
+      <path d="M3 14h18" />
+      <circle cx="8.5" cy="14" r="1.5" />
+      <circle cx="15.5" cy="14" r="1.5" />
+    </svg>
+  );
+}
+
 /** Phase 34 (049): generic "Direct API / SDK" tile — terminal/code glyph. */
 export function ApiLogo({ className = "h-8 w-8" }: { className?: string }) {
   return (

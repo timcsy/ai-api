@@ -280,10 +280,17 @@ async def proxy_responses(
             response_id=prev_id, allocation_id=allocation.id, provider=provider
         )
         if owned == "not_found":
-            return await reject("response_not_found", "previous response not found or expired", 404)
+            return await reject(
+                "response_not_found",
+                "previous response not found or expired — 此對話已過期或不存在，請開新對話",
+                404,
+            )
         if owned == "forbidden":
             return await reject(
-                "response_forbidden", "previous response does not belong to this allocation", 403
+                "response_forbidden",
+                "previous response does not belong to this allocation — "
+                "此對話屬於另一個分配（你切換了 model），請開新對話",
+                403,
             )
         passthrough["previous_response_id"] = owned
 

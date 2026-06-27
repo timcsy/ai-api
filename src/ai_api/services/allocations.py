@@ -380,6 +380,25 @@ class AllocationService:
         )
         return list((await self._s.execute(stmt)).scalars().all())
 
+    async def list_active_scope_allocations(
+        self, credential: Credential
+    ) -> Sequence[Allocation]:
+        """Phase 36 (spec 050): the ACTIVE allocations in this key's scope, sorted
+        by resource_model. Powers OpenAI-compatible `GET /v1/models` — a model is
+        discoverable iff the key is scoped to an active allocation for it (the grant
+        itself is the authorization; paused/revoked/quarantined are excluded so we
+        never list "shows up but can't call")."""
+        stmt = (
+            select(Allocation)
+            .join(CredentialAllocation, CredentialAllocation.allocation_id == Allocation.id)
+            .where(
+                CredentialAllocation.credential_id == credential.id,
+                Allocation.status == AllocationStatus.active,
+            )
+            .order_by(Allocation.resource_model)
+        )
+        return list((await self._s.execute(stmt)).scalars().all())
+
     async def lookup_by_token(self, plaintext: str) -> Allocation | None:
         """Back-compat / display: resolve a token to a representative allocation in
         its scope (the first one). Proxy uses the model-aware pair above instead."""

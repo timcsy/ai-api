@@ -92,6 +92,9 @@ async def test_continue_other_allocation_forbidden(
     )
     assert r.status_code == 403
     assert r.json()["error"]["code"] == "response_forbidden"
+    # Phase 36 (US3): the message must be actionable — tell the user to start a
+    # new conversation (fail loud, don't silently degrade).
+    assert "開新對話" in r.json()["error"]["message"]
 
 
 @pytest.mark.asyncio
@@ -106,3 +109,5 @@ async def test_continue_unknown_not_found(
     )
     assert r.status_code == 404
     assert r.json()["error"]["code"] == "response_not_found"
+    # Phase 36 (US3): actionable message — expired/unknown → start a new conversation.
+    assert "開新對話" in r.json()["error"]["message"]
