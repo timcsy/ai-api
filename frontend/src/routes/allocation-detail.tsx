@@ -172,6 +172,9 @@ export function AllocationDetailPage() {
       <AllocationKeysReadonly allocationId={id} />
 
       <ApiUsageExample model={alloc?.resource_model ?? ""} supportsResponses={supportsResponses} />
+      <p className="text-sm text-muted-foreground">
+        想接 Codex 等工具？<Link to="/apps" className="underline underline-offset-4">看應用 →</Link>
+      </p>
 
       <Card>
         <CardHeader>

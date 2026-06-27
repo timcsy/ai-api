@@ -76,6 +76,16 @@ export function MemberOverview() {
         </section>
       )}
 
+      {/* Phase 34 (049): once you have a key, point to "how to call". */}
+      {!hasNoKey && (
+        <Alert>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            <span>有金鑰了？每把金鑰都有「如何使用」——選個模型就有可複製範例。</span>
+            <Link to="/keys" className="font-medium underline underline-offset-4">怎麼開始呼叫 →</Link>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Link to="/keys" className="block">
           <Card className="hover:bg-accent transition-colors cursor-pointer h-full">

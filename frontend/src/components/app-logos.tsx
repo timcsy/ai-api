@@ -8,3 +8,15 @@ export function CodexLogo({ className = "h-8 w-8" }: { className?: string }) {
     </svg>
   );
 }
+
+/** Phase 34 (049): generic "Direct API / SDK" tile — terminal/code glyph. */
+export function ApiLogo({ className = "h-8 w-8" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="m6 9 3 3-3 3" />
+      <path d="M13 15h5" />
+    </svg>
+  );
+}
