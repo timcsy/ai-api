@@ -44,6 +44,24 @@ interface Created {
   token_prefix: string;
 }
 
+/** Build the `models` array for VS Code's chatLanguageModels.json, pre-filled with
+ * the key's scoped models. `url` is the BASE (…/v1) — Copilot appends the path per
+ * apiType. id = canonical resource_model (always routable; matches /v1/models). */
+function buildModelsJson(models: string[], apiBase: string): string {
+  return JSON.stringify(
+    models.map((id) => ({
+      id,
+      name: id,
+      url: apiBase,
+      toolCalling: true,
+      maxInputTokens: 128000,
+      maxOutputTokens: 16000,
+    })),
+    null,
+    2,
+  );
+}
+
 /** Phase 36 (spec 050): the GitHub Copilot application detail — point VS Code
  * Copilot at the platform's OpenAI-compatible endpoint, create a scoped key.
  * Copilot lists models (GET /v1/models) and needs Responses-capable models, so
@@ -67,6 +85,7 @@ export function CopilotAppDetail() {
   const [name, setName] = React.useState("Copilot");
   const [pick, setPick] = React.useState<Set<string>>(new Set());
   const [fresh, setFresh] = React.useState<Created | null>(null);
+  const [freshModels, setFreshModels] = React.useState<string[]>([]);
 
   const openCreate = () => {
     setName("Copilot");
@@ -83,6 +102,7 @@ export function CopilotAppDetail() {
     onSuccess: (d) => {
       setCreateOpen(false);
       setFresh(d);
+      setFreshModels(agentAllocs.filter((a) => pick.has(a.id)).map((a) => a.resource_model));
       qc.invalidateQueries({ queryKey: ["me", "credentials"] });
       toast({ title: "已建立 Copilot 金鑰", description: "請立即複製 token，僅顯示一次" });
     },
@@ -254,17 +274,51 @@ export function CopilotAppDetail() {
           <AlertDialogHeader>
             <AlertDialogTitle>金鑰已建立——請立即複製</AlertDialogTitle>
             <AlertDialogDescription>
-              這個 token 僅顯示一次。複製後貼進 Copilot 的 API key 設定。
+              token 僅顯示一次。下面也幫你把 Copilot 的模型設定填好了。
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <code className="block break-all rounded bg-muted p-2 font-mono text-sm">{fresh?.token}</code>
+          <div className="space-y-3">
+            <div>
+              <div className="mb-1 text-xs font-medium">① API Key（貼進 Custom Endpoint 的 API Key 欄）</div>
+              <code className="block break-all rounded bg-muted p-2 font-mono text-sm">{fresh?.token}</code>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-1"
+                onClick={() => fresh && copyToClipboard(fresh.token).then(() => toast({ title: "已複製 token" }))}
+              >
+                複製 token
+              </Button>
+            </div>
+            {freshModels.length > 0 && (
+              <div>
+                <div className="mb-1 text-xs font-medium">
+                  ② <code className="text-xs">chatLanguageModels.json</code> 的 <code className="text-xs">models</code>
+                  （已填好你的 {freshModels.length} 個模型）
+                </div>
+                <pre className="max-h-48 overflow-auto rounded bg-muted p-2 text-xs leading-relaxed">
+                  {buildModelsJson(freshModels, apiBase)}
+                </pre>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-1"
+                  onClick={() =>
+                    copyToClipboard(buildModelsJson(freshModels, apiBase)).then(() =>
+                      toast({ title: "已複製 models 設定" }),
+                    )
+                  }
+                >
+                  複製 models 設定
+                </Button>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  在 wizard 建好 Custom Endpoint 後，把它的 <code className="text-xs">models</code> 換成這段——
+                  你全部的模型就會出現在 Chat 的模型選單，用選的即可。
+                </p>
+              </div>
+            )}
+          </div>
           <AlertDialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => fresh && copyToClipboard(fresh.token).then(() => toast({ title: "已複製" }))}
-            >
-              複製 token
-            </Button>
             <AlertDialogAction onClick={() => setFresh(null)}>完成</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -78,5 +79,39 @@ describe("應用商店 — GitHub Copilot (Phase 36 / spec 050)", () => {
     setupDetail([AGENT]);
     await waitFor(() => expect(screen.getByRole("heading", { name: "GitHub Copilot" })).toBeInTheDocument());
     expect(screen.getByText(/跨 model 切換.*開新對話|開新對話/)).toBeInTheDocument();
+  });
+
+  it("after creating a key, offers a pre-filled models config (base url, scoped id)", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = typeof input === "string" ? input : (input as Request).url;
+      if (url.endsWith("/me")) return jsonResponse(200, { id: "m", email: "u@x.com", provider: "local_password" });
+      if (url.endsWith("/me/allocations")) return jsonResponse(200, [AGENT]);
+      if (url.endsWith("/me/credentials") && init?.method === "POST")
+        return jsonResponse(201, { id: "c1", name: "Copilot", token: "aiapi_tok", token_prefix: "aiapi_tok" });
+      if (url.endsWith("/me/credentials")) return jsonResponse(200, []);
+      return jsonResponse(404, { error: {} });
+    });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={["/apps/copilot"]}>
+          <AuthProvider queryClient={qc}>
+            <Routes>
+              <Route path="/apps/:appId" element={<AppDetailPage />} />
+            </Routes>
+          </AuthProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getByText("為 Copilot 建金鑰")).toBeInTheDocument());
+    await user.click(screen.getByText("為 Copilot 建金鑰"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "建立" })).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "建立" }));
+    // Reveal dialog offers the pre-filled models config.
+    await waitFor(() => expect(screen.getByText("複製 models 設定")).toBeInTheDocument());
+    const pre = screen.getByText(/"id": "azure\/agent"/); // generated config (scoped model id)
+    expect(pre.textContent).toContain("/v1"); // base url, not a full endpoint
+    expect(pre.textContent).not.toContain("/chat/completions");
   });
 });
