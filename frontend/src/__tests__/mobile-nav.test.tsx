@@ -83,6 +83,21 @@ describe("mobile navigation (Phase 16 US1)", () => {
     expect(drawer.getByRole("button", { name: "登出" })).toBeInTheDocument();
   });
 
+  it("drawer lists member destinations in the Phase 37 order (應用 second, 金鑰 last)", async () => {
+    setViewport(375);
+    renderShell(false); // non-admin member
+    await waitFor(() => expect(screen.getByTestId("dash")).toBeInTheDocument());
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /選單/ }));
+    const drawer = within(await screen.findByRole("dialog"));
+    const member = ["我的儀表板", "應用", "模型目錄", "分配", "用量", "金鑰"];
+    const order = drawer
+      .getAllByRole("link")
+      .map((a) => a.textContent)
+      .filter((t) => member.includes(t ?? ""));
+    expect(order).toEqual(member); // same order as desktop (shared MAIN_NAV)
+  });
+
   it("on desktop shows no hamburger and keeps the inline nav", async () => {
     setViewport(1280);
     renderShell(true);

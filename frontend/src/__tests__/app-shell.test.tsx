@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -47,6 +47,19 @@ describe("<AppShell />", () => {
     renderShell("/dashboard");
     await waitFor(() => expect(screen.getByTestId("dash")).toBeInTheDocument());
     expect(screen.getByTestId("member-email")).toHaveTextContent("alice@x.com");
+  });
+
+  it("orders member nav as 儀表板 → 應用 → 模型目錄 → 分配 → 用量 → 金鑰 (Phase 37)", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse(200, { id: "m1", email: "alice@x.com" }), // non-admin member
+    );
+    renderShell("/dashboard");
+    await waitFor(() => expect(screen.getByTestId("dash")).toBeInTheDocument());
+    const nav = screen.getByRole("navigation");
+    const labels = within(nav)
+      .getAllByRole("link")
+      .map((a) => a.textContent);
+    expect(labels).toEqual(["我的儀表板", "應用", "模型目錄", "分配", "用量", "金鑰"]);
   });
 
   it("nav links route between Dashboard and Catalog", async () => {
