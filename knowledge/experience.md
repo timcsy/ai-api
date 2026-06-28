@@ -537,13 +537,13 @@
 - **教訓**：凡「刪一個東西要連帶處理子資料」的邏輯，**在服務層顯式寫出每一步**，別把正確性託付給 DB 的 ondelete——只要測試 DB 與生產 DB 的 FK 強制行為不同（SQLite 預設關、Postgres 開），靠 DB cascade 就會 dev/prod drift 且測試測不出來。顯式做＝可攜、可測、可在每步插稽核。需要驗 DB 端真實行為時，補一支 Postgres integration 測試。
 - **來源**：`src/ai_api/services/members.py` `delete`；`tests/integration/test_member_safe_delete.py`；階段 30
 
-### 本機 lint 範圍要對齊 CI——CI 跑 `ruff check .`（含 tests/），別只檢 src
+### 本機品質關卡要逐字對齊 CI——`ruff check .`（含 tests/）**與** `uv run mypy src/ai_api`，別只檢 src 也別漏 mypy
 
-- **理論說**：實作前 `ruff check src/ai_api` 綠就代表 lint 過了。
-- **實際發生**：階段 29② 本機只檢 `src/ai_api`，但 CI 的 `test` job 跑 **`ruff check .`**（整個 repo，含 `tests/`）。測試檔註解裡一個 `×`（乘號）被 `RUF003 ambiguous-char` 擋下，CI `test` 在 22 秒就紅（lint 在跑測試前），白等一輪。
-- **解決方式**：推之前跑 **`ruff check .`**（與 CI 同範圍），不要只檢 src。註解/字串用 ASCII（`x` 不用 `×`、`->` 不用箭頭）。
-- **教訓**：本機品質關卡的**範圍與指令要逐字對齊 CI**——CI 檢 `.`，你也檢 `.`；CI 檢 tests，你也檢 tests。範圍不一致時「本機綠」是假綠，最快的失敗（lint）反而最容易因範圍漏掉而浪費一輪 CI。
-- **來源**：CI `.github/workflows/ci.yml` 的 `ruff check .`；階段 29②（PR #77 第一輪紅）
+- **理論說**：實作前 `ruff check src/ai_api` 綠（或只跑 pytest）就代表品質關卡過了。
+- **實際發生**：兩次同根：① 階段 29② 本機只檢 `src/ai_api`，但 CI `test` job 跑 **`ruff check .`**（整個 repo、含 `tests/`），測試檔註解一個 `×`（乘號）被 `RUF003` 擋下，CI 22 秒就紅、白等一輪。② **階段 36**（`/v1/models`）本機跑了 ruff + pytest 全綠就推，但 CI 還跑 **`uv run mypy src/ai_api`**——`proxy/models.py` 三個型別錯〔函式缺回傳註解、`exc.detail["error"]` 的 `# type: ignore[index]` 只蓋第一層索引、`d` 落成 `str` 再爆〕又吃一輪紅。
+- **解決方式**：推之前把 CI `test` job 的**所有指令逐字跑一遍**——至少 `ruff check .`（與 CI 同範圍）**＋** `uv run mypy src/ai_api`（＋ pytest）。註解/字串用 ASCII；型別錯就地修。
+- **教訓**：本機品質關卡的**範圍與指令要逐字對齊 CI**——不只 lint 的「路徑範圍」（`.` vs `src`），還有「**有哪些關卡**」（ruff／mypy／pytest 缺一不可）。漏掉任一個，「本機綠」都是假綠，最快的失敗（lint/型別）反而最容易因沒跑而浪費一整輪 CI（image 仍會 build，但 `test` 紅）。做法：照 `.github/workflows/ci.yml` 的 `test` job 列一份本機 pre-push 清單，逐條跑。
+- **來源**：CI `.github/workflows/ci.yml` 的 `ruff check .` + `uv run mypy src/ai_api`；階段 29②（PR #77）、階段 36（PR #93 第一輪 mypy 紅）
 
 ### 真實牌價會推翻「憑種類想當然」的計費假設——`inspect` litellm model_cost 再定 spec
 
@@ -624,3 +624,11 @@
 - **解決方式（抉擇）**：**維持明確吐錯，不做靜默降級**。根因：server-state 把「記憶」外包給伺服器、客戶端沒留 transcript，所以降級**救不回 context**——結果是「使用者以為續接、model 卻失憶」的**靜默錯誤**，比一個可操作的明確錯誤更糟。明確錯誤讓邊界可見：使用者知道「換 model／過期 ＝ 開新對話」。對策是把**錯誤訊息做得可操作**（講清楚「請開新對話」），而非把錯誤藏起來。
 - **教訓**：當一個「續接／還原／沿用既有狀態」的請求**無法被忠實履行**時，**寧可明確拒絕（fail loud）也不要靜默降級到一個「看起來成功、實際丟了東西」的狀態**。判準：降級後是否**無聲損失**使用者預期的資料／脈絡？是 → 該吐錯（呼應「靜默假成功是最惡失敗模式」recipe-table 假通過、原則 2 可追蹤性：跨分配不串味）。延伸架構觀：**伺服器端對話狀態是便利選項、有固有取捨**；可攜的正道是 **stateless**（客戶端持有並重播 context，如 Codex `store=false`、OpenRouter、Chat Completions）——順 UX 來自「客戶端自己記」，非伺服器。故我們對外**鼓勵 stateless**，server-state（store=true）支援但定位為便利選項，並老實標明「伺服器端對話記憶是 per-分配的，跨 model 帶脈絡得靠客戶端重播」。
 - **來源**：`src/ai_api/proxy/responses.py` `resolve_for_continuation`（`response_not_found`／`response_forbidden`，維持拒絕）；GitHub Copilot `apiType=responses` 同金鑰跨分配切換實測（2026-06-27，chat 討論）；延伸自「能不能測 ⟺ 有沒有 recipe（靜默假成功）」與原則 2 可追蹤性。
+
+### 寫給「第三方客戶端」的設定說明，要真機跑一次才算數——文件慣例會騙人
+
+- **理論說**：要在 UI 卡片教使用者怎麼把某客戶端（GitHub Copilot、Continue…）指向本平台，照官方文件把欄位寫上去就好。
+- **實際發生**（階段 36 Copilot 卡）：照 VS Code 官方文件寫「`url` 填模型的完整端點」，於是卡片教使用者填 `…/v1/chat/completions`。維護者真機一跑，**正確的是 `url` 只填 base `…/v1`**——Copilot 自己會依 `apiType`（`responses`/chat completions）把路徑接上去；填完整端點反而錯。連 config 的**結構**（頂層 provider 陣列 + 巢狀 `models`、`apiKey` 走 VS Code secret 參照）都跟臆想不同。文件對「url 是 base 還是完整端點」這種細節常含糊或過時。
+- **解決方式**：把客戶端設定說明當成「**未驗證直到真機跑過**」——拿真帳號/真金鑰在該客戶端實際接一次、列模型 + 對話成功，再把**那份可用的設定**原樣搬進卡片（標「已在真機驗證」）。卡片只放驗證過的形狀；不確定的欄位寧可交給該客戶端的 wizard，不要自己臆測一個值寫死。
+- **教訓**：呼應「採上游 WS 協定前用真憑證探測」「採用 SDK 前先印一次真實回傳值」——但對象是**我們寫給使用者的對外設定文案**：第三方客戶端的設定細節（base vs 完整端點、欄位名、config 結構）以**真機行為**為準，不以官方文件字面為準。判準：「這份設定我親手在該客戶端跑通過嗎？」沒有 → 標「待驗證」、別當成已驗證的步驟發出去（否則使用者照做卻處處紅字，正是階段 34 排除 Copilot 卡的原始顧慮）。附帶：能用「**幫使用者把設定產生好**」（如 Copilot 卡一鍵帶出 `models` 陣列）就別叫他手打——少一個出錯點。
+- **來源**：`frontend/src/components/copilot-app-detail.tsx`（真機驗證後改 base `url` + provider 陣列結構 + 一鍵複製 `models`）；GitHub Copilot Custom Endpoint 真機（2026-06-28，維護者 VS Code 實測 `chatLanguageModels.json`）；rev 99→101。
