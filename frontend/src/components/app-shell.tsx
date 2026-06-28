@@ -43,12 +43,14 @@ const ADMIN_SUBNAV = [
 ];
 
 const MAIN_NAV = [
+  // Phase 37: 凸顯「應用」——把面向「真的用起來」的入口提到第二位、金鑰降到最後
+  // （但不隱藏）。路由/標籤逐項不變，只改順序；桌機與手機 Sheet 皆 map 此單一來源。
   { to: "/dashboard", label: "我的儀表板", adminOnly: false },
-  { to: "/keys", label: "金鑰", adminOnly: false },
+  { to: "/apps", label: "應用", adminOnly: false },
+  { to: "/catalog", label: "模型目錄", adminOnly: false },
   { to: "/allocations", label: "分配", adminOnly: false },
   { to: "/usage", label: "用量", adminOnly: false },
-  { to: "/catalog", label: "模型目錄", adminOnly: false },
-  { to: "/apps", label: "應用", adminOnly: false },
+  { to: "/keys", label: "金鑰", adminOnly: false },
   { to: "/admin", label: "管理員", adminOnly: true },
 ];
 
