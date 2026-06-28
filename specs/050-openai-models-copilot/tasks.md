@@ -111,7 +111,7 @@ Web app：後端 `src/ai_api/`、`tests/`；前端 `frontend/src/`。
 ## Phase 6: Polish & Cross-Cutting（收尾與上線驗收）
 
 - [X] T019 跑全套件零回歸：`pytest tests/ -q`（contract + integration + unit）+ `ruff check .`；`cd frontend && npx tsc --noEmit && npm run build && npx vitest run`
-- [ ] T020 PR + squash-merge 到 main（CI 全綠：test / frontend / build-and-push / build-and-push-frontend），依維護者偏好前後端一起部署到同一新 sha（helm `--reuse-values` + `--set storedResponseCleanup.enabled=true --set storedResponseCleanup.schedule="0 3 * * *"`，**無 migration 故不設 migrationJob**）
+- [X] T020 PR + squash-merge 到 main（CI 全綠：test / frontend / build-and-push / build-and-push-frontend），依維護者偏好前後端一起部署到同一新 sha（helm `--reuse-values` + `--set storedResponseCleanup.enabled=true --set storedResponseCleanup.schedule="0 3 * * *"`，**無 migration 故不設 migrationJob**）
 - [ ] T021 **部署後真機驗收（SC-004，人工）**：依 `quickstart.md` §3——VS Code GitHub Copilot 指向本平台，確認「列模型 → 一次對話」端到端成功（非只 401 煙霧）；§4 帶真金鑰 curl `/v1/models` 回非空 list 且 id 可 chat。若揭露阻斷性限制 → 卡誠實標限制 / 延後（FR-010）
 - [ ] T022 知識同步（經使用者確認後）：`knowledge/vision.md` 將階段 36 標為 ✅ 上線（rev 待定）+ 現狀/狀態同步；若真機揭露新坑，蒸餾一條進 `knowledge/experience.md`（呼應「新端點帶真憑證真打才算驗過」）
 

@@ -117,30 +117,81 @@ export function CopilotAppDetail() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">在 VS Code 設定 GitHub Copilot</CardTitle>
+          <CardTitle className="text-base">在 VS Code 設定 GitHub Copilot（自訂模型 / BYOK）</CardTitle>
           <CardDescription>
-            Copilot 支援自訂 OpenAI 相容模型；把端點指向本平台、填入金鑰即可。
+            VS Code 1.122+ 的 Copilot Chat 可加入「自訂 OpenAI 相容模型」；設定一次，模型就會出現在
+            Chat 的模型選單。設定步驟如下（依官方文件；不同版本標籤可能略有差異）。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <ol className="list-decimal space-y-2 pl-5">
             <li>
-              在 Copilot 的「自訂模型 / OpenAI 相容」設定，API base URL 填{" "}
-              <code className="break-all rounded bg-muted px-1 text-xs">{apiBase}</code>
+              先在上方「接上你的金鑰」建立一把金鑰，拿到 token（<strong>只顯示一次</strong>，請先複製）。
             </li>
             <li>
-              API key 填你上面建立的金鑰 token（<code className="text-xs">$TOKEN</code>）
+              VS Code 開命令面板（<code className="text-xs">⌘/Ctrl + Shift + P</code>）→ 執行{" "}
+              <strong>Chat: Manage Language Models</strong>（管理語言模型）。
             </li>
             <li>
-              model 填模型 id——就是 <code className="break-all rounded bg-muted px-1 text-xs">{apiBase}/models</code>{" "}
-              列出的某個 id（例如 <code className="text-xs">azure/gpt-5.4</code>）；別留空，否則會被擋下「模型不在範圍」
+              供應商選 <strong>Custom Endpoint</strong>（自訂端點）。
+              <span className="text-muted-foreground">（較舊版 Copilot 可能顯示為「OpenAI Compatible」，欄位類似。）</span>
+            </li>
+            <li>
+              依提示填：
+              <ul className="mt-1 list-disc space-y-1 pl-5">
+                <li><strong>Group / Display Name</strong>：隨意命名（選單顯示用，例如 <code className="text-xs">CCSH</code>）。</li>
+                <li><strong>API Key</strong>：貼上步驟 1 的金鑰 token。</li>
+                <li><strong>API Type</strong>：選 <strong>Chat Completions</strong>（無狀態、最省事，建議）。</li>
+              </ul>
+            </li>
+            <li>
+              VS Code 接著開 <code className="text-xs">chatLanguageModels.json</code>，把該模型補成下面這樣
+              （<code className="text-xs">id</code> 換成 <code className="break-all text-xs">{apiBase}/models</code> 列出的某個 id）：
             </li>
           </ol>
-          <div className="rounded-md border border-muted bg-muted/40 p-3 text-xs text-muted-foreground">
-            <strong className="font-medium text-foreground">小提醒：</strong>
-            伺服器端的對話記憶是「每個分配各自獨立」的。若你在同一把金鑰下
-            <strong>跨 model 切換</strong>（＝切換分配）或對話過期，舊對話會接不上、平台會明確請你
-            <strong>開新對話</strong>（而不是無聲地丟掉脈絡）——這是刻意的，避免「以為續接、其實失憶」。
+          <pre className="overflow-x-auto rounded bg-muted p-3 text-xs leading-relaxed">{`{
+  "id": "azure/gpt-5.4",
+  "url": "${apiBase}/chat/completions",
+  "toolCalling": true,
+  "maxInputTokens": 128000,
+  "maxOutputTokens": 16000
+}`}</pre>
+          <p className="text-xs text-muted-foreground">
+            <code className="text-xs">url</code> 依 <strong>API Type</strong> 決定端點：Chat Completions →{" "}
+            <code className="break-all text-xs">{apiBase}/chat/completions</code>；Responses →{" "}
+            <code className="break-all text-xs">{apiBase}/responses</code>。
+          </p>
+          <ol className="list-decimal space-y-2 pl-5" start={6}>
+            <li>存檔 → 回到 Chat，模型選單就會出現你的模型，選它即可開始對話。</li>
+          </ol>
+
+          <ul className="space-y-1 rounded-md border border-muted bg-muted/40 p-3 text-xs text-muted-foreground">
+            <li>
+              <strong className="text-foreground">模型 id（必填）</strong>：用你在「<strong>分配</strong>」頁看到的模型名稱
+              （例如 <code className="text-xs">azure/gpt-5.4</code>）——建金鑰時的清單也會列出。前綴可省略：
+              無歧義時直接寫 <code className="text-xs">gpt-5.4</code> 也會自動對應到該分配（<code className="break-all text-xs">{apiBase}/models</code>{" "}
+              則一律回完整名稱，照抄最保險）。填錯或留空才會被擋下「模型不在範圍」。
+            </li>
+            <li>
+              <strong className="text-foreground">想用 Responses API</strong>（伺服器端對話狀態 <code className="text-xs">store</code>）？
+              API Type 改選 <strong>Responses</strong>、<code className="text-xs">url</code> 改{" "}
+              <code className="break-all text-xs">{apiBase}/responses</code>——但有下方的「跨分配對話」限制，一般用 Chat Completions 即可。
+            </li>
+            <li>
+              <strong className="text-foreground">toolCalling</strong>：要讓模型在 agent 模式可選，需 <code className="text-xs">true</code>
+              （本平台 Agent 相容模型支援工具呼叫）。
+            </li>
+            <li>
+              BYOK 只作用在 <strong className="text-foreground">Chat</strong>（不含行內補全 inline completions）；用量計入你在本平台的分配額度。
+            </li>
+          </ul>
+
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs">
+            <strong className="font-medium">跨分配對話的限制：</strong>
+            伺服器端對話記憶（Responses 的 <code className="text-xs">store</code>）是「<strong>每個分配各自獨立</strong>」的。
+            若你在同一把金鑰下<strong>跨 model 切換</strong>（＝切換分配）或對話過期，舊對話會接不上，平台會明確請你
+            <strong>開新對話</strong>（而非無聲丟掉脈絡）——這是刻意的，避免「以為續接、其實失憶」。
+            用 <strong>Chat Completions</strong>（無狀態、由客戶端帶 context）則沒有這個問題。
           </div>
         </CardContent>
       </Card>
