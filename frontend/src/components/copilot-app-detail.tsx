@@ -120,7 +120,7 @@ export function CopilotAppDetail() {
           <CardTitle className="text-base">在 VS Code 設定 GitHub Copilot（自訂模型 / BYOK）</CardTitle>
           <CardDescription>
             VS Code 1.122+ 的 Copilot Chat 可加入「自訂 OpenAI 相容模型」；設定一次，模型就會出現在
-            Chat 的模型選單。設定步驟如下（依官方文件；不同版本標籤可能略有差異）。
+            Chat 的模型選單。以下為**已在真機驗證**的設定（不同版本標籤可能略有差異）。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
@@ -137,29 +137,38 @@ export function CopilotAppDetail() {
               <span className="text-muted-foreground">（較舊版 Copilot 可能顯示為「OpenAI Compatible」，欄位類似。）</span>
             </li>
             <li>
-              依提示填：
-              <ul className="mt-1 list-disc space-y-1 pl-5">
-                <li><strong>Group / Display Name</strong>：隨意命名（選單顯示用，例如 <code className="text-xs">CCSH</code>）。</li>
-                <li><strong>API Key</strong>：貼上步驟 1 的金鑰 token。</li>
-                <li><strong>API Type</strong>：選 <strong>Chat Completions</strong>（無狀態、最省事，建議）。</li>
-              </ul>
+              依提示填 <strong>Name</strong>（隨意）、<strong>API Key</strong>（貼上步驟 1 的金鑰；VS Code 會存成 secret、不寫明文進檔）、
+              <strong>API Type</strong> 選 <strong>Responses</strong>（實測可用）。
             </li>
             <li>
-              VS Code 接著開 <code className="text-xs">chatLanguageModels.json</code>，把該模型補成下面這樣
-              （<code className="text-xs">id</code> 換成 <code className="break-all text-xs">{apiBase}/models</code> 列出的某個 id）：
+              VS Code 接著開 <code className="text-xs">chatLanguageModels.json</code>——外層 provider 它已建好，
+              你在 <code className="text-xs">models</code> 陣列加入要用的模型。<strong>實測可用的範例</strong>：
             </li>
           </ol>
-          <pre className="overflow-x-auto rounded bg-muted p-3 text-xs leading-relaxed">{`{
-  "id": "azure/gpt-5.4",
-  "url": "${apiBase}/chat/completions",
-  "toolCalling": true,
-  "maxInputTokens": 128000,
-  "maxOutputTokens": 16000
-}`}</pre>
-          <p className="text-xs text-muted-foreground">
-            <code className="text-xs">url</code> 依 <strong>API Type</strong> 決定端點：Chat Completions →{" "}
-            <code className="break-all text-xs">{apiBase}/chat/completions</code>；Responses →{" "}
-            <code className="break-all text-xs">{apiBase}/responses</code>。
+          <pre className="overflow-x-auto rounded bg-muted p-3 text-xs leading-relaxed">{`[
+  {
+    "name": "Custom Endpoint",
+    "vendor": "customendpoint",
+    "apiKey": "\${input:chat.lm.secret.xxxx}",
+    "apiType": "responses",
+    "models": [
+      {
+        "id": "gpt-5.4",
+        "name": "gpt-5.4",
+        "url": "${apiBase}",
+        "toolCalling": true,
+        "vision": true,
+        "maxInputTokens": 128000,
+        "maxOutputTokens": 16000
+      }
+    ]
+  }
+]`}</pre>
+          <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs">
+            <strong>最容易填錯的地方</strong>：<code className="text-xs">url</code> 只填到 base{" "}
+            <code className="break-all text-xs">{apiBase}</code>（到 <code className="text-xs">/v1</code> 為止），
+            <strong>不要</strong>自己接 <code className="text-xs">/chat/completions</code> 或 <code className="text-xs">/responses</code>——
+            Copilot 會依 <code className="text-xs">apiType</code> 自動接（<code className="text-xs">responses</code> → <code className="text-xs">/v1/responses</code>）。
           </p>
           <ol className="list-decimal space-y-2 pl-5" start={6}>
             <li>存檔 → 回到 Chat，模型選單就會出現你的模型，選它即可開始對話。</li>
@@ -167,19 +176,17 @@ export function CopilotAppDetail() {
 
           <ul className="space-y-1 rounded-md border border-muted bg-muted/40 p-3 text-xs text-muted-foreground">
             <li>
-              <strong className="text-foreground">模型 id（必填）</strong>：用你在「<strong>分配</strong>」頁看到的模型名稱
-              （例如 <code className="text-xs">azure/gpt-5.4</code>）——建金鑰時的清單也會列出。前綴可省略：
-              無歧義時直接寫 <code className="text-xs">gpt-5.4</code> 也會自動對應到該分配（<code className="break-all text-xs">{apiBase}/models</code>{" "}
-              則一律回完整名稱，照抄最保險）。填錯或留空才會被擋下「模型不在範圍」。
+              <strong className="text-foreground">模型 id</strong>：用你在「<strong>分配</strong>」頁看到的模型名稱
+              （建金鑰時的清單也會列出）。前綴可省略——無歧義時直接寫 <code className="text-xs">gpt-5.4</code> 即可（如上例），
+              寫完整 <code className="text-xs">azure/gpt-5.4</code> 也行；填錯或留空才會被擋「模型不在範圍」。
             </li>
             <li>
-              <strong className="text-foreground">想用 Responses API</strong>（伺服器端對話狀態 <code className="text-xs">store</code>）？
-              API Type 改選 <strong>Responses</strong>、<code className="text-xs">url</code> 改{" "}
-              <code className="break-all text-xs">{apiBase}/responses</code>——但有下方的「跨分配對話」限制，一般用 Chat Completions 即可。
+              <strong className="text-foreground">apiType</strong>：<code className="text-xs">responses</code> 實測可用（本平台高保真路徑）；
+              也可在 wizard 改選 <strong>Chat Completions</strong>（無狀態、無下方限制）。url 一律填 base、端點由 apiType 決定。
             </li>
             <li>
-              <strong className="text-foreground">toolCalling</strong>：要讓模型在 agent 模式可選，需 <code className="text-xs">true</code>
-              （本平台 Agent 相容模型支援工具呼叫）。
+              每個模型 <code className="text-xs">toolCalling: true</code> 才能在 agent 模式選；
+              <code className="text-xs">vision</code> 依該模型是否支援圖片輸入。
             </li>
             <li>
               BYOK 只作用在 <strong className="text-foreground">Chat</strong>（不含行內補全 inline completions）；用量計入你在本平台的分配額度。
@@ -187,11 +194,11 @@ export function CopilotAppDetail() {
           </ul>
 
           <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs">
-            <strong className="font-medium">跨分配對話的限制：</strong>
-            伺服器端對話記憶（Responses 的 <code className="text-xs">store</code>）是「<strong>每個分配各自獨立</strong>」的。
-            若你在同一把金鑰下<strong>跨 model 切換</strong>（＝切換分配）或對話過期，舊對話會接不上，平台會明確請你
-            <strong>開新對話</strong>（而非無聲丟掉脈絡）——這是刻意的，避免「以為續接、其實失憶」。
-            用 <strong>Chat Completions</strong>（無狀態、由客戶端帶 context）則沒有這個問題。
+            <strong className="font-medium">跨分配對話的限制（用 Responses 時）：</strong>
+            伺服器端對話記憶（<code className="text-xs">store</code>）是「<strong>每個分配各自獨立</strong>」的。
+            若你設了多個模型、在同一把金鑰下<strong>跨 model 切換</strong>（＝切換分配）或對話過期，舊對話會接不上，
+            平台會明確請你 <strong>開新對話</strong>（而非無聲丟掉脈絡）——避免「以為續接、其實失憶」。
+            把 API Type 設 <strong>Chat Completions</strong>（無狀態）則沒有這個問題。
           </div>
         </CardContent>
       </Card>
