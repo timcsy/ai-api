@@ -24,7 +24,8 @@ describe("<CodexInstallCard />", () => {
       screen.getByText("irm https://ai.example.com/install/codex.ps1 | iex"),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "複製" }));
+    // Two "複製" buttons now (install + restore-in-details); the install one is first.
+    await user.click(screen.getAllByRole("button", { name: "複製" })[0]!);
     expect(copyToClipboard).toHaveBeenCalledWith(
       "irm https://ai.example.com/install/codex.ps1 | iex",
     );
