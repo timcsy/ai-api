@@ -640,3 +640,11 @@
 - **解決方式**：(a) **動任何共用設定檔前先帶時間戳備份**（`*.bak-<ts>`，cp 失敗就 fail-loud 中止、不在沒備份下改檔），並提供**對稱的一鍵還原**把最近備份放回去（還原前也先存 `*.prerestore-<ts>`）；(b) config.toml 改**整檔覆寫成已知乾淨狀態**（blind 下繞過所有未知殘留，備份保可逆），而非 merge 保留；(c) 登入用**工具自身 CLI 重設**（`codex logout` 再 `codex login`），**別手寫它的 auth 檔格式**（跨版本會爛）；(d) 長駐 GUI（桌面版）共用同一份設定 → 腳本/卡**提醒先完全關閉**（含 Windows 工作列／系統匣常駐），`curl|sh` 無法中途暫停只能提醒。
 - **教訓**：腳本去改「使用者本機、且可能被別的程式共用」的設定檔時——**備份是前置動作不是事後**（且要可一鍵還原）；blind 修復「未知殘留」用**重設到已知乾淨狀態 + 備份可逆**比「聰明地保留」穩；登入/憑證類**用該工具的 CLI 重設、別硬編檔案格式**（呼應「別硬編外部工具格式、用它的 CLI」）；**長駐 GUI 會與你的寫入競爭**，至少要提醒關閉（能偵測更好，但行程名跨版本脆弱、提醒先行）。判準：「這個設定檔有沒有可能被別的程式（GUI/另一個 session）同時握著或回寫？」有 → 備份 + 提醒關閉。
 - **來源**：`src/ai_api/install/codex.{sh,ps1}.tmpl`（logout、整檔覆寫、備份、桌面版提醒）、`codex-restore.{sh,ps1}.tmpl`（一鍵還原）、`frontend/src/components/codex-install-card.tsx`；spec 052 + 還原 small-change；三平台真機驗收 2026-06-29（rev 103→104）。
+
+### 把設定從 env 搬到 DB（admin 可編輯）：改「所有讀取點」指向單一入口 + 首讀 lazy-seed 保零行為變更
+
+- **理論說**：要讓 admin 在 UI 改某個原本 env/Helm 的設定（如配額池 T／保底），建個 DB 表 + 一個 PUT 端點、讓 UI 寫它就好。
+- **實際發生**（階段 39）：那個設定在後端常被**多處讀取**——T／保底同時被 `apply_rebalance`（執法）與 `GET /quota-pool/status`（顯示）讀。若只把 UI/顯示改讀 DB、漏掉執法那條（仍讀 env），就會「**顯示值 ≠ 實際執法值**」drift（admin 以為改了、rebalance 還用舊 env 值）——正是 body-size／白名單那條教訓的同形。另外冷啟動：DB 剛建表沒有列，若不處理會回 0／壞掉、或與現行 env 值不符（行為突變）。
+- **解決方式**：(a) 建**單一讀取入口** `get_pool_config(db)`（get-or-create），把**所有**讀取點都改成呼叫它（grep 舊的 `settings.pool_*` 確認一個不剩）——DB 成為唯一真理；(b) 入口**首讀 lazy-seed 自現行 env**（無列時用 settings 值建列），讓搬家當下**零行為變更**，env 自此退為 bootstrap 預設；(c) 不保留「env 與 UI 都能改」的雙路（單一真理，原則 5）。
+- **教訓**：搬「會被多處讀」的設定到 DB 時，**先列出所有讀取點（grep 舊來源）再一次全改指向單一入口**——漏一個就是「顯示≠執法」的沉默 drift（呼應「加欄要追到所有讀寫點」「顯示值=執法值不 drift」）。冷啟動用 **lazy-seed 自舊來源**保證搬家零行為變更，比 migration 內寫死預設更穩（migration 不易讀 env、且寫死值可能與現行 env 不符）。前例可抄：階段 13 `notification_config` 單例（`CHECK id=1`）。附帶踩坑：pyproject `per-file-ignores` 同一檔已有一條（`api/quota_pool.py=["N806"]`）時要**合併成 `["N806","RUF001"]`**，再加一行同 key 會 TOML duplicate-key 解析失敗。
+- **來源**：`src/ai_api/services/quota_pool.py` `get_pool_config`（單一入口 + lazy-seed）、`api/quota_pool.py`（PUT + GET 改讀）、`models/pool_config.py`、migration 0021；spec 053、階段 39、rev 105（2026-06-29 真機驗收）。
