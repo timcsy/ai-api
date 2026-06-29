@@ -8,7 +8,28 @@ $BaseUrl  = "__BASE_URL__"
 $CcshBase = "$BaseUrl/v1"
 $CodexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME ".codex" }
 $Config = Join-Path $CodexHome "config.toml"
+$Auth = Join-Path $CodexHome "auth.json"
 New-Item -ItemType Directory -Force -Path $CodexHome | Out-Null
+
+# -- 開始前請注意：先關閉 Codex 桌面版 --------------------------------------
+# 執行中的 Codex 桌面版會握住 ~/.codex、可能蓋掉我們寫的設定（無法中途暫停等
+# 你關閉，只能在這裡提醒）。
+Write-Host "-- 開始前請注意 --"
+Write-Host "若你已安裝 Codex 桌面版，請先「完全關閉」它（含 Windows 工作列／系統匣的常駐圖示）再繼續，"
+Write-Host "否則執行中的桌面版可能蓋掉這次設定。裝好後再重新開啟即可。"
+Write-Host ""
+
+# Back up existing Codex config + auth (timestamped; a re-run never clobbers an
+# earlier backup) BEFORE we modify anything. Fail loud if we can't back up.
+$ts = Get-Date -Format "yyyyMMdd-HHmmss"
+$backedUp = $false
+foreach ($f in @($Config, $Auth)) {
+  if (Test-Path $f) {
+    try { Copy-Item $f "$f.bak-$ts" -Force } catch { Write-Host "ERROR: 無法備份 $f（請確認 $CodexHome 可寫）。已中止，未改任何設定。"; exit 1 }
+    $backedUp = $true
+  }
+}
+if ($backedUp) { Write-Host "已備份你原本的 Codex 設定為 *.bak-$ts（在 $CodexHome）。" }
 
 # ---------------------------------------------------------------------------
 # 1. Install the Codex CLI (standalone binary from GitHub Releases; no Node).
@@ -35,8 +56,10 @@ if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
 if (-not (Get-Command codex -ErrorAction SilentlyContinue)) { $CodexCli = $false }
 
 # ---------------------------------------------------------------------------
-# 2. Write config.toml MERGE-style: only our provider block + default provider.
-#    No read-only config, no wrapper/alias — a /model switch keeps 'ccsh'.
+# 2. Write a CLEAN config.toml for this platform (any prior one was backed up
+#    above). A full reset avoids stale leftovers from a previous login/config
+#    silently breaking the connection. /model switch still keeps 'ccsh'; no
+#    read-only config, no wrapper/alias.
 # ---------------------------------------------------------------------------
 $block = @"
 model_provider = "ccsh"
@@ -48,13 +71,8 @@ wire_api = "responses"
 requires_openai_auth = true
 supports_websockets = false
 "@
-$existing = ""
-if (Test-Path $Config) { $existing = Get-Content -Raw $Config }
-# Drop any prior model_provider line and our [model_providers.ccsh] block.
-$existing = [regex]::Replace($existing, '(?m)^\s*model_provider\s*=.*\r?\n?', '')
-$existing = [regex]::Replace($existing, '(?ms)^\[model_providers\.ccsh\].*?(?=^\[|\Z)', '')
-Set-Content -Path $Config -Value ($block + "`n" + $existing.TrimStart())
-Write-Host "Wrote $Config (provider 'ccsh' -> $CcshBase)"
+Set-Content -Path $Config -Value $block
+Write-Host "Wrote $Config (clean platform config; provider 'ccsh' -> $CcshBase)"
 
 # ---------------------------------------------------------------------------
 # 3. Device-flow: authorize in the browser, no token copy-paste.
@@ -108,6 +126,9 @@ if ($defaultModel) {
 }
 
 if ($CodexCli) {
+  # Clear any prior login (e.g. a ChatGPT account) so our API key wins — a stale
+  # login can otherwise take precedence. Safe no-op if not logged in.
+  try { codex logout 2>$null | Out-Null } catch {}
   $token | codex login --with-api-key | Out-Null
   Write-Host "Verifying connection..."
   try {
@@ -129,3 +150,5 @@ if ($CodexCli) {
   Write-Host "       `$env:KEY='<KEY>'; `$env:KEY | codex login --with-api-key"
   Write-Host "  2) Codex 桌面 App：在 App 設定填入上面的金鑰當 API key（provider 已指向本平台）。"
 }
+
+if ($backedUp) { Write-Host "（要還原舊設定：把 $CodexHome 內的 *.bak-$ts 改回原本檔名即可。）" }
