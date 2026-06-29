@@ -26,6 +26,7 @@ from ai_api.models import (
     AuditEventType,
     CallOutcome,
     CallRecord,
+    PoolConfig,
     RebalanceLog,
 )
 
@@ -168,6 +169,78 @@ class RebalanceOutcome:
     skipped_reason: str | None = None
 
 
+# ---- Phase 39: pool settings live in DB (single source of truth) ----
+
+async def get_pool_config(db: AsyncSession) -> PoolConfig:
+    """The singleton pool config (T + floor). Lazy-seeds from settings (Helm/env)
+    on first access so the move from env→DB is a no-op on first run; thereafter
+    the DB row is the single source of truth (env is bootstrap default only)."""
+    cfg = await db.get(PoolConfig, 1)
+    if cfg is None:
+        settings = get_settings()
+        cfg = PoolConfig(
+            id=1,
+            total_tokens_per_month=settings.pool_total_tokens_per_month,
+            floor_per_allocation=settings.pool_floor_per_allocation,
+            updated_at=datetime.now(UTC),
+            updated_by=None,
+        )
+        db.add(cfg)
+        await db.flush()
+    return cfg
+
+
+async def active_pool_member_count(db: AsyncSession) -> int:
+    """N = active, non-service, non-locked allocations (the rebalanced pool)."""
+    stmt = select(func.count()).where(
+        Allocation.status == AllocationStatus.active,
+        Allocation.is_service_allocation.is_(False),
+        Allocation.quota_locked.is_(False),
+    )
+    return int((await db.execute(stmt)).scalar_one() or 0)
+
+
+async def recent_month_usage(db: AsyncSession, now: datetime | None = None) -> int:
+    """Total success tokens in the previous calendar month (for suggestions/warnings)."""
+    started = datetime.now(UTC) if now is None else now
+    prev_start, this_start = previous_month_range_utc(started)
+    stmt = select(func.coalesce(func.sum(CallRecord.total_tokens), 0)).where(
+        CallRecord.outcome == CallOutcome.success,
+        CallRecord.started_at >= prev_start,
+        CallRecord.started_at < this_start,
+    )
+    return int((await db.execute(stmt)).scalar_one() or 0)
+
+
+@dataclass(frozen=True)
+class PoolSuggestion:
+    recent_month_tokens: int
+    pool_members: int
+    suggested_total: int
+    suggested_floor: int
+
+
+async def suggest_pool_config(db: AsyncSession, now: datetime | None = None) -> PoolSuggestion:
+    """Suggest T/floor from recent usage + member count N: T ≈ 2x recent (growth
+    headroom + a real total ceiling); floor ≈ a usable baseline so an idle member
+    isn't stuck at ~0 until next rebalance — while respecting T ≥ floor x N."""
+    recent = await recent_month_usage(db, now)
+    n = await active_pool_member_count(db)
+    suggested_total = recent * 2
+    # Usable baseline that keeps floorxN ≤ T/2 (leaves ≥half of T for usage-weighted
+    # bonus), min 1000. For ~21M recent / N=53 → floor ≈ 400k.
+    if n > 0 and suggested_total > 0:
+        suggested_floor = max(1000, suggested_total // (2 * n))
+    else:
+        suggested_floor = 1000
+    return PoolSuggestion(
+        recent_month_tokens=recent,
+        pool_members=n,
+        suggested_total=suggested_total,
+        suggested_floor=suggested_floor,
+    )
+
+
 async def apply_rebalance(
     db: AsyncSession, *, trigger: str, now: datetime | None = None
 ) -> RebalanceOutcome:
@@ -177,12 +250,12 @@ async def apply_rebalance(
     write a `rebalance_failed` audit event in a NEW session so the audit
     survives the rollback. Re-raises the exception.
     """
-    settings = get_settings()
-    T = settings.pool_total_tokens_per_month
-    floor = settings.pool_floor_per_allocation
+    cfg = await get_pool_config(db)  # single source of truth (DB; env is bootstrap only)
+    T = cfg.total_tokens_per_month
+    floor = cfg.floor_per_allocation
     if T == 0:
         await _write_failure_audit(db, trigger, AuditEventType.pool_idle, "pool disabled (T=0)")
-        raise PoolDisabledError("pool_total_tokens_per_month is 0; pool disabled")
+        raise PoolDisabledError("pool total is 0; pool disabled")
 
     started_at = datetime.now(UTC) if now is None else now
     prev_start, this_start = previous_month_range_utc(started_at)

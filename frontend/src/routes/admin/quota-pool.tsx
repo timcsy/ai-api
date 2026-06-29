@@ -15,6 +15,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +44,19 @@ interface PoolStatus {
   floor: number;
   settings: { enabled: boolean };
   last_rebalance_at: string | null;
+  config: {
+    total_tokens_per_month: number;
+    floor_per_allocation: number;
+    updated_at: string | null;
+    updated_by: string | null;
+  };
+  suggestion: {
+    recent_month_tokens: number;
+    pool_members: number;
+    suggested_total: number;
+    suggested_floor: number;
+  };
+  warning: string | null;
 }
 
 interface LogSummary {
@@ -97,6 +112,41 @@ export function AdminQuotaPoolPage() {
   const status = statusQuery.data;
   const disabled = status?.settings.enabled === false;
 
+  // Phase 39: editable pool config (T / floor) + suggestion + validation.
+  const [editT, setEditT] = React.useState<string>("");
+  const [editFloor, setEditFloor] = React.useState<string>("");
+  React.useEffect(() => {
+    if (status) {
+      setEditT(String(status.config.total_tokens_per_month));
+      setEditFloor(String(status.config.floor_per_allocation));
+    }
+  }, [status?.config.total_tokens_per_month, status?.config.floor_per_allocation]);
+
+  const saveMut = useMutation({
+    mutationFn: () =>
+      api("/admin/quota-pool/config", {
+        method: "PUT",
+        body: JSON.stringify({
+          total_tokens_per_month: Number(editT),
+          floor_per_allocation: Number(editFloor),
+        }),
+      }),
+    onSuccess: () => {
+      toast({ title: "已儲存配額池設定", description: "設定於下次再分配生效" });
+      qc.invalidateQueries({ queryKey: ["admin", "quota-pool"] });
+    },
+    onError: (err: ApiError) =>
+      toast({ title: "儲存失敗", description: `${err.code}: ${err.message}`, variant: "destructive" }),
+  });
+
+  const N = status?.pool_member_count ?? 0;
+  const tNum = Number(editT);
+  const floorNum = Number(editFloor);
+  const validNums =
+    Number.isInteger(tNum) && Number.isInteger(floorNum) && tNum >= 0 && floorNum >= 0;
+  const meetsFloor = validNums && tNum >= floorNum * N;
+  const belowUsage = validNums && status != null && tNum < status.suggestion.recent_month_tokens;
+
   return (
     <div className="container mx-auto py-8 space-y-6">
       <div className="flex items-center justify-between">
@@ -114,7 +164,7 @@ export function AdminQuotaPoolPage() {
 
       {disabled && (
         <Alert>
-          <AlertDescription>池已停用（T=0）。設定 POOL_TOTAL_TOKENS_PER_MONTH 才能啟用。</AlertDescription>
+          <AlertDescription>池已停用（總額 T=0）。在下方「配額池設定」填入每月總額即可啟用。</AlertDescription>
         </Alert>
       )}
 
@@ -143,6 +193,76 @@ export function AdminQuotaPoolPage() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {status && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">配額池設定</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="pool-T">每月總額 T（tokens）</Label>
+                <Input
+                  id="pool-T"
+                  inputMode="numeric"
+                  value={editT}
+                  onChange={(e) => setEditT(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="pool-floor">每分配保底（tokens）</Label>
+                <Input
+                  id="pool-floor"
+                  inputMode="numeric"
+                  value={editFloor}
+                  onChange={(e) => setEditFloor(e.target.value)}
+                />
+              </div>
+            </div>
+            {!validNums && <p className="text-sm text-destructive">請輸入 ≥ 0 的整數。</p>}
+            {validNums && !meetsFloor && (
+              <p className="text-sm text-destructive">
+                總額需 ≥ 保底 × 池內成員數（{floorNum.toLocaleString()} × {N} ={" "}
+                {(floorNum * N).toLocaleString()}）。
+              </p>
+            )}
+            {belowUsage && (
+              <p className="text-sm text-amber-600 dark:text-amber-500">
+                ⚠ 總額低於近月用量（{status.suggestion.recent_month_tokens.toLocaleString()}），
+                部分使用者本月可能被擋下；仍可儲存。
+              </p>
+            )}
+            <div className="rounded-md border bg-muted/40 p-3 text-sm">
+              <div className="font-medium">建議值</div>
+              <div className="mt-1 text-muted-foreground">
+                近月用量 {status.suggestion.recent_month_tokens.toLocaleString()}；建議總額 ≈{" "}
+                {status.suggestion.suggested_total.toLocaleString()}（近月 × 2，留成長空間又封住總量上限）、
+                建議保底 ≈ {status.suggestion.suggested_floor.toLocaleString()}（讓零用量成員仍有可用基本額）。
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => {
+                  setEditT(String(status.suggestion.suggested_total));
+                  setEditFloor(String(status.suggestion.suggested_floor));
+                }}
+              >
+                套用建議
+              </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button onClick={() => saveMut.mutate()} disabled={!meetsFloor || saveMut.isPending}>
+                {saveMut.isPending ? "儲存中…" : "儲存設定"}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                設定於下次再分配生效（或按「手動執行再分配」）。池內成員 N＝{N}。
+              </span>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {status?.last_rebalance_at && (

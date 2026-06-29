@@ -1,6 +1,6 @@
 # ai-api Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-06-27
+Auto-generated from all feature plans. Last updated: 2026-06-29
 
 ## Active Technologies
 - Python 3.11+（同 Phase 1） (002-auth-membership)
@@ -73,6 +73,8 @@ Auto-generated from all feature plans. Last updated: 2026-06-27
 - TypeScript strict + React 19 + Vite 6（**僅前端**；Python 後端不動） + TanStack Query、shadcn/ui、既有共用元件 `ApiUsageExample`、`applications.tsx` 註冊表——**皆既有，不新增套件** (049-usage-discoverability)
 - Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Pydantic v2（後端）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件** (050-openai-models-copilot)
 - PostgreSQL（生產）/ SQLite（dev、CI）；**不新增表、不新增 migration**——`/v1/models` 純讀既有 `credentials` / `credential_allocations` / `allocations` / `model_catalog` (050-openai-models-copilot)
+- Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2（後端）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件** (053-pool-config-ui)
+- PostgreSQL（生產）/ SQLite（dev、CI）；**新 migration 0021**——單例表 `pool_config`（`CHECK id=1`，欄：`total_tokens_per_month`、`floor_per_allocation`、`updated_at`、`updated_by`）。純加表。 (053-pool-config-ui)
 
 - Python 3.11+ + LiteLLM（proxy core）、FastAPI（admin API）、 (001-gateway-core)
 
@@ -93,9 +95,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11+: Follow standard conventions
 
 ## Recent Changes
+- 053-pool-config-ui: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2（後端）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件**
 - 050-openai-models-copilot: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Pydantic v2（後端）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件**
 - 049-usage-discoverability: Added TypeScript strict + React 19 + Vite 6（**僅前端**；Python 後端不動） + TanStack Query、shadcn/ui、既有共用元件 `ApiUsageExample`、`applications.tsx` 註冊表——**皆既有，不新增套件**
-- 046-cost-quota: Added Python 3.11+（後端）/ TypeScript strict + React 19 + Vite 6（前端） + FastAPI、SQLAlchemy 2.x async、Alembic、Pydantic v2（後端）；TanStack Query、shadcn/ui（前端）——**皆既有，不新增套件**
 
 
 <!-- MANUAL ADDITIONS START -->

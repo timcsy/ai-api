@@ -60,6 +60,8 @@ class AuditEventType(enum.StrEnum):
     allocation_resumed = "allocation_resumed"
     # Phase 33 (046): cost-based monthly quota cap change
     allocation_cost_quota_updated = "allocation_cost_quota_updated"
+    # Phase 39 (053): admin edited the quota-pool config (T / floor)
+    pool_config_updated = "pool_config_updated"
     # Phase 13: admin email notifications — event types that trigger admin emails
     responses_upstream_error_burst = "responses_upstream_error_burst"
     provider_credential_auth_failed = "provider_credential_auth_failed"

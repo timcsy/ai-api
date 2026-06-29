@@ -26,6 +26,7 @@ from ai_api.models.notification import (
 )
 from ai_api.models.oidc_state import OidcState
 from ai_api.models.password_attempt import AttemptOutcome, PasswordAttempt
+from ai_api.models.pool_config import PoolConfig
 from ai_api.models.price_list import PriceList
 from ai_api.models.provider_credential import ProviderCredential, ProviderCredentialStatus
 from ai_api.models.rebalance_log import RebalanceLog
@@ -65,6 +66,7 @@ __all__ = [
     "NotificationRecord",
     "OidcState",
     "PasswordAttempt",
+    "PoolConfig",
     "PriceList",
     "ProviderCredential",
     "ProviderCredentialStatus",
