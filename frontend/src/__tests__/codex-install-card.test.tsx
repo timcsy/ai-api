@@ -49,7 +49,8 @@ describe("<CodexInstallCard />", () => {
     render(<CodexInstallCard baseUrl="https://ai.example.com/" />);
     // The note is collapsed behind a summary; expand it.
     await user.click(screen.getByText(/已經裝過 Codex/));
-    expect(screen.getByText(/不會重裝/)).toBeInTheDocument();
+    // Phase 052: CLI now resets to a clean platform config (prior settings backed up).
+    expect(screen.getByText(/重設為乾淨的平台設定/)).toBeInTheDocument();
     // Phase 27: desktop App is now ✓ via shared config (免再設定), not "不建議".
     expect(screen.getByText(/Codex 桌面 App/)).toBeInTheDocument();
     expect(screen.getAllByText(/免再設定/).length).toBeGreaterThan(0);
