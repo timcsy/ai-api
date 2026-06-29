@@ -1,17 +1,21 @@
 """Admin endpoints for the adaptive quota pool (Phase 3c)."""
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import get_db_session, require_admin_token
-from ai_api.config import get_settings
+from ai_api.auth import audit
 from ai_api.models import (
+    ActorType,
     Allocation,
     AllocationStatus,
+    AuditEventType,
     RebalanceLog,
 )
 from ai_api.services.quota_pool import (
@@ -19,7 +23,11 @@ from ai_api.services.quota_pool import (
     PoolExhaustedByReservedError,
     PoolIdleError,
     RebalanceConservationError,
+    active_pool_member_count,
     apply_rebalance,
+    get_pool_config,
+    recent_month_usage,
+    suggest_pool_config,
 )
 
 router = APIRouter(dependencies=[Depends(require_admin_token)])
@@ -29,13 +37,20 @@ def _err(code: str, message: str) -> dict[str, Any]:
     return {"error": {"code": code, "message": message}}
 
 
+class PoolConfigUpdate(BaseModel):
+    total_tokens_per_month: int = Field(ge=0)
+    floor_per_allocation: int = Field(ge=0)
+
+
 @router.get("/quota-pool/status")
 async def get_pool_status(
     session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
-    settings = get_settings()
-    T = settings.pool_total_tokens_per_month
-    floor = settings.pool_floor_per_allocation
+    # Phase 39: T/floor come from the DB singleton (single source of truth;
+    # lazy-seeded from env on first read). This value == what apply_rebalance uses.
+    cfg = await get_pool_config(session)
+    T = cfg.total_tokens_per_month
+    floor = cfg.floor_per_allocation
 
     service_stmt = select(
         func.coalesce(
@@ -70,6 +85,15 @@ async def get_pool_status(
     pool_count = int((await session.execute(pool_count_stmt)).scalar_one() or 0)
     last_at = (await session.execute(last_log_stmt)).scalar_one_or_none()
 
+    sugg = await suggest_pool_config(session)
+    recent = sugg.recent_month_tokens
+    # Soft warning (FR-006): current T below recent usage will start blocking users.
+    warning = (
+        f"目前總額 {T} 低於近月用量 {recent}，這會讓部分使用者本月被擋下。"
+        if T > 0 and recent > T
+        else None
+    )
+
     return {
         "total_T": T,
         "reserved": {"service": service_reserved, "locked": locked_reserved},
@@ -78,6 +102,71 @@ async def get_pool_status(
         "floor": floor,
         "settings": {"enabled": T > 0},
         "last_rebalance_at": last_at.isoformat() if last_at else None,
+        # Phase 39: editable config + recommendation + soft warning.
+        "config": {
+            "total_tokens_per_month": cfg.total_tokens_per_month,
+            "floor_per_allocation": cfg.floor_per_allocation,
+            "updated_at": cfg.updated_at.isoformat() if cfg.updated_at else None,
+            "updated_by": cfg.updated_by,
+        },
+        "suggestion": {
+            "recent_month_tokens": recent,
+            "pool_members": sugg.pool_members,
+            "suggested_total": sugg.suggested_total,
+            "suggested_floor": sugg.suggested_floor,
+        },
+        "warning": warning,
+    }
+
+
+@router.put("/quota-pool/config")
+async def update_pool_config(
+    body: PoolConfigUpdate = Body(...),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Set the quota-pool total T and per-allocation floor (Phase 39).
+
+    Validation: T >= floor * N (else the pool can't even cover floors). T below
+    recent usage is allowed but surfaced as a warning on GET status.
+    """
+    n = await active_pool_member_count(session)
+    if body.total_tokens_per_month < body.floor_per_allocation * n:
+        raise HTTPException(
+            status_code=422,
+            detail=_err(
+                "invalid_pool_config",
+                f"總額 {body.total_tokens_per_month} 不足以墊付每人保底"
+                f"（保底 {body.floor_per_allocation} × {n} 人 = {body.floor_per_allocation * n}）。"
+                f"請提高總額或降低保底。",
+            ),
+        )
+
+    cfg = await get_pool_config(session)
+    cfg.total_tokens_per_month = body.total_tokens_per_month
+    cfg.floor_per_allocation = body.floor_per_allocation
+    cfg.updated_at = datetime.now(UTC)
+    cfg.updated_by = "admin"
+    await audit.record(
+        session,
+        event_type=AuditEventType.pool_config_updated,
+        actor_type=ActorType.admin,
+        target_type="pool_config",
+        target_id="1",
+        details={
+            "total_tokens_per_month": body.total_tokens_per_month,
+            "floor_per_allocation": body.floor_per_allocation,
+        },
+    )
+    await session.commit()
+    recent = await recent_month_usage(session)
+    return {
+        "total_tokens_per_month": cfg.total_tokens_per_month,
+        "floor_per_allocation": cfg.floor_per_allocation,
+        "warning": (
+            f"目前總額低於近月用量 {recent}，部分使用者本月可能被擋下。"
+            if recent > cfg.total_tokens_per_month
+            else None
+        ),
     }
 
 
