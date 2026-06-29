@@ -6,11 +6,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from ulid import ULID
 
 from ai_api.auth.audit import record as audit_record
+from ai_api.db import get_sessionmaker
 from ai_api.models import ActorType, AuditEventType, ProviderCredential, ProviderCredentialStatus
 from ai_api.services.crypto import decrypt_str, encrypt_str
 
@@ -75,26 +76,42 @@ class ProviderCredentialService:
         if cred is None:
             return None
         first_use = cred.last_used_at is None
-        cred.last_used_at = datetime.now(UTC)
-        await self._s.flush()
-        if first_use:
-            await audit_record(
-                self._s,
-                event_type=AuditEventType.provider_credential_used_first_time,
-                actor_type=ActorType.system,
-                target_type="provider_credential",
-                target_id=cred.id,
-                details={"provider": cred.provider, "label": cred.label},
-            )
-        plain = decrypt_str(cred.enc_key)
-        return ResolvedCredential(
+        # Build the resolved credential from the row as read. We deliberately do
+        # NOT mutate `cred` on the request session (that would re-emit the UPDATE
+        # at request-commit time, re-taking the row lock across the upstream call).
+        resolved = ResolvedCredential(
             id=cred.id,
             provider=cred.provider,
             label=cred.label,
-            api_key=plain,
+            api_key=decrypt_str(cred.enc_key),
             base_url=cred.base_url,
             extra_config=cred.extra_config,
         )
+        cred_id, cred_provider, cred_label = cred.id, cred.provider, cred.label
+
+        # Update last_used_at (round-robin bookkeeping) in its OWN short-lived
+        # transaction so the row lock is held for milliseconds, never across the
+        # slow upstream call. With a shared provider key, holding this lock across
+        # upstream serialized every concurrent request on one row → DB connection
+        # pool exhaustion (QueuePool TimeoutError) under load.
+        now = datetime.now(UTC)
+        async with get_sessionmaker()() as s2:
+            await s2.execute(
+                update(ProviderCredential)
+                .where(ProviderCredential.id == cred_id)
+                .values(last_used_at=now)
+            )
+            if first_use:
+                await audit_record(
+                    s2,
+                    event_type=AuditEventType.provider_credential_used_first_time,
+                    actor_type=ActorType.system,
+                    target_type="provider_credential",
+                    target_id=cred_id,
+                    details={"provider": cred_provider, "label": cred_label},
+                )
+            await s2.commit()
+        return resolved
 
     async def create(
         self,
