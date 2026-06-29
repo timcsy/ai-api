@@ -74,8 +74,8 @@ description: "Task list for Codex 安裝腳本硬化"
 
 - [X] T009 跑 `python -m pytest tests/contract/test_install_endpoint.py -q`（新斷言轉綠 + 既有零回歸）+ `ruff check .`；前端 `cd frontend && npx tsc --noEmit && npm run build`（卡改動）。
 - [X] T010 PR + squash-merge（CI 全綠）。**模板是後端檔、卡是前端** → **兩個 image 都 bump**：helm `--reuse-values` + `--set image.tag=sha-<new>` + `--set frontend.image.tag=sha-<new>` + `migrationJob.enabled=false` + storedResponseCleanup。部署後驗 `/install/codex.sh`、`/install/codex.ps1` 200 且含 `codex logout`/`.bak-`/`桌面版`。
-- [ ] T011 **SC-006 三平台真機驗收（人工，維護者）**：在「Codex 已用 ChatGPT 登入」的 Windows / macOS / Linux 各跑一鍵安裝——不清檔可用、備份生成可還原、桌面版提醒可見。若 `codex logout` 一步不足/行為有出入 → 回報、據實調整（沿用 Copilot 卡的「部署→真機→修」迴圈）。
-- [ ] T012 知識同步（真機過後）：`knowledge/vision.md` 記此階段（Codex 接入硬化）；`knowledge/experience.md` 蒸餾「腳本寫共用設定檔前先備份 + 用工具自身 CLI 重設登入（別硬編格式）+ 長駐 GUI 會搶寫設定要提醒關閉」。
+- [X] T011 **SC-006 三平台真機驗收（人工，維護者）**：在「Codex 已用 ChatGPT 登入」的 Windows / macOS / Linux 各跑一鍵安裝——不清檔可用、備份生成可還原、桌面版提醒可見。若 `codex logout` 一步不足/行為有出入 → 回報、據實調整（沿用 Copilot 卡的「部署→真機→修」迴圈）。
+- [X] T012 知識同步（真機過後）：`knowledge/vision.md` 記此階段（Codex 接入硬化）；`knowledge/experience.md` 蒸餾「腳本寫共用設定檔前先備份 + 用工具自身 CLI 重設登入（別硬編格式）+ 長駐 GUI 會搶寫設定要提醒關閉」。
 
 ---
 
