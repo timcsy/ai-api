@@ -540,10 +540,10 @@
 ### 本機品質關卡要逐字對齊 CI——`ruff check .`（含 tests/）**與** `uv run mypy src/ai_api`，別只檢 src 也別漏 mypy
 
 - **理論說**：實作前 `ruff check src/ai_api` 綠（或只跑 pytest）就代表品質關卡過了。
-- **實際發生**：兩次同根：① 階段 29② 本機只檢 `src/ai_api`，但 CI `test` job 跑 **`ruff check .`**（整個 repo、含 `tests/`），測試檔註解一個 `×`（乘號）被 `RUF003` 擋下，CI 22 秒就紅、白等一輪。② **階段 36**（`/v1/models`）本機跑了 ruff + pytest 全綠就推，但 CI 還跑 **`uv run mypy src/ai_api`**——`proxy/models.py` 三個型別錯〔函式缺回傳註解、`exc.detail["error"]` 的 `# type: ignore[index]` 只蓋第一層索引、`d` 落成 `str` 再爆〕又吃一輪紅。
-- **解決方式**：推之前把 CI `test` job 的**所有指令逐字跑一遍**——至少 `ruff check .`（與 CI 同範圍）**＋** `uv run mypy src/ai_api`（＋ pytest）。註解/字串用 ASCII；型別錯就地修。
-- **教訓**：本機品質關卡的**範圍與指令要逐字對齊 CI**——不只 lint 的「路徑範圍」（`.` vs `src`），還有「**有哪些關卡**」（ruff／mypy／pytest 缺一不可）。漏掉任一個，「本機綠」都是假綠，最快的失敗（lint/型別）反而最容易因沒跑而浪費一整輪 CI（image 仍會 build，但 `test` 紅）。做法：照 `.github/workflows/ci.yml` 的 `test` job 列一份本機 pre-push 清單，逐條跑。
-- **來源**：CI `.github/workflows/ci.yml` 的 `ruff check .` + `uv run mypy src/ai_api`；階段 29②（PR #77）、階段 36（PR #93 第一輪 mypy 紅）
+- **實際發生**：三次同根：① 階段 29② 本機只檢 `src/ai_api`，但 CI `test` job 跑 **`ruff check .`**（整個 repo、含 `tests/`），測試檔註解一個 `×`（乘號）被 `RUF003` 擋下，CI 22 秒就紅、白等一輪。② **階段 36**（`/v1/models`）本機跑了 ruff + pytest 全綠就推，但 CI 還跑 **`uv run mypy src/ai_api`**——`proxy/models.py` 三個型別錯又吃一輪紅。③ **Codex 還原 script（直推 main）**：本機只跑了「單一卡測試檔 + `tsc | tail && echo OK`」就推，結果 **Frontend CI 連兩紅**——改文案的另一支卡測試斷言舊字（沒跑全套 vitest 漏掉）、新增的「複製」鈕讓 `getByRole("複製")` 變歧義、`getAllByRole(...)[0]` 的 `HTMLElement | undefined` 沒過 `tsc`。更慘的是 **`npx tsc --noEmit | tail -1 && echo "tsc OK"` 的 `&&` 綁的是 `tail` 的退出碼、不是 `tsc` 的**——pipe 把 tsc 的非零退出碼吃掉，我一度誤判 tsc 通過。
+- **解決方式**：推之前把 CI 的**所有關卡逐字、完整跑一遍**——後端 `ruff check .` + `uv run mypy src/ai_api` + `pytest`；**前端 `npx vitest run`（全套、非單檔）+ `npx tsc --noEmit`**。檢查指令**用 `; echo $?` 看真正退出碼、別用 `cmd | tail && echo OK`**（pipe/`&&` 會遮蔽前段退出碼）。
+- **教訓**：本機品質關卡的**範圍與指令要逐字對齊 CI**——路徑範圍（`.` vs `src`）、**有哪些關卡**（ruff／mypy／pytest／**前端 vitest＋tsc**）、且**跑全套非單檔**（改共用元件會波及別支測試）。**驗證指令本身別讓 pipe 吃掉退出碼**（`a | b && c` 的 `&&` 看的是 `b`）。**直推 main（小改、不開 PR）時這條加倍重要——沒有 PR 當關卡，假綠會直接讓 main 變紅**；所以直推前更要完整跑、看退出碼。做法：照 `.github/workflows/{ci,frontend}.yml` 列一份 pre-push 清單逐條跑。
+- **來源**：CI `.github/workflows/` 的 `ruff check .` + `uv run mypy` + 前端 vitest/tsc；階段 29②（PR #77）、階段 36（PR #93 mypy 紅）、Codex 還原 script（直推 main、Frontend CI 連兩紅 + tsc 退出碼被 pipe 遮蔽，2026-06-29）
 
 ### 真實牌價會推翻「憑種類想當然」的計費假設——`inspect` litellm model_cost 再定 spec
 
