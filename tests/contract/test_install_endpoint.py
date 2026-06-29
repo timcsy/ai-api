@@ -91,3 +91,17 @@ async def test_install_script_hardening(app_client: AsyncClient, path: str) -> N
     assert "備份" in body
     # remind the user to close a running Codex desktop app (incl. Windows tray).
     assert "桌面版" in body
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["/install/codex-restore.sh", "/install/codex-restore.ps1"])
+async def test_restore_script_served(app_client: AsyncClient, path: str) -> None:
+    """Restore endpoint puts back the most recent installer backup (*.bak-<ts>)."""
+    r = await app_client.get(path)
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith("text/plain")
+    body = r.text
+    assert get_settings().base_url.rstrip("/") in body
+    assert ".bak-" in body  # restores from the installer's backups
+    assert "config.toml" in body and "auth.json" in body
+    assert "桌面版" in body  # same close-desktop reminder as install

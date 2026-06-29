@@ -1,0 +1,39 @@
+#!/bin/sh
+# Restore your ORIGINAL Codex settings (macOS / Linux).
+# Usage:  curl -fsSL __BASE_URL__/install/codex-restore.sh | sh
+# Puts back the most recent config.toml / auth.json backup that this platform's
+# installer made (the *.bak-<timestamp> files), so you switch back to whatever
+# Codex setup you had before installing.
+set -eu
+
+CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+say() { printf '%s\n' "$*"; }
+
+say "── 還原 Codex 原本設定 ──"
+say "若 Codex 桌面版正在執行，請先「完全關閉」它（含 Windows 工作列／系統匣常駐圖示）再還原，"
+say "否則執行中的桌面版可能蓋掉這次還原。"
+say ""
+
+TS="$(date +%Y%m%d-%H%M%S 2>/dev/null || echo restore)"
+RESTORED=0
+for name in config.toml auth.json; do
+  f="$CODEX_HOME/$name"
+  # Most recent installer backup = highest-sorted *.bak-<timestamp>.
+  latest="$(ls -1 "$f".bak-* 2>/dev/null | sort | tail -1 || true)"
+  if [ -n "$latest" ]; then
+    # Keep the current file too (so this restore is itself reversible).
+    if [ -f "$f" ]; then cp "$f" "$f.prerestore-$TS" 2>/dev/null || true; fi
+    cp "$latest" "$f" && { say "已還原 $name  ←  $(basename "$latest")"; RESTORED=1; }
+  else
+    say "（找不到 $name 的備份，略過。）"
+  fi
+done
+
+say ""
+if [ "$RESTORED" = "1" ]; then
+  say "✓ 已還原最近一次安裝前的 Codex 設定。請重新開啟 Codex。"
+  say "  想用更早的備份？$CODEX_HOME 內還有其他 *.bak-* 檔，手動把它 cp 回原本檔名即可。"
+  say "  （還原前的設定已另存為 *.prerestore-$TS，可再切回去。）"
+else
+  say "找不到任何可還原的備份（$CODEX_HOME 內沒有 *.bak-* 檔）——未改動任何設定。"
+fi

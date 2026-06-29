@@ -1,0 +1,40 @@
+# Restore your ORIGINAL Codex settings (Windows PowerShell).
+# Usage:  irm __BASE_URL__/install/codex-restore.ps1 | iex
+# Puts back the most recent config.toml / auth.json backup that this platform's
+# installer made (the *.bak-<timestamp> files), so you switch back to whatever
+# Codex setup you had before installing.
+$ErrorActionPreference = "Stop"
+
+$CodexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME ".codex" }
+
+Write-Host "-- 還原 Codex 原本設定 --"
+Write-Host "若 Codex 桌面版正在執行，請先「完全關閉」它（含 Windows 工作列／系統匣常駐圖示）再還原，"
+Write-Host "否則執行中的桌面版可能蓋掉這次還原。"
+Write-Host ""
+
+$ts = Get-Date -Format "yyyyMMdd-HHmmss"
+$restored = $false
+foreach ($name in @("config.toml", "auth.json")) {
+  $f = Join-Path $CodexHome $name
+  # Most recent installer backup = last by name sort of *.bak-<timestamp>.
+  $latest = Get-ChildItem -Path $CodexHome -Filter "$name.bak-*" -ErrorAction SilentlyContinue |
+    Sort-Object Name | Select-Object -Last 1
+  if ($latest) {
+    # Keep the current file too (so this restore is itself reversible).
+    if (Test-Path $f) { try { Copy-Item $f "$f.prerestore-$ts" -Force } catch {} }
+    Copy-Item $latest.FullName $f -Force
+    Write-Host "已還原 $name  <-  $($latest.Name)"
+    $restored = $true
+  } else {
+    Write-Host "（找不到 $name 的備份，略過。）"
+  }
+}
+
+Write-Host ""
+if ($restored) {
+  Write-Host "OK - 已還原最近一次安裝前的 Codex 設定。請重新開啟 Codex。"
+  Write-Host "  想用更早的備份？$CodexHome 內還有其他 *.bak-* 檔，手動改回原本檔名即可。"
+  Write-Host "  （還原前的設定已另存為 *.prerestore-$ts，可再切回去。）"
+} else {
+  Write-Host "找不到任何可還原的備份（$CodexHome 內沒有 *.bak-* 檔）——未改動任何設定。"
+}

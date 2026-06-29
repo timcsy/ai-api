@@ -25,6 +25,10 @@ export function CodexInstallCard({ baseUrl }: { baseUrl: string }) {
     os === "windows"
       ? `irm ${base}/install/codex.ps1 | iex`
       : `curl -fsSL ${base}/install/codex.sh | sh`;
+  const restoreCommand =
+    os === "windows"
+      ? `irm ${base}/install/codex-restore.ps1 | iex`
+      : `curl -fsSL ${base}/install/codex-restore.sh | sh`;
 
   return (
     <Card className="mt-3">
@@ -120,6 +124,27 @@ export function CodexInstallCard({ baseUrl }: { baseUrl: string }) {
                   <strong>網頁版 Codex（chatgpt.com/codex）</strong>：跑在 OpenAI 雲端、綁 ChatGPT 帳號，不經本地設定 → 請用 <strong>CLI</strong>。
                 </li>
               </ul>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">想切回原本的 Codex 設定？</p>
+              <p className="mt-1">
+                安裝前會把你原本的 <code className="break-all">~/.codex</code> 設定備份起來。跑下面這行就能
+                <strong>還原回安裝前的設定</strong>（切回你原本的 Codex 帳號／設定）：
+              </p>
+              <div className="mt-1 flex items-stretch gap-2">
+                <code className="block flex-1 min-w-0 break-all bg-muted px-2 py-1 rounded">{restoreCommand}</code>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    await copyToClipboard(restoreCommand);
+                    toast({ title: "已複製還原指令" });
+                  }}
+                >
+                  複製
+                </Button>
+              </div>
+              <p className="mt-1">還原前一樣請先完全關閉 Codex 桌面版（含工作列常駐）。</p>
             </div>
           </div>
         </details>
