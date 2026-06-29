@@ -71,8 +71,8 @@ description: "Task list for 會員導覽重排——凸顯「應用」"
 ## Phase 5: Polish & 上線
 
 - [X] T007 全前端零回歸：`cd frontend && npx vitest run && npx tsc --noEmit && npm run build`（確認其他斷言 nav「存在」的測試〔apps-*, dashboard-* 等〕不受影響）。
-- [ ] T008 PR + squash-merge 到 main（CI 全綠）；**純前端**部署：helm `--reuse-values` + `--set image.tag=sha-d104990`（backend 不動）`--set frontend.image.tag=sha-<new>` + `migrationJob.enabled=false` + storedResponseCleanup。部署後 SPA 200、肉眼確認導覽新順序。
-- [ ] T009 知識同步：把 `knowledge/vision.md` 階段 37 標 ✅（本刀 = 純重排已上線）；本分支已含的階段 37 stub 引用修正一併帶入該 PR。
+- [X] T008 PR + squash-merge 到 main（CI 全綠）；**純前端**部署：helm `--reuse-values` + `--set image.tag=sha-d104990`（backend 不動）`--set frontend.image.tag=sha-<new>` + `migrationJob.enabled=false` + storedResponseCleanup。部署後 SPA 200、肉眼確認導覽新順序。
+- [X] T009 知識同步：把 `knowledge/vision.md` 階段 37 標 ✅（本刀 = 純重排已上線）；本分支已含的階段 37 stub 引用修正一併帶入該 PR。
 
 ---
 
