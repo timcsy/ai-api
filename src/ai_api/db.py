@@ -23,11 +23,27 @@ _engine: AsyncEngine | None = None
 _sessionmaker: async_sessionmaker[AsyncSession] | None = None
 
 
+def _engine_kwargs(url: str) -> dict[str, object]:
+    """Engine kwargs. Pool sizing applies to PostgreSQL only — SQLite (tests)
+    uses NullPool/StaticPool which reject pool_size/max_overflow."""
+    kwargs: dict[str, object] = {"future": True, "echo": False}
+    if url.startswith("postgresql"):
+        settings = get_settings()
+        kwargs.update(
+            pool_size=settings.db_pool_size,
+            max_overflow=settings.db_max_overflow,
+            pool_timeout=settings.db_pool_timeout,
+            pool_recycle=settings.db_pool_recycle,
+            pool_pre_ping=True,  # drop dead conns (e.g. after a PG restart)
+        )
+    return kwargs
+
+
 def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
         settings = get_settings()
-        _engine = create_async_engine(settings.database_url, future=True, echo=False)
+        _engine = create_async_engine(settings.database_url, **_engine_kwargs(settings.database_url))
     return _engine
 
 
@@ -75,5 +91,5 @@ async def dispose_engine() -> None:
 def reset_engine_for_testing(url: str) -> None:
     """Test helper: replace the engine with one pointing at the given URL."""
     global _engine, _sessionmaker
-    _engine = create_async_engine(url, future=True, echo=False)
+    _engine = create_async_engine(url, **_engine_kwargs(url))
     _sessionmaker = async_sessionmaker(_engine, expire_on_commit=False, class_=AsyncSession)

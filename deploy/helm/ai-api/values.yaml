@@ -76,6 +76,14 @@ providerKeyEncKey: ""
 database:
   # External Postgres URL (asyncpg). e.g. postgresql+asyncpg://user:pass@host:5432/db
   url: ""
+  # Per-pod connection pool (PostgreSQL only). poolSize+maxOverflow = max conns
+  # per pod; (poolSize+maxOverflow) × replicaCount must stay under Postgres
+  # max_connections. Raised above SQLAlchemy's 5+10 default so long /v1 calls
+  # don't exhaust the pool under load.
+  poolSize: 20
+  maxOverflow: 30
+  poolTimeout: 30
+  poolRecycle: 1800
 
 # Phase 2: auth
 baseUrl: "http://localhost:8000"

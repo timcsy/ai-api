@@ -43,6 +43,14 @@ spec:
               value: {{ .Values.logging.level | quote }}
             - name: REQUEST_BODY_LIMIT_MB
               value: {{ .Values.requestBodyLimitMB | quote }}
+            - name: DB_POOL_SIZE
+              value: {{ .Values.database.poolSize | quote }}
+            - name: DB_MAX_OVERFLOW
+              value: {{ .Values.database.maxOverflow | quote }}
+            - name: DB_POOL_TIMEOUT
+              value: {{ .Values.database.poolTimeout | quote }}
+            - name: DB_POOL_RECYCLE
+              value: {{ .Values.database.poolRecycle | quote }}
           ports:
             - name: http
               containerPort: 8000

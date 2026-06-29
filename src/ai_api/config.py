@@ -23,6 +23,14 @@ class Settings(BaseSettings):
         default="sqlite+aiosqlite:///./ai_api.db",
         alias="DATABASE_URL",
     )
+    # DB connection pool (PostgreSQL only; ignored for SQLite). Defaults raised
+    # above SQLAlchemy's 5+10 so each pod can absorb concurrent long-running
+    # /v1 calls without exhausting the pool. Total across pods must stay under
+    # Postgres max_connections — size per cluster via these env vars.
+    db_pool_size: int = Field(default=20, alias="DB_POOL_SIZE")
+    db_max_overflow: int = Field(default=30, alias="DB_MAX_OVERFLOW")
+    db_pool_timeout: int = Field(default=30, alias="DB_POOL_TIMEOUT")
+    db_pool_recycle: int = Field(default=1800, alias="DB_POOL_RECYCLE")
     admin_bootstrap_token: str = Field(
         default=DEFAULT_ADMIN_BOOTSTRAP_TOKEN,
         alias="ADMIN_BOOTSTRAP_TOKEN",
