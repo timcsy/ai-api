@@ -70,3 +70,24 @@ async def test_install_script_no_decouple_strategy(app_client: AsyncClient, path
     assert "chmod a-w" not in low
     assert "readonly" not in low
     assert "alias codex" not in low
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["/install/codex.sh", "/install/codex.ps1"])
+async def test_install_script_hardening(app_client: AsyncClient, path: str) -> None:
+    """Phase 052: existing-login users must install cleanly.
+
+    - `codex logout` runs BEFORE `codex login --with-api-key` so a stale prior
+      login (e.g. a ChatGPT account) can't take precedence.
+    - existing config/auth are backed up (timestamped) before being modified.
+    - the script reminds the user to close a running Codex desktop app first.
+    """
+    body = (await app_client.get(path)).text
+    # logout clears any prior login, and must precede our login.
+    assert "codex logout" in body
+    assert body.index("codex logout") < body.index("codex login --with-api-key")
+    # timestamped backup before touching files.
+    assert ".bak-" in body
+    assert "備份" in body
+    # remind the user to close a running Codex desktop app (incl. Windows tray).
+    assert "桌面版" in body

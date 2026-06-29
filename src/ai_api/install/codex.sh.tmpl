@@ -16,6 +16,28 @@ need() { command -v "$1" >/dev/null 2>&1 || { say "ERROR: '$1' is required but n
 need curl
 need python3
 
+AUTH="$CODEX_HOME/auth.json"
+
+# ── 開始前請注意：先關閉 Codex 桌面版 ─────────────────────────────────────
+# 執行中的 Codex 桌面版會握住 ~/.codex、可能蓋掉我們寫的設定（curl|sh 無法
+# 中途暫停等你關閉，只能在這裡提醒）。
+say "── 開始前請注意 ──"
+say "若你已安裝 Codex 桌面版，請先「完全關閉」它（含 Windows 工作列／系統匣的常駐圖示）再繼續，"
+say "否則執行中的桌面版可能蓋掉這次設定。裝好後再重新開啟即可。"
+say ""
+
+# Back up existing Codex config + auth (timestamped; a re-run never clobbers an
+# earlier backup) BEFORE we modify anything. Fail loud if we can't back up.
+TS="$(date +%Y%m%d-%H%M%S 2>/dev/null || echo backup)"
+BACKED_UP=0
+for f in "$CONFIG" "$AUTH"; do
+  if [ -f "$f" ]; then
+    cp "$f" "$f.bak-$TS" || { say "ERROR: 無法備份 $f（請確認 $CODEX_HOME 可寫）。已中止，未改任何設定。"; exit 1; }
+    BACKED_UP=1
+  fi
+done
+[ "$BACKED_UP" = "1" ] && say "已備份你原本的 Codex 設定為 *.bak-$TS（在 $CODEX_HOME）。"
+
 # ---------------------------------------------------------------------------
 # 1. Install the Codex CLI (standalone binary from GitHub Releases; no Node).
 #    Fail-soft: if the CLI can't be installed (network / antivirus / unsupported
@@ -55,29 +77,22 @@ fi
 command -v codex >/dev/null 2>&1 || CODEX_CLI=0
 
 # ---------------------------------------------------------------------------
-# 2. Write config.toml MERGE-style: only our provider block + default provider.
-#    No read-only config, no wrapper/alias — a /model switch keeps 'ccsh'.
+# 2. Write a CLEAN config.toml for this platform (any prior one was backed up
+#    above). A full reset avoids stale leftovers from a previous login/config
+#    silently breaking the connection. /model switch still keeps 'ccsh'; no
+#    read-only config, no wrapper/alias.
 # ---------------------------------------------------------------------------
-python3 - "$CONFIG" "$CCSH_BASE" <<'PY'
-import sys, re, pathlib
-cfg, base = pathlib.Path(sys.argv[1]), sys.argv[2]
-text = cfg.read_text() if cfg.exists() else ""
-block = f'''model_provider = "ccsh"
+cat > "$CONFIG" <<EOF
+model_provider = "ccsh"
 
 [model_providers.ccsh]
 name = "CCSH"
-base_url = "{base}"
+base_url = "$CCSH_BASE"
 wire_api = "responses"
 requires_openai_auth = true
 supports_websockets = false
-'''
-# Drop any prior 'model_provider = ...' line and our [model_providers.ccsh] block,
-# preserving everything else the user has.
-text = re.sub(r'(?m)^\s*model_provider\s*=.*$\n?', '', text)
-text = re.sub(r'(?ms)^\[model_providers\.ccsh\].*?(?=^\[|\Z)', '', text)
-cfg.write_text(block + "\n" + text.lstrip())
-PY
-say "Wrote $CONFIG (provider 'ccsh' -> $CCSH_BASE)"
+EOF
+say "Wrote $CONFIG (clean platform config; provider 'ccsh' -> $CCSH_BASE)"
 
 # ---------------------------------------------------------------------------
 # 3. Device-flow: authorize in the browser, no token copy-paste.
@@ -131,6 +146,9 @@ PY
 fi
 
 if [ "$CODEX_CLI" = "1" ]; then
+  # Clear any prior login (e.g. a ChatGPT account) so our API key wins — a stale
+  # login can otherwise take precedence. Safe no-op if not logged in.
+  codex logout >/dev/null 2>&1 || true
   printf '%s' "$TOKEN" | codex login --with-api-key >/dev/null 2>&1 || {
     say "ERROR: codex login failed."; exit 1; }
   say "Verifying connection..."
@@ -152,3 +170,5 @@ else
   say "       printf '%s' '<KEY>' | codex login --with-api-key"
   say "  2) Codex 桌面 App：在 App 設定填入上面的金鑰當 API key（provider 已指向本平台）。"
 fi
+
+[ "$BACKED_UP" = "1" ] && say "（要還原舊設定：把 $CODEX_HOME 內的 *.bak-$TS 改回原本檔名即可。）"

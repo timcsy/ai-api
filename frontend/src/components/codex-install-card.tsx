@@ -73,6 +73,10 @@ export function CodexInstallCard({ baseUrl }: { baseUrl: string }) {
             複製
           </Button>
         </div>
+        <p className="text-xs text-amber-600 dark:text-amber-500">
+          ⚠ 若你已安裝 <strong>Codex 桌面版</strong>，請先<strong>完全關閉它</strong>（含 Windows
+          工作列／系統匣的常駐圖示）再執行，否則執行中的桌面版會蓋掉這次設定；裝好後再重新開啟。
+        </p>
         <details className="text-xs text-muted-foreground">
           <summary className="cursor-pointer select-none">已經裝過 Codex？點此看會發生什麼</summary>
           <div className="mt-2 space-y-2 pl-1">
@@ -84,8 +88,9 @@ export function CodexInstallCard({ baseUrl }: { baseUrl: string }) {
               <p className="font-medium text-foreground">✓ 適用</p>
               <ul className="mt-1 list-disc space-y-1 pl-5">
                 <li>
-                  <strong>指令列（CLI）</strong>（最穩、推薦）：不會重裝、保留你其他設定；只把<strong>預設連線對象切到本平台</strong>、
-                  用平台金鑰取代目前登入。想換回自己的 OpenAI 帳號，重跑 <code className="break-all">codex login</code> 即可（可逆）。
+                  <strong>指令列（CLI）</strong>（最穩、推薦）：會把 <code className="break-all">~/.codex</code> 設定
+                  <strong>重設為乾淨的平台設定</strong>（你原本的 config 與登入會<strong>先備份成 <code>*.bak-時間戳</code>、可還原</strong>），
+                  並用平台金鑰取代目前登入。想換回自己的 OpenAI 帳號：重跑 <code className="break-all">codex login</code> 或還原備份即可（可逆）。
                 </li>
                 <li>
                   <strong>編輯器擴充（VS Code / Cursor / JetBrains 的 Codex）</strong>：與 CLI 共用同一份設定，
