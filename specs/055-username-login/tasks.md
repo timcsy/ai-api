@@ -36,9 +36,9 @@ description: "Task list for 本地登入允許以帳號（非 email）登入"
 
 ## Phase 7: Polish & 驗收（部署前停）
 - [X] T016 全套零回歸：`pytest tests/ -q` + `ruff check .` + `uv run mypy src/ai_api`；前端全套 vitest + tsc(退出碼) + build。
-- [ ] T017 **本機/預備驗證**：以帳號建成員→設密碼→登入；email 登入仍正常；帳號型成員拿到 identifier_regex tag、網域規則不誤匹配。→ **停在此處交付使用者確認**（登入敏感，正式部署前先驗）。
-- [ ] T018 （使用者確認後）PR + squash-merge；前後端兩 image、**無 migration**；部署 ccsh + tew；真機驗一輪登入。
-- [ ] T019 知識同步：experience 蒸餾「email 在本地登入只是未驗證識別碼→可放寬成帳號（重用欄位零 migration、含@才走 email 驗證）；自動 tag 網域式對無網域識別碼自然不匹配、加 identifier_regex 補齊」；vision 視需要加一筆。
+- [X] T017 **本機/預備驗證**：以帳號建成員→設密碼→登入；email 登入仍正常；帳號型成員拿到 identifier_regex tag、網域規則不誤匹配。→ **停在此處交付使用者確認**（登入敏感，正式部署前先驗）。
+- [X] T018 （使用者確認後）PR + squash-merge；前後端兩 image、**無 migration**；部署 ccsh + tew；真機驗一輪登入。
+- [X] T019 知識同步：experience 蒸餾「email 在本地登入只是未驗證識別碼→可放寬成帳號（重用欄位零 migration、含@才走 email 驗證）；自動 tag 網域式對無網域識別碼自然不匹配、加 identifier_regex 補齊」；vision 視需要加一筆。
 
 ## Dependencies
 - Foundational（T002–T004）阻斷全部。US1（T005–07）、US2（T008–10）依賴它；US3（T011–13）獨立於 US1/US2 但共用識別碼概念。前端（T014–15）依賴後端。

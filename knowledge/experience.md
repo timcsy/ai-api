@@ -666,3 +666,12 @@
 - **解決方式**（spec 054）：① **稀疏 baseline 退回絕對門檻**——baseline 樣本數 < `baseline_min_calls`（預設 200）時不套比例規則、只用絕對門檻；研習 103 次在絕對門檻（1萬）下不觸發，但真跑掉狂打上萬次照抓。② **設定搬 DB 單例**（比照 `pool_config`/`notification_config`，migration + `get_anomaly_config` lazy-seed）＝單一真理、admin 可自助改。③ **admin 可自助暫停/關閉**：偵測器讀 `effective_enforcing`（開關 AND 未在暫停期），不執法時照掃描/稽核但不隔離；`pause_until` 過期讀時判斷即自動恢復（不需背景任務），辦活動設「暫停到結束時間」不怕忘記關回。
 - **教訓**：① **比例/相對門檻只有在 baseline 有足量樣本時才可信**——樣本不足要退回絕對門檻，別讓「除以小樣本」放大成脆弱門檻（剛遷移的新叢集、新分配、計畫性衝量全是稀疏 baseline 的常客）。② **保護型自動化（會擋人的）要給 admin 自助的暫停/關閉旋鈕**，且最好帶「到期自動恢復」——不是只能靠工程師（原則 6）。③ 「暫停」用讀時判斷 `pause_until > now` 比背景清理簡單且不會漏。④ 硬天花板（配額）已在時，第二層偵測「暫停」的風險有界，可以更放心地把控制權交給 admin。
 - **來源**：`services/anomaly.py`（`get_anomaly_config` + 稀疏 baseline 分支 + `effective_enforcing` 略過）、`models/anomaly_config.py`、`api/anomaly.py`、migration 0022；spec 054、rev 107（ccsh rev 4 / tew rev 107，`sha-e1ea1c2`）。
+
+### 「email」若只是未驗證識別碼，就別用 EmailStr 綁死——放寬成自由帳號可零 migration，但要追出所有把它當 email 的隱形耦合
+
+- **理論說**：本地登入用 email 當帳號很自然，欄位叫 `email`、schema 用 `EmailStr` 驗證，天經地義。
+- **實際發生**（spec 055）：使用者要「用帳號（非 email）登入」。一查才發現 **email 在本地登入根本沒被驗證**——系統從不寄信給成員（邀請是管理員手動交付的 token 連結、SMTP 只給 admin），email 只是個**未驗證的識別字串**。強制它是 email 格式毫無實質意義，純粹是 `EmailStr` 這個型別選擇留下的耦合。
+- **解決方式**：識別碼**重用既有 `members.email` 欄**（唯一、String(320)、無格式約束）→ 值可為帳號或 email、**零 migration**。把 `EmailStr` 換成一個小的 `validate_identifier`（strip+lower、非空、無空白、長度上限；`@` 是否允許由業務決定，本案最終允許）。登入查詢/速率限制/稽核/session 全不動（只換識別碼型別）。
+- **隱形耦合要追全**：`EmailStr` 不只在登入——還散在**建立成員 / 批次匯入 / email 白名單 / tag 規則測試**等多個 admin schema；自動 tag 更是 `email.partition("@")` 切 local/domain 來比對（網域/後綴 matcher 對「無 @ 的帳號」自然不命中、但**用 `partition` 不會 crash**）。放寬時要 grep 全部 `EmailStr` 使用點逐一決定（本案：只放寬 local 相關；OIDC 一律 email、其網域式自動註冊/白名單不動），並補一個 `identifier_regex` matcher 讓純帳號也能自動分組。
+- **教訓**：① 型別即契約——`EmailStr` 這種「看似合理的嚴格驗證」會**悄悄把一個未驗證識別碼綁成 email**，需求一變才發現是自找的限制。先問「這個 email **真的**被當 email 用嗎（有寄信/驗證嗎）？」再決定要不要 `EmailStr`。② 放寬一個「身分/識別」欄位時，**grep 出所有把它當 email 的點**（schema 驗證、字串切分、規則比對、UI 標籤）逐一決定，別只改登入。③ 重用既有欄位（值語意放寬）常能**零 migration** 達成，比新增 `username` 欄+雙軌省事得多——但要接受「同一欄混裝兩種值」的語意債（本案可接受）。④ 用 `partition("@")` 而非 `split("@")[1]` 這類寫法，天然對非 email 輸入安全（不 crash，只是不命中）。
+- **來源**：`src/ai_api/auth/identifier.py`（normalize/validate）、`api/auth.py`（登入放寬）、`api/admin_members.py`/`admin_tag_rules.py`（EmailStr→identifier）、`models/tag_rule.py` + `services/tag_rules.py`（`identifier_regex`）；spec 055、無 migration、ccsh rev 6 / tew rev 108、`sha-8a2444f`（2026-07-02）。
