@@ -8,6 +8,7 @@ from ai_api.models.access_control import (
     SourceRestriction,
 )
 from ai_api.models.allocation import Allocation, AllocationOrigin, AllocationStatus
+from ai_api.models.anomaly_config import AnomalyConfig
 from ai_api.models.auth_audit import ActorType, AuditEventType, AuthAuditLog
 from ai_api.models.call_record import CallOutcome, CallRecord
 from ai_api.models.credential import Credential
@@ -40,6 +41,7 @@ __all__ = [
     "Allocation",
     "AllocationOrigin",
     "AllocationStatus",
+    "AnomalyConfig",
     "AttemptOutcome",
     "AuditEventType",
     "AuthAuditLog",

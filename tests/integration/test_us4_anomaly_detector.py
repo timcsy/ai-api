@@ -144,6 +144,95 @@ async def test_cold_start_over_absolute_triggers(app_client) -> None:
     assert decisions[0].reason == "absolute_cold_start"
 
 
+# Spec 054 — US2: sparse baseline must fall back to the absolute threshold, so a
+# legit spike on a freshly-migrated / new / workshop allocation is NOT false-flagged.
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_sparse_baseline_spike_does_not_trigger(app_client) -> None:
+    alloc_id = await _seed_member_and_alloc()
+    # Sparse baseline: 84 calls over 23h (< baseline_min_calls=200) → ratio DISTRUSTED.
+    for h in range(2, 25):
+        await _add_calls(alloc_id, 4, h)  # ~92 total, well under 200
+    # Workshop-style spike: 103 calls (would trip ratio 10x of ~4/hr, but < absolute).
+    await _add_calls(alloc_id, 103, 0)
+
+    sm = get_sessionmaker()
+    async with sm() as s:
+        decisions = await detect_and_quarantine(s)
+        await s.commit()
+    assert decisions == []  # sparse baseline → absolute only → 103 < 10000 → no quarantine
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_sparse_baseline_over_absolute_still_triggers(app_client) -> None:
+    alloc_id = await _seed_member_and_alloc()
+    for h in range(2, 25):
+        await _add_calls(alloc_id, 4, h)
+    await _add_calls(alloc_id, 10001, 0)  # genuinely runaway → still caught
+
+    sm = get_sessionmaker()
+    async with sm() as s:
+        decisions = await detect_and_quarantine(s)
+        await s.commit()
+    assert len(decisions) == 1
+
+
+# Spec 054 — US1: admin can disable/pause auto-quarantine; the detector still scans
+# but must not quarantine anyone.
+async def _set_anomaly_config(**kwargs) -> None:
+    from ai_api.services.anomaly import get_anomaly_config
+
+    sm = get_sessionmaker()
+    async with sm() as s:
+        cfg = await get_anomaly_config(s)
+        for k, v in kwargs.items():
+            setattr(cfg, k, v)
+        await s.commit()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_disabled_switch_skips_quarantine(app_client) -> None:
+    alloc_id = await _seed_member_and_alloc()
+    for h in range(2, 25):
+        await _add_calls(alloc_id, 100, h)  # robust baseline
+    await _add_calls(alloc_id, 1100, 0)  # would normally quarantine (ratio)
+    await _set_anomaly_config(auto_quarantine_enabled=False)
+
+    sm = get_sessionmaker()
+    async with sm() as s:
+        decisions = await detect_and_quarantine(s)
+        await s.commit()
+    assert decisions == []  # enforcement off → scanned but not quarantined
+    async with sm() as s:
+        alloc = (
+            await s.execute(select(Allocation).where(Allocation.id == alloc_id))
+        ).scalar_one()
+        assert alloc.status == AllocationStatus.active
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_paused_until_future_skips_then_resumes(app_client) -> None:
+    alloc_id = await _seed_member_and_alloc()
+    for h in range(2, 25):
+        await _add_calls(alloc_id, 100, h)
+    await _add_calls(alloc_id, 1100, 0)
+    # Paused far in the future → skipped.
+    await _set_anomaly_config(pause_until=datetime(2999, 1, 1, tzinfo=UTC))
+    sm = get_sessionmaker()
+    async with sm() as s:
+        assert await detect_and_quarantine(s) == []
+        await s.commit()
+    # Pause expired (past) → enforcement resumes automatically.
+    await _set_anomaly_config(pause_until=datetime(2000, 1, 1, tzinfo=UTC))
+    async with sm() as s:
+        decisions = await detect_and_quarantine(s)
+        await s.commit()
+    assert len(decisions) == 1
+
+
 # Phase 11 follow-up — service allocations (e.g. Codex/agent CLIs) are exempt;
 # their traffic is bursty by design and should not be auto-quarantined.
 @pytest.mark.integration
