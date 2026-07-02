@@ -60,7 +60,7 @@ describe("<LoginPage />", () => {
     renderLogin("/login");
     const user = userEvent.setup();
 
-    await user.type(screen.getByLabelText("Email"), "alice@x.com");
+    await user.type(screen.getByLabelText("帳號 / Email"), "alice@x.com");
     await user.type(screen.getByLabelText("密碼"), "pw");
     await user.click(screen.getByRole("button", { name: "登入" }));
 
@@ -80,7 +80,7 @@ describe("<LoginPage />", () => {
     renderLogin("/login");
     const user = userEvent.setup();
 
-    await user.type(screen.getByLabelText("Email"), "bad@x.com");
+    await user.type(screen.getByLabelText("帳號 / Email"), "bad@x.com");
     await user.type(screen.getByLabelText("密碼"), "wrong");
     await user.click(screen.getByRole("button", { name: "登入" }));
 

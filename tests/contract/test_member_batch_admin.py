@@ -144,7 +144,9 @@ async def test_bulk_delete_requires_admin(app_client: AsyncClient) -> None:
 async def test_bulk_create_mixed(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
     # pre-existing member
     await _new_member(app_client, admin_headers, "exists@x.com")
-    emails = "new1@x.com\nexists@x.com\nbad-email\nnew1@x.com\n"
+    # spec 055: usernames (incl. '@') are valid identifiers now, so the invalid
+    # sample must break a structural rule — an internal space.
+    emails = "new1@x.com\nexists@x.com\nbad user\nnew1@x.com\n"
     r = await app_client.post(
         "/admin/members/bulk-create", headers=admin_headers, json={"emails": emails}
     )
@@ -162,7 +164,7 @@ async def test_bulk_create_mixed(app_client: AsyncClient, admin_headers: dict[st
     created_entry = next(x for x in new1 if x["status"] == "created")
     assert created_entry["invitation_url"]
     assert next(x for x in res if x["email"] == "exists@x.com")["status"] == "exists"
-    assert next(x for x in res if x["email"] == "bad-email")["status"] == "invalid"
+    assert next(x for x in res if x["email"] == "bad user")["status"] == "invalid"
     # the new member exists + is local_password
     listed = (await app_client.get("/admin/members", headers=admin_headers)).json()
     emails_now = {m["email"] for m in (listed if isinstance(listed, list) else listed["items"])}

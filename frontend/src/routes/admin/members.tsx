@@ -63,7 +63,13 @@ interface AdminMember {
 
 const createSchema = z
   .object({
-    email: z.string().email("email 格式錯"),
+    // spec 055: 登入識別碼——帳號或 email 皆可，'@' 自由允許（不強制 email 格式）；
+    // 僅結構限制：非空、不可含空白。
+    email: z
+      .string()
+      .trim()
+      .min(1, "必填")
+      .refine((v) => !/\s/.test(v), "不可含空白"),
     provider: z.enum(["local_password", "external", "google_oidc"]),
     initial_password: z.string().min(12, "密碼至少 12 字元").optional().or(z.literal("")),
     send_invitation: z.boolean().default(false),
@@ -628,9 +634,9 @@ function CreateMemberDialog({
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>帳號 / Email</FormLabel>
                   <FormControl>
-                    <Input type="email" {...field} />
+                    <Input type="text" placeholder="帳號或 email" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

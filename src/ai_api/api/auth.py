@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from ulid import ULID
@@ -18,6 +18,7 @@ from ai_api.api.deps import (
 from ai_api.auth import audit, local, policy, sessions
 from ai_api.auth.base import AuthError
 from ai_api.auth.google_oidc import GoogleOidcProvider
+from ai_api.auth.identifier import normalize_identifier
 from ai_api.auth.invitations import consume as consume_invite
 from ai_api.auth.invitations import lookup as lookup_invite
 from ai_api.auth.ratelimit import (
@@ -263,7 +264,10 @@ async def _find_or_create_oidc_member(
 
 
 class LocalLoginRequest(BaseModel):
-    email: EmailStr
+    # spec 055: a login identifier may be a username OR an email (both stored in
+    # members.email). No format gate here — lookup normalizes; a value that
+    # doesn't exist just yields the generic "invalid credentials".
+    email: str
     password: str
 
 
@@ -273,7 +277,7 @@ async def local_login(
     payload: LocalLoginRequest,
     session: AsyncSession = Depends(get_db_session),
 ) -> Response:
-    email = str(payload.email).lower()
+    email = normalize_identifier(payload.email)
     ip = _client_ip(request)
     if not await policy.is_source_allowed(session, ip):
         return _error_response("source_not_allowed", "this source is not allowed", 401)

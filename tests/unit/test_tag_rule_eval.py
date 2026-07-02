@@ -91,3 +91,29 @@ def test_no_match_no_fallback_returns_unmatched():
     r = evaluate("a@school.edu", rules)
     assert r["matched"] is False
     assert r["rule_id"] is None
+
+
+# Spec 055: identifier_regex matches the whole login identifier (username-friendly);
+# email_domain / suffix rules simply don't fire on a bare username (no crash).
+def test_identifier_regex_matches_username():
+    rules = [_rule(0, MatcherType.identifier_regex, guard_regex(r"stu\d+"), "student")]
+    r = evaluate("stu2026", rules)  # a username, no '@'
+    assert r["matched"] is True
+    assert r["tag"] == "student"
+    assert r["matcher_type"] == MatcherType.identifier_regex
+
+
+def test_identifier_regex_matches_email_too():
+    rules = [_rule(0, MatcherType.identifier_regex, guard_regex(r".+@ccsh\.tn\.edu\.tw"), "ccsh")]
+    assert evaluate("teacher@ccsh.tn.edu.tw", rules)["matched"] is True
+
+
+def test_email_domain_does_not_match_username():
+    rules = [_rule(0, MatcherType.email_domain, "ccsh.tn.edu.tw", "ccsh")]
+    r = evaluate("alice", rules)  # username → domain is "" → no match, no error
+    assert r["matched"] is False
+
+
+def test_email_suffix_does_not_match_username():
+    rules = [_rule(0, MatcherType.email_suffix, "@ccsh.tn.edu.tw", "ccsh")]
+    assert evaluate("bob", rules)["matched"] is False

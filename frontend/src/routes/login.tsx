@@ -72,11 +72,11 @@ export function LoginPage() {
 
           <form onSubmit={onSubmit} className="space-y-3" aria-label="local-login-form">
             <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">帳號 / Email</Label>
               <Input
                 id="email"
-                type="email"
-                autoComplete="email"
+                type="text"
+                autoComplete="username"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
