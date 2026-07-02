@@ -26,6 +26,10 @@ def test_is_email() -> None:
     ("Alice", "alice"),
     ("bob.smith_01", "bob.smith_01"),
     ("user@ccsh.tn.edu.tw", "user@ccsh.tn.edu.tw"),
+    # '@' is allowed freely — an identifier is NOT required to be a valid email.
+    ("weird@handle", "weird@handle"),
+    ("@nolocal", "@nolocal"),
+    ("bad@", "bad@"),
 ])
 def test_validate_accepts_usernames_and_emails(raw: str, expected: str) -> None:
     assert validate_identifier(raw) == expected
@@ -37,9 +41,7 @@ def test_validate_accepts_usernames_and_emails(raw: str, expected: str) -> None:
     "has space",
     "tab\tuser",
     "x" * 321,
-    "not an email@",       # has '@' but invalid email
-    "@nolocal.com",
 ])
-def test_validate_rejects(raw: str) -> None:
+def test_validate_rejects_only_structural(raw: str) -> None:
     with pytest.raises(InvalidIdentifierError):
         validate_identifier(raw)

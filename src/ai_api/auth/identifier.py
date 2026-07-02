@@ -1,19 +1,16 @@
 """Login-identifier helpers (spec 055): local login accepts a username OR an email.
 
 The identifier is stored in the existing `members.email` column (reused, so no
-schema change). Rules:
+schema change). It is a **free-form login name** — '@' is allowed and the value is
+NOT required to be a valid email (nothing is ever mailed to a member; the string is
+just an unverified login identifier). Only structural rules apply:
 - folded to lowercase + stripped → lookups are case-insensitive (matches the
   pre-existing email behaviour).
-- an identifier containing '@' is treated as an email and validated with EmailStr.
-- otherwise it is a username: no whitespace, non-empty, <= 320 chars, and (by
-  definition) no '@' — keeping the username / email namespaces clean.
+- non-empty, no whitespace, <= 320 chars.
 """
 from __future__ import annotations
 
-from pydantic import EmailStr, TypeAdapter, ValidationError
-
 MAX_LEN = 320
-_email_adapter: TypeAdapter[str] = TypeAdapter(EmailStr)
 
 
 class InvalidIdentifierError(ValueError):
@@ -27,12 +24,16 @@ def normalize_identifier(raw: str) -> str:
 
 
 def is_email(identifier: str) -> bool:
+    """Best-effort hint (an identifier that looks like an email). Not a gate —
+    '@' is allowed in usernames; this is only used where email-shaped handling
+    is a convenience (e.g. UI)."""
     return "@" in identifier
 
 
 def validate_identifier(raw: str) -> str:
     """Normalize + validate for the creation path. Returns the normalized
-    identifier or raises InvalidIdentifierError."""
+    identifier or raises InvalidIdentifierError. '@' is allowed (not validated as
+    an email); only structural rules are enforced."""
     ident = normalize_identifier(raw)
     if not ident:
         raise InvalidIdentifierError("identifier must not be empty")
@@ -40,9 +41,4 @@ def validate_identifier(raw: str) -> str:
         raise InvalidIdentifierError(f"identifier must be at most {MAX_LEN} characters")
     if any(c.isspace() for c in raw):
         raise InvalidIdentifierError("identifier must not contain whitespace")
-    if is_email(ident):
-        try:
-            _email_adapter.validate_python(ident)
-        except ValidationError as exc:
-            raise InvalidIdentifierError("invalid email address") from exc
     return ident

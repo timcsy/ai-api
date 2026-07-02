@@ -11,7 +11,7 @@ description: "Task list for 本地登入允許以帳號（非 email）登入"
 - [X] T001 基線：`pytest tests/ -q -k "login or member or tag_rule"` 全綠（零回歸起點）。
 
 ## Phase 2: Foundational（識別碼工具——阻斷全部）
-- [X] T002 [test] `tests/unit/test_identifier.py`：`normalize_identifier`（strip+lower）、`is_email`（含 `@` 且合法）、`validate`（禁空白/空/超長；帳號禁 `@`）邊界。先紅。
+- [X] T002 [test] `tests/unit/test_identifier.py`：`normalize_identifier`（strip+lower）、`is_email`（含 `@` 且合法）、`validate`（禁空白/空/超長；`@` 允許）邊界。先紅。
 - [X] T003 新建 `src/ai_api/auth/identifier.py`：`normalize_identifier()` / `is_email()` / `validate_identifier()`（含 `@`→走 EmailStr 驗證；否則帳號規則）。
 - [X] T004 跑 T002 綠。
 
@@ -21,7 +21,7 @@ description: "Task list for 本地登入允許以帳號（非 email）登入"
 - [X] T007 [US1] 跑 T005 綠 + 既有 email 登入測試零回歸。
 
 ## Phase 4: US2 帳號建立成員 + 邀請（P1）
-- [X] T008 [test][US2] 契約：以帳號建立本地成員→201 + 邀請連結；重複識別碼→重複；非法（空白/含 `@` 的帳號路徑/超長）→擋。先紅。
+- [X] T008 [test][US2] 契約：以帳號建立本地成員→201 + 邀請連結；重複識別碼→重複；非法（空白/超長）→擋；`@` 允許。先紅。
 - [X] T009 [US2] `api/admin_members.py`（`CreateMemberRequest`、`BulkCreateRequest` 的 `EmailStr`/adapter）→ 改用 `validate_identifier` + normalize；`services/members.py::create` 接受帳號、唯一性沿用。
 - [X] T010 [US2] 跑 T008 綠。
 

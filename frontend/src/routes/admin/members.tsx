@@ -63,13 +63,13 @@ interface AdminMember {
 
 const createSchema = z
   .object({
-    // spec 055: 帳號或 email。含 @ 視為 email 需合法；否則為帳號（不可含空白）。
+    // spec 055: 登入識別碼——帳號或 email 皆可，'@' 自由允許（不強制 email 格式）；
+    // 僅結構限制：非空、不可含空白。
     email: z
       .string()
       .trim()
       .min(1, "必填")
-      .refine((v) => !/\s/.test(v), "不可含空白")
-      .refine((v) => !v.includes("@") || z.string().email().safeParse(v).success, "email 格式錯"),
+      .refine((v) => !/\s/.test(v), "不可含空白"),
     provider: z.enum(["local_password", "external", "google_oidc"]),
     initial_password: z.string().min(12, "密碼至少 12 字元").optional().or(z.literal("")),
     send_invitation: z.boolean().default(false),

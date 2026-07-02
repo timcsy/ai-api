@@ -48,9 +48,10 @@ async def test_username_case_insensitive(app_client: AsyncClient, admin_headers)
 
 
 @pytest.mark.asyncio
-async def test_create_rejects_bad_identifier(app_client: AsyncClient, admin_headers) -> None:
-    assert await _create_local(app_client, admin_headers, "has space") == 400
-    assert await _create_local(app_client, admin_headers, "bad@") == 400  # '@' but not an email
+async def test_create_rejects_only_structural(app_client: AsyncClient, admin_headers) -> None:
+    assert await _create_local(app_client, admin_headers, "has space") == 400  # whitespace
+    # '@' is allowed freely (not required to be a valid email).
+    assert await _create_local(app_client, admin_headers, "weird@handle") == 201
 
 
 @pytest.mark.asyncio

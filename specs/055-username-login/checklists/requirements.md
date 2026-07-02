@@ -31,5 +31,5 @@
 
 ## Notes
 
-- 無 [NEEDS CLARIFICATION]：scope 由前面的影響分析對話充分定義，使用者已核可 Option C（折衷）與其推薦預設（重用 email 欄零 migration、只放寬 local、帳號禁 `@`、小寫收斂、自動 tag 依帳號本身比對）。
+- 無 [NEEDS CLARIFICATION]：scope 由前面的影響分析對話充分定義，使用者已核可 Option C（折衷）與其推薦預設（重用 email 欄零 migration、只放寬 local、`@` 允許、小寫收斂、自動 tag 依帳號本身比對）。
 - 決策已凍結於 Assumptions；準備進入 `/speckit.plan`。

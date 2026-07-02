@@ -10,15 +10,15 @@
 
 ## 核心決策（Option C 折衷，spec Assumptions 已凍結）
 
-- **只放寬 local**；OIDC 一律 email。`email` 欄重用為「登入識別碼」，值可為 email（含 `@`）或帳號（不含 `@`）。
-- **識別碼正規化**：統一 `strip().lower()`；帳號禁 `@`、禁空白、非空、≤320。含 `@` 者走既有 email 驗證（沿用 `EmailStr` 判斷）。
+- **只放寬 local**；OIDC 一律 email。`email` 欄重用為「登入識別碼」，值可為 email 或任意帳號（`@` 允許、不強制 email 格式）。
+- **識別碼正規化**：統一 `strip().lower()`；`@` 允許（不強制 email 格式）、禁空白、非空、≤320。
 - **自動 tag**：現有 `email_localpart_regex` 對無 `@` 帳號＝整串比對，已可用；額外加一個 `MatcherType.identifier_regex`（比對整個識別碼、語意清楚，VARCHAR 免 migration）。網域/後綴對帳號自然不匹配。
 
 ## 需改動的點（無新資料結構）
 
 ```
 backend/
-  src/ai_api/auth/identifier.py            # NEW 小工具：normalize_identifier() + is_email() + validate（禁@/空白/長度）
+  src/ai_api/auth/identifier.py            # NEW 小工具：normalize_identifier() + is_email() + validate（結構：非空/無空白/≤320，@ 允許）
   src/ai_api/api/auth.py                   # LocalLoginRequest.email EmailStr→識別碼(str)+正規化；查詢照舊
   src/ai_api/api/admin_members.py          # CreateMemberRequest/BulkCreate：EmailStr→識別碼驗證
   src/ai_api/services/members.py           # create：接受帳號、正規化、唯一性沿用
