@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/auth";
 import { LegacyRedirectRoutes } from "@/lib/legacy-redirects";
 import { AdminAllocationsPage } from "@/routes/admin/allocations";
+import { AdminAnomalyPage } from "@/routes/admin/anomaly";
 import { AdminAuditPage } from "@/routes/admin/audit";
 import { AdminCatalogManagePage } from "@/routes/admin/catalog-manage";
 import { AdminHomePage } from "@/routes/admin/home";
@@ -101,6 +102,7 @@ export function App() {
                   <Route path="usage" element={<AdminUsagePage />} />
                   <Route path="allocations" element={<AdminAllocationsPage />} />
                   <Route path="quota" element={<AdminQuotaPoolPage />} />
+                  <Route path="anomaly" element={<AdminAnomalyPage />} />
                   <Route path="rebalance" element={<AdminRebalanceLogListPage />} />
                   <Route path="rebalance/:id" element={<AdminRebalanceLogDetailPage />} />
                   <Route path="audit" element={<AdminAuditPage />} />

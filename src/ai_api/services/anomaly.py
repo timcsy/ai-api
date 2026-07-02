@@ -14,6 +14,7 @@ from ai_api.models import (
     ActorType,
     Allocation,
     AllocationStatus,
+    AnomalyConfig,
     AuditEventType,
     CallOutcome,
     CallRecord,
@@ -46,16 +47,43 @@ async def _count_calls(
     return int((await db.execute(stmt)).scalar_one())
 
 
+async def get_anomaly_config(db: AsyncSession) -> AnomalyConfig:
+    """The singleton anomaly config (switch + pause + thresholds). Lazy-seeds from
+    settings on first access so the move env→DB is a no-op on first run; thereafter
+    the DB row is the single source of truth (env is bootstrap default only)."""
+    cfg = await db.get(AnomalyConfig, 1)
+    if cfg is None:
+        settings = get_settings()
+        cfg = AnomalyConfig(
+            id=1,
+            auto_quarantine_enabled=True,
+            pause_until=None,
+            threshold_multiplier=settings.anomaly_threshold_multiplier,
+            min_calls=settings.anomaly_min_calls,
+            absolute_cold_start=settings.anomaly_absolute_cold_start,
+            baseline_min_calls=200,
+            updated_at=datetime.now(UTC),
+            updated_by=None,
+        )
+        db.add(cfg)
+        await db.flush()
+    return cfg
+
+
 async def evaluate_allocation(
-    db: AsyncSession, allocation_id: str, now: datetime | None = None
+    db: AsyncSession,
+    allocation_id: str,
+    now: datetime | None = None,
+    cfg: AnomalyConfig | None = None,
 ) -> QuarantineDecision | None:
-    settings = get_settings()
     now = now or datetime.now(UTC)
+    if cfg is None:
+        cfg = await get_anomaly_config(db)
     last_hour_start = now - timedelta(hours=1)
     baseline_window_start = now - timedelta(hours=24)
 
     last_hour = await _count_calls(db, allocation_id, last_hour_start, now)
-    if last_hour < settings.anomaly_min_calls:
+    if last_hour < cfg.min_calls:
         return None
 
     baseline_total = await _count_calls(
@@ -64,18 +92,21 @@ async def evaluate_allocation(
     # 23 hours of baseline window (24h total minus last hour)
     baseline_per_hour = baseline_total / 23.0
 
-    if baseline_per_hour == 0:
-        # cold-start: use absolute threshold
-        if last_hour >= settings.anomaly_absolute_cold_start:
+    # Sparse baseline (incl. cold-start, freshly-migrated cluster, new allocation):
+    # too few samples to trust the ratio → use the absolute threshold only. This
+    # is what stops workshop/onboarding spikes from being false-flagged, while a
+    # genuinely runaway caller (>= absolute) is still caught.
+    if baseline_total < cfg.baseline_min_calls:
+        if last_hour >= cfg.absolute_cold_start:
             return QuarantineDecision(
                 allocation_id=allocation_id,
                 last_hour_calls=last_hour,
-                baseline_per_hour=0.0,
+                baseline_per_hour=baseline_per_hour,
                 reason="absolute_cold_start",
             )
         return None
 
-    if last_hour >= baseline_per_hour * settings.anomaly_threshold_multiplier:
+    if last_hour >= baseline_per_hour * cfg.threshold_multiplier:
         return QuarantineDecision(
             allocation_id=allocation_id,
             last_hour_calls=last_hour,
@@ -86,8 +117,13 @@ async def evaluate_allocation(
 
 
 async def detect_and_quarantine(db: AsyncSession) -> list[QuarantineDecision]:
-    """One scan pass. Returns list of allocations that were quarantined."""
+    """One scan pass. Returns list of allocations that were quarantined.
+
+    When enforcement is disabled or paused (admin control), the scan still runs
+    and flags outliers in the logs/audit, but does NOT quarantine anyone."""
     now = datetime.now(UTC)
+    cfg = await get_anomaly_config(db)
+    enforcing = cfg.effective_enforcing(now)
     # Only consider active, non-service allocations. Service allocations
     # (e.g. agent CLIs like Codex, internal bots) are exempt — their traffic
     # is bursty by design and would otherwise be flagged as anomalous.
@@ -97,13 +133,25 @@ async def detect_and_quarantine(db: AsyncSession) -> list[QuarantineDecision]:
     )
     allocations = (await db.execute(active_stmt)).scalars().all()
 
-    decisions: list[QuarantineDecision] = []
+    quarantined: list[QuarantineDecision] = []
+    flagged = 0
     for alloc in allocations:
-        decision = await evaluate_allocation(db, alloc.id, now=now)
+        decision = await evaluate_allocation(db, alloc.id, now=now, cfg=cfg)
         if decision is None:
             continue
+        flagged += 1
+        if not enforcing:
+            # Admin has disabled/paused auto-quarantine — detect but don't block.
+            logger.info(
+                "anomaly flagged but enforcement %s: allocation=%s last_hour=%d reason=%s",
+                cfg.status(now),
+                alloc.id,
+                decision.last_hour_calls,
+                decision.reason,
+            )
+            continue
         alloc.status = AllocationStatus.quarantined
-        decisions.append(decision)
+        quarantined.append(decision)
         await audit.record(
             db,
             event_type=AuditEventType.allocation_quarantined,
@@ -131,8 +179,10 @@ async def detect_and_quarantine(db: AsyncSession) -> list[QuarantineDecision]:
         actor_type=ActorType.system,
         details={
             "scanned": len(allocations),
-            "quarantined": len(decisions),
+            "flagged": flagged,
+            "quarantined": len(quarantined),
+            "enforced": enforcing,
         },
     )
     await db.flush()
-    return decisions
+    return quarantined

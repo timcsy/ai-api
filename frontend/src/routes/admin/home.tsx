@@ -260,10 +260,15 @@ function Dashboard({
                 : "有分配處於暫停狀態，使用者目前無法呼叫。"}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-wrap gap-2">
             <Button asChild variant="outline" size="sm">
-              <Link to="/admin/observability/allocations">去檢視 / 處理</Link>
+              <Link to="/admin/observability/allocations">去檢視 / 解除隔離</Link>
             </Button>
+            {quarantinedCount > 0 && (
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/admin/observability/anomaly">暫停 / 調整自動隔離</Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}

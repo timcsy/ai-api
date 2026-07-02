@@ -22,6 +22,7 @@ from ai_api.api import (
     admin_tag_rules,
     admin_tags,
     allocations,
+    anomaly,
     auth,
     catalog,
     credentials,
@@ -98,6 +99,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(usage.router, prefix="/admin", tags=["admin-usage"])
     app.include_router(quota_pool.router, prefix="/admin", tags=["admin-quota-pool"])
+    app.include_router(anomaly.router, prefix="/admin", tags=["admin-anomaly"])
     app.include_router(catalog.router, prefix="/catalog", tags=["catalog"])
     app.include_router(proxy_router, prefix="/v1", tags=["proxy"])  # chat (streaming)
     app.include_router(models_router, prefix="/v1", tags=["proxy"])  # model discovery (GET /v1/models)
