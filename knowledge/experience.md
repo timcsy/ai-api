@@ -657,3 +657,12 @@
 - **解決方式**：bookkeeping 更新改用**獨立短交易**（另開一個 session、寫完**立刻 commit**），鎖只持有毫秒、**絕不跨外部慢呼叫**；且**不要弄髒請求 session 上的 ORM 物件**（否則請求結束 commit 時又重發一次 UPDATE、把長鎖加回來）。一處（`get_next`）修好，四個 proxy 入口（chat/responses/router/realtime）全受惠。修復後連線 79→5、active 51→1、卡死 UPDATE 50→0、500 歸零。
 - **教訓**：① 任何「請求生命週期內、上游慢呼叫之前」拿到的 row lock，預設它會被**持有到請求結束**（含整段上游時間）——bookkeeping/計數/`last_used_at` 這類**非交易核心**的寫入，要嘛獨立短交易立即 commit、要嘛 best-effort/節流，**別跟著請求 session 跨外部呼叫**。② 共用單一資源（一把 key、一個計數列）時，熱列 row lock 是隱形的全域序列化點——併發越高越致命。③ 診斷「塞車」先看 `pg_stat_activity` 的 `state=active` 數、`xact_start` 最久秒數、卡在哪句 query，**別先假設是 CPU/連線數**（node CPU 12% 卻在塞車，就是鎖/外部等待）。④ 既有的 app-key `last_used_at` 早就做了 >5min 節流（`services/allocations.py`），provider-cred 這條卻漏了——**同類 bookkeeping 要套用同一套防護**。
 - **來源**：`src/ai_api/services/provider_credentials.py::get_next`（獨立短交易）+ `src/ai_api/db.py`/`config.py`（可調池 + `pool_pre_ping`）+ helm `database.poolSize/maxOverflow`；事故 2026-06-29、ccsh rev 3 / tew rev 106、鏡像 `sha-6da8b19`。
+
+### 異常偵測要能被 admin 自助暫停，且稀疏 baseline 要退回絕對門檻（比例規則需足量樣本才可信）
+
+- **理論說**：用「近1h ≥ baseline/hr × 倍數」抓爆量很直覺；門檻寫在 env、偵測器自動隔離即可。
+- **實際發生**（研習誤隔離，2026-06〜07）：baseline 稀疏時比例規則的門檻低到荒謬——某分配 baseline 僅 3.65 次/hr，研習示範 103 次（10×=36.5）就被自動隔離、正常使用者吃 403。而且辦活動當下**管理員無法自助關閉**、只能找工程師改 env 或暫停排程（違反原則 6）。
+- **誤判彎路**：一開始想「調高倍數」或「暫停 cronjob」。調倍數是無腦放寬（會放過真濫用）；暫停 cronjob 是工程師介入、非自助，且事後易忘了開回。
+- **解決方式**（spec 054）：① **稀疏 baseline 退回絕對門檻**——baseline 樣本數 < `baseline_min_calls`（預設 200）時不套比例規則、只用絕對門檻；研習 103 次在絕對門檻（1萬）下不觸發，但真跑掉狂打上萬次照抓。② **設定搬 DB 單例**（比照 `pool_config`/`notification_config`，migration + `get_anomaly_config` lazy-seed）＝單一真理、admin 可自助改。③ **admin 可自助暫停/關閉**：偵測器讀 `effective_enforcing`（開關 AND 未在暫停期），不執法時照掃描/稽核但不隔離；`pause_until` 過期讀時判斷即自動恢復（不需背景任務），辦活動設「暫停到結束時間」不怕忘記關回。
+- **教訓**：① **比例/相對門檻只有在 baseline 有足量樣本時才可信**——樣本不足要退回絕對門檻，別讓「除以小樣本」放大成脆弱門檻（剛遷移的新叢集、新分配、計畫性衝量全是稀疏 baseline 的常客）。② **保護型自動化（會擋人的）要給 admin 自助的暫停/關閉旋鈕**，且最好帶「到期自動恢復」——不是只能靠工程師（原則 6）。③ 「暫停」用讀時判斷 `pause_until > now` 比背景清理簡單且不會漏。④ 硬天花板（配額）已在時，第二層偵測「暫停」的風險有界，可以更放心地把控制權交給 admin。
+- **來源**：`services/anomaly.py`（`get_anomaly_config` + 稀疏 baseline 分支 + `effective_enforcing` 略過）、`models/anomaly_config.py`、`api/anomaly.py`、migration 0022；spec 054、rev 107（ccsh rev 4 / tew rev 107，`sha-e1ea1c2`）。

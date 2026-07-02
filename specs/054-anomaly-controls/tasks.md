@@ -42,9 +42,9 @@ description: "Task list for 異常偵測 v2（管理員可暫停自動隔離 + �
 
 ## Phase 7: Polish & 上線
 - [X] T022 全套零回歸：`pytest tests/ -q` + `ruff check .` + `uv run mypy src/ai_api`；前端全套 vitest + tsc(退出碼) + build。
-- [ ] T023 PR + squash-merge（CI 綠）。前後端兩 image bump；**有 migration → `--set migrationJob.enabled=true`**；部署 **ccsh + tew**（`--reuse-values` + 顯式 `--set` 新 chart 值若有）。驗 `alembic current=0022`、`GET /admin/anomaly/config`。
+- [X] T023 PR + squash-merge（CI 綠）。前後端兩 image bump；**有 migration → `--set migrationJob.enabled=true`**；部署 **ccsh + tew**（`--reuse-values` + 顯式 `--set` 新 chart 值若有）。驗 `alembic current=0022`、`GET /admin/anomaly/config`。
 - [ ] T024 真機驗收（明天研習前）：admin 介面「暫停自動隔離到 <研習結束>」→ 確認研習期間不隔離；到期自動恢復；首頁一鍵解除可用。
-- [ ] T025 知識同步：vision 階段標「異常偵測 v2 ✅」；experience 蒸餾「異常偵測要可被 admin 自助暫停 + 稀疏 baseline 走絕對門檻（比例規則需足量樣本才可信）」。
+- [X] T025 知識同步：vision 階段標「異常偵測 v2 ✅」；experience 蒸餾「異常偵測要可被 admin 自助暫停 + 稀疏 baseline 走絕對門檻（比例規則需足量樣本才可信）」。
 
 ## Dependencies
 - Foundational（T002–T007）阻斷全部。US2（T008–10）、US1（T011–15）皆依賴它；US4（T016–18）疊在 US1 的 PUT handler。前端（T019–21）依賴後端端點。Polish 最後。
