@@ -77,6 +77,13 @@ def _matches(rule: Any, email: str, local: str, domain: str) -> bool:
         except re.error:
             logger.warning("tag_rule %s has invalid stored pattern; skipping", getattr(rule, "id", "?"))
             return False
+    if mt == MatcherType.identifier_regex:
+        # spec 055: match the whole login identifier (username or email).
+        try:
+            return re.fullmatch(rule.pattern, email) is not None
+        except re.error:
+            logger.warning("tag_rule %s has invalid stored pattern; skipping", getattr(rule, "id", "?"))
+            return False
     if mt == MatcherType.email_suffix:
         return bool(email.lower().endswith(rule.pattern.lower()))
     if mt == MatcherType.email_domain:
@@ -120,7 +127,7 @@ class TagRuleService:
     @staticmethod
     def _normalize(matcher_type: MatcherType, pattern: str) -> str:
         """Validate/normalize pattern for the matcher; returns stored pattern."""
-        if matcher_type == MatcherType.email_localpart_regex:
+        if matcher_type in (MatcherType.email_localpart_regex, MatcherType.identifier_regex):
             return guard_regex(pattern)
         if matcher_type == MatcherType.always:
             return ""

@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import get_db_session, require_admin_token
@@ -53,7 +53,8 @@ class ReorderRequest(BaseModel):
 
 
 class TestRequest(BaseModel):
-    email: EmailStr
+    # spec 055: test any login identifier (username or email) against the rules.
+    email: str
 
 
 @router.get("/tag-rules")

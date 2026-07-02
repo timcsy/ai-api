@@ -20,6 +20,9 @@ class MatcherType(enum.StrEnum):
     email_suffix = "email_suffix"
     email_domain = "email_domain"
     always = "always"
+    # spec 055: regex over the whole login identifier (username or email) — the
+    # username-friendly matcher (email_domain/suffix don't fire on a bare username).
+    identifier_regex = "identifier_regex"
 
 
 class TagRule(Base):

@@ -45,6 +45,7 @@ import { ApiError, api } from "@/lib/api-client";
 
 type MatcherType =
   | "email_localpart_regex"
+  | "identifier_regex"
   | "email_suffix"
   | "email_domain"
   | "always";
@@ -69,6 +70,7 @@ interface RuleMatch {
 
 const MATCHER_LABELS: Record<MatcherType, string> = {
   email_localpart_regex: "@ 前段格式比對（學號 / 帳號）",
+  identifier_regex: "整個帳號 / Email 格式比對（含純帳號）",
   email_suffix: "Email 結尾比對（單位 / 子網域）",
   email_domain: "Email 網域完全比對",
   always: "其他全部（Fallback）",
@@ -77,6 +79,8 @@ const MATCHER_LABELS: Record<MatcherType, string> = {
 const MATCHER_HINTS: Record<MatcherType, string> = {
   email_localpart_regex:
     "比對 email「@ 前面」那段的格式。例：b10901234@school.edu → 比對 b10901234。學生學號是固定格式、老師多是姓名，可用這個區分「同校」的學生 vs 老師。",
+  identifier_regex:
+    "比對「整個登入識別碼」的格式（帳號或 email 皆可）。適合純帳號登入者（沒有 @、網域規則無法命中）。例：stu\\d+ → 命中 stu2026。",
   email_suffix:
     "比對 email 是否以某段字串結尾。例：以 @students.school.edu 結尾 → 命中該子網域所有人。",
   email_domain:
@@ -272,12 +276,12 @@ export function AdminTagRulesPage() {
 
       {/* Test email box */}
       <div className="border rounded-md p-4 space-y-3">
-        <Label htmlFor="test-email" className="font-semibold">測試 email</Label>
-        <p className="text-xs text-muted-foreground">輸入一個 email，預覽會命中哪條規則、貼哪個標籤（不會建立成員）。</p>
+        <Label htmlFor="test-email" className="font-semibold">測試 帳號 / email</Label>
+        <p className="text-xs text-muted-foreground">輸入一個帳號或 email，預覽會命中哪條規則、貼哪個標籤（不會建立成員）。</p>
         <div className="flex gap-2">
           <Input
             id="test-email"
-            placeholder="b10901234@school.edu"
+            placeholder="b10901234@school.edu 或 stu2026"
             value={testEmail}
             onChange={(e) => setTestEmail(e.target.value)}
           />

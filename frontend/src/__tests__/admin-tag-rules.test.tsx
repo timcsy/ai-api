@@ -86,7 +86,7 @@ describe("<AdminTagRulesPage />", () => {
     renderPage();
 
     await screen.findByText(/還沒有規則/);
-    fireEvent.change(screen.getByPlaceholderText("b10901234@school.edu"), {
+    fireEvent.change(screen.getByPlaceholderText(/b10901234@school.edu/), {
       target: { value: "b10901234@school.edu" },
     });
     fireEvent.click(screen.getByText("測試"));

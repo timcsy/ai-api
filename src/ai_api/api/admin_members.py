@@ -4,11 +4,12 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import get_db_session, require_admin_token
+from ai_api.auth.identifier import validate_identifier
 from ai_api.auth.sessions import revoke_all_for_member
 from ai_api.models import Member, MemberProvider, MemberStatus, Session
 from ai_api.services.members import (
@@ -23,7 +24,8 @@ router = APIRouter(dependencies=[Depends(require_admin_token)])
 
 
 class CreateMemberRequest(BaseModel):
-    email: EmailStr
+    # spec 055: login identifier — a username or an email (validated in-handler).
+    email: str
     provider: MemberProvider
     display_name: str | None = None
     external_id: str | None = None
@@ -70,7 +72,7 @@ async def create_member(
     service = MemberService(session)
     try:
         created = await service.create(
-            email=payload.email,
+            email=validate_identifier(payload.email),
             provider=payload.provider,
             display_name=payload.display_name,
             external_id=payload.external_id,
@@ -232,14 +234,11 @@ async def bulk_create_members(
     request: Request,
     payload: BulkCreateRequest,
 ) -> dict[str, Any]:
-    """Batch pre-create local_password members from a pasted email list. Each
-    email is processed independently; results are classified created / exists /
-    invalid / duplicate."""
-    from pydantic import TypeAdapter
-
+    """Batch pre-create local_password members from a pasted identifier list
+    (usernames or emails, spec 055). Each line is processed independently;
+    results are classified created / exists / invalid / duplicate."""
     from ai_api.db import get_sessionmaker
 
-    email_adapter: TypeAdapter[EmailStr] = TypeAdapter(EmailStr)
     lines = [ln.strip().lower() for ln in payload.emails.splitlines()]
     lines = [ln for ln in lines if ln]
     if not lines:
@@ -261,7 +260,7 @@ async def bulk_create_members(
             continue
         seen.add(email)
         try:
-            email_adapter.validate_python(email)
+            validate_identifier(email)
         except Exception:
             results.append({"email": email, "status": "invalid", "invitation_url": None})
             counts["invalid"] += 1
