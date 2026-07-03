@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { ApiUsageExample } from "@/components/api-usage-example";
 import { AllocationUsageCharts } from "@/components/allocation-usage-charts";
+import { PerCallScatter } from "@/components/per-call-scatter";
 import { AllocationKeysReadonly } from "@/components/allocation-keys-readonly";
 import { per1kToPer1m } from "@/lib/price-format";
 import { useToast } from "@/components/ui/use-toast";
@@ -34,6 +35,10 @@ interface CallItem {
   prompt_tokens: number | null;
   completion_tokens: number | null;
   total_tokens: number | null;
+  cost_usd: string | null;
+  quantity: number | null;
+  unit: string | null;
+  model?: string | null;
 }
 
 interface CallsPage {
@@ -208,6 +213,13 @@ export function AllocationDetailPage() {
 
       <AllocationUsageCharts allocationId={id} />
 
+      {items.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-lg">逐筆呼叫（散點）</CardTitle></CardHeader>
+          <CardContent><PerCallScatter records={items} /></CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">最近呼叫</CardTitle>
@@ -224,19 +236,23 @@ export function AllocationDetailPage() {
           )}
           {items.length > 0 && (
             <div className="space-y-2 overflow-x-auto">
-              <div className="grid min-w-[560px] grid-cols-[1.6fr_0.6fr_1fr_0.8fr_1.4fr] gap-3 text-xs font-medium text-muted-foreground border-b pb-2">
+              <div className="grid min-w-[620px] grid-cols-[1.6fr_0.6fr_1fr_0.8fr_0.8fr_1.4fr] gap-3 text-xs font-medium text-muted-foreground border-b pb-2">
                 <span>時間</span>
                 <span>狀態</span>
                 <span>結果</span>
                 <span className="text-right">總 tokens</span>
+                <span className="text-right">花費</span>
                 <span className="text-right">請求 ID</span>
               </div>
               {items.map((c) => (
-                <div key={c.id} className="grid min-w-[560px] grid-cols-[1.6fr_0.6fr_1fr_0.8fr_1.4fr] gap-3 text-sm py-1 border-b border-border/30">
+                <div key={c.id} className="grid min-w-[620px] grid-cols-[1.6fr_0.6fr_1fr_0.8fr_0.8fr_1.4fr] gap-3 text-sm py-1 border-b border-border/30">
                   <span className="truncate">{new Date(c.started_at).toLocaleString("zh-TW")}</span>
                   <span>{c.status_code}</span>
                   <span className="text-xs truncate">{c.outcome}</span>
                   <span className="text-right tabular-nums">{c.total_tokens ?? "—"}</span>
+                  <span className="text-right tabular-nums text-xs">
+                    {c.cost_usd != null ? `$${Number(c.cost_usd).toFixed(Number(c.cost_usd) < 1 ? 4 : 2)}` : (c.unit && c.unit !== "token" ? `${c.quantity ?? "?"} ${c.unit}` : "—")}
+                  </span>
                   <span className="min-w-0 text-right font-mono text-xs text-muted-foreground truncate" title={c.request_id}>
                     {c.request_id}
                   </span>

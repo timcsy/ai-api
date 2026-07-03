@@ -162,6 +162,12 @@ class CallRecordOut(BaseModel):
     prompt_tokens: int | None
     completion_tokens: int | None
     total_tokens: int | None
+    # spec 056: per-record cost + non-token metering (None ⇒ unpriced / token unit).
+    reasoning_tokens: int | None = None
+    cached_tokens: int | None = None
+    cost_usd: Decimal | None = None
+    quantity: int | None = None
+    unit: str | None = None
     error_message: str | None
 
 
