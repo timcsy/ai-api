@@ -34,8 +34,8 @@ description: "Task list for 用量可觀測性 v2（逐筆記錄檢視 + 逐筆�
 
 ## Phase 6: Polish & 上線
 - [X] T016 全套零回歸：`pytest tests/ -q` + `ruff check .` + `uv run mypy src/ai_api`；前端全套 vitest + tsc(退出碼) + build。
-- [ ] T017 PR + squash-merge（CI 綠）。前後端兩 image、**無 migration**；部署 ccsh + tew（ccsh 走 SSH 隧道；helm 不接 rollout-status 於同指令）。部署後驗 admin 逐筆頁 + 成員逐筆含成本 + 散點。
-- [ ] T018 知識同步：experience 蒸餾「逐筆可觀測性：後端逐筆端點/資料早有，缺的是對外輸出補成本 + admin UI 頁 + 逐筆散點；彙總圖看不出離群單次呼叫」；vision 視需要加一筆。
+- [X] T017 PR + squash-merge（CI 綠）。前後端兩 image、**無 migration**；部署 ccsh + tew（ccsh 走 SSH 隧道；helm 不接 rollout-status 於同指令）。部署後驗 admin 逐筆頁 + 成員逐筆含成本 + 散點。
+- [X] T018 知識同步：experience 蒸餾「逐筆可觀測性：後端逐筆端點/資料早有，缺的是對外輸出補成本 + admin UI 頁 + 逐筆散點；彙總圖看不出離群單次呼叫」；vision 視需要加一筆。
 
 ## Dependencies
 - Foundational（T002–T005，逐筆含成本）阻斷顯示層。US1（T006–09 admin 端點）依賴 schema 已含成本；US3（T010–12 散點元件）獨立可先做（吃資料即可）。前端整合（T013–14）依賴後端端點 + 散點元件。

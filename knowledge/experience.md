@@ -684,3 +684,12 @@
 - **解決方式**：把**所有「後面緊接非 ASCII 字元」的 `$VAR` 都改成 `${VAR}`**（大括號明確界定名字結尾）。用 `perl -CSD -pe 's/\$([A-Za-z_]\w*)(?=[^\x00-\x7F])/\${$1}/g'` 一次掃全檔。四支安裝腳本（sh + ps1）都要。並加**回歸測試**：斷言 render 後的腳本裡沒有「裸 `$VAR` 直接接非 ASCII 位元組」（`re.findall(r"\$[A-Za-z_]\w*[^\x00-\x7F]", body)` 應為空）。
 - **教訓**：① 給非工程師跑的 shell 腳本、又混中文訊息時，**變數一律 `${VAR}`**——尤其緊接標點/中文處。這種 bug 只在特定 locale 現形，本機測不出來、要嘛真機、要嘛靜態掃描擋。② 「三平台驗收過」不等於「所有 locale 過」；locale/編碼類 bug 要用**規則掃描**當守門（呼應「本機測不出來的東西要用 CI/規則擋」）。③ 順帶：這次 image build 被 Trivy 擋下（joserfc 1.6.5 的 HS256 空 HMAC key CVE-2026-49852，transitive via authlib）——有 fix 的 auth 函式庫 CVE 就**升版**（`uv lock --upgrade-package joserfc` → 1.7.2）別 ignore。
 - **來源**：`src/ai_api/install/codex.sh.tmpl`（+ .ps1 + restore 兩支）、`tests/contract/test_install_endpoint.py::test_no_unbraced_var_before_non_ascii`（回歸守門）、`uv.lock`（joserfc 1.7.2）；`sha-1a3462e`（ccsh rev 8 / tew rev 110、2026-07-03）。
+
+### 逐筆可觀測性：後端資料/端點常已齊，缺的是「對外輸出補成本 + admin UI 頁 + 逐筆散點」——彙總圖看不出離群的單次呼叫
+
+- **理論說**：已經有依 成員/分配/模型/日 的彙總圖 + 熱力圖 + CSV，用量可觀測性很完整了。
+- **實際發生**（spec 056）：使用者問「管理員看得到每一筆 record 嗎？逐筆能成圖嗎？」一盤點才發現——**逐筆端點與資料早就有**（`/admin/allocations/{id}/calls`、`CallRecord` 有 `cost_usd`/`quantity`/`unit`），但：① admin **前端沒有頁面**接它（只能打 API）；② 逐筆對外輸出（`CallRecordOut`、`/me/.../calls`）**漏帶成本**（DB 有 cost_usd 卻沒序列化出去）；③ 所有圖都是**時間桶彙總**，沒有「每筆呼叫一個點」的散點——**離群的單次大呼叫在彙總圖裡被平均掉、看不出來**。
+- **解決方式**：三刀都很小、**零 migration**——(a) `CallRecordOut` + `/me/.../calls` 補 `cost_usd`/`quantity`/`unit`（未定價⇒null，別當 0）；(b) 新 `GET /admin/records`（跨成員/分配 keyset 游標 + 篩選）+ 觀測頁「逐筆記錄」tab；(c) 共用 `<PerCallScatter>`（recharts `ScatterChart`，一點一呼叫、y=花費↔tokens），admin 與成員共用。
+- **教訓**：① 盤點可觀測性時分「**彙總層 vs 逐筆層**」兩條線各自查——彙總完整不代表逐筆可達；「後端有端點」≠「使用者看得到」（同「backend 有 API 卻沒 UI = 隱性債」）。② **DB 有記的欄位要確認有沒有序列化出去**——`cost_usd` 存了卻沒進逐筆輸出，是常見的「記了但看不到」。③ **彙總會藏離群**——要抓「某一次異常大呼叫」需逐筆散點，不是日彙總。④ **未定價語意**：逐筆成本 None 要顯示「未定價」不可當 0（跨端點只有花費可比，但沒定價的不能亂補 0）。
+- **流程再犯**：前端 CI 跑 `eslint .`，我本機只跑了 vitest/tsc/build **又漏了 eslint**（`no-explicit-any` 擋下）；且用 `;` 串接 tsc+git 導致 tsc 失敗仍 push 出一個壞 commit。**改前端一定本機先跑 `npx eslint .` + `tsc --noEmit`（用 `&&` 串、別用 `;`）再 push**（強化既有「本機關卡逐字對齊 CI」那條）。
+- **來源**：`api/schemas.py::CallRecordOut`、`api/records.py::list_records`+`GET /admin/records`、`services/records.py::list_records`、`api/me.py`（calls 補成本）、`components/per-call-scatter.tsx`、`routes/admin/records.tsx`；spec 056、無 migration、ccsh rev 9 / tew rev 111、`sha-eb84520`（2026-07-03）。
