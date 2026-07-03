@@ -13,6 +13,10 @@ from ai_api.models import ActorType, AuditEventType, AuthAuditLog
 
 router = APIRouter(dependencies=[Depends(require_admin_token)])
 
+# High-frequency routine system events that flood the log (the anomaly detector
+# runs every 5 min). Hidden by default; the UI has a "show routine events" toggle.
+ROUTINE_EVENT_TYPES = frozenset({AuditEventType.anomaly_detector_run})
+
 
 @router.get("/audit")
 async def list_audit(
@@ -23,11 +27,18 @@ async def list_audit(
     target_id: str | None = Query(default=None),
     since: datetime | None = Query(default=None, description="ISO 8601 inclusive lower bound"),
     until: datetime | None = Query(default=None, description="ISO 8601 exclusive upper bound"),
+    include_routine: bool = Query(
+        default=False, description="include high-frequency routine system events"
+    ),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     stmt = select(AuthAuditLog).order_by(desc(AuthAuditLog.created_at))
+    # Hide routine noise by default — unless the caller explicitly filters for one
+    # of those event types (then they clearly want it).
+    if not include_routine and event_type is None:
+        stmt = stmt.where(AuthAuditLog.event_type.not_in(ROUTINE_EVENT_TYPES))
     if actor_type is not None:
         stmt = stmt.where(AuthAuditLog.actor_type == actor_type)
     if actor_id is not None:

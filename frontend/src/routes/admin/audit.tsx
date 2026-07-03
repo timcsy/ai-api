@@ -39,6 +39,7 @@ export function AdminAuditPage() {
   const [actorId, setActorId] = React.useState("");
   const [targetType, setTargetType] = React.useState("");
   const [targetId, setTargetId] = React.useState("");
+  const [includeRoutine, setIncludeRoutine] = React.useState(false);
 
   const eventsQuery = useQuery<string[], ApiError>({
     queryKey: ["admin", "audit-event-types"],
@@ -52,9 +53,10 @@ export function AdminAuditPage() {
     if (actorId) p.set("actor_id", actorId);
     if (targetType) p.set("target_type", targetType);
     if (targetId) p.set("target_id", targetId);
+    if (includeRoutine) p.set("include_routine", "true");
     p.set("limit", "100");
     return p.toString();
-  }, [eventType, actorType, actorId, targetType, targetId]);
+  }, [eventType, actorType, actorId, targetType, targetId, includeRoutine]);
 
   const query = useQuery<{ rows: AuditRow[]; limit: number; offset: number }, ApiError>({
     queryKey: ["admin", "audit", params],
@@ -102,10 +104,20 @@ export function AdminAuditPage() {
           <Label className="text-xs">Target ID</Label>
           <Input className="mt-1" value={targetId} onChange={(e) => setTargetId(e.target.value)} />
         </div>
+        <label className="col-span-2 md:col-span-5 flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            className="h-4 w-4"
+            checked={includeRoutine}
+            onChange={(e) => setIncludeRoutine(e.target.checked)}
+          />
+          顯示系統例行事件（異常偵測器每 5 分鐘的掃描等；預設隱藏以免洗版）
+        </label>
       </div>
 
       <p className="text-xs text-muted-foreground">
         最近 {query.data?.rows.length ?? 0} 筆（從新到舊；最多 100）
+        {!includeRoutine && "，已隱藏例行系統事件"}
       </p>
 
       <Table className="responsive-table">
