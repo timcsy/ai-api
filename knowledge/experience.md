@@ -675,3 +675,12 @@
 - **隱形耦合要追全**：`EmailStr` 不只在登入——還散在**建立成員 / 批次匯入 / email 白名單 / tag 規則測試**等多個 admin schema；自動 tag 更是 `email.partition("@")` 切 local/domain 來比對（網域/後綴 matcher 對「無 @ 的帳號」自然不命中、但**用 `partition` 不會 crash**）。放寬時要 grep 全部 `EmailStr` 使用點逐一決定（本案：只放寬 local 相關；OIDC 一律 email、其網域式自動註冊/白名單不動），並補一個 `identifier_regex` matcher 讓純帳號也能自動分組。
 - **教訓**：① 型別即契約——`EmailStr` 這種「看似合理的嚴格驗證」會**悄悄把一個未驗證識別碼綁成 email**，需求一變才發現是自找的限制。先問「這個 email **真的**被當 email 用嗎（有寄信/驗證嗎）？」再決定要不要 `EmailStr`。② 放寬一個「身分/識別」欄位時，**grep 出所有把它當 email 的點**（schema 驗證、字串切分、規則比對、UI 標籤）逐一決定，別只改登入。③ 重用既有欄位（值語意放寬）常能**零 migration** 達成，比新增 `username` 欄+雙軌省事得多——但要接受「同一欄混裝兩種值」的語意債（本案可接受）。④ 用 `partition("@")` 而非 `split("@")[1]` 這類寫法，天然對非 email 輸入安全（不 crash，只是不命中）。
 - **來源**：`src/ai_api/auth/identifier.py`（normalize/validate）、`api/auth.py`（登入放寬）、`api/admin_members.py`/`admin_tag_rules.py`（EmailStr→identifier）、`models/tag_rule.py` + `services/tag_rules.py`（`identifier_regex`）；spec 055、無 migration、ccsh rev 6 / tew rev 108、`sha-8a2444f`（2026-07-02）。
+
+### shell 腳本裡 `$VAR` 後面直接接中文/全形字元一定要加大括號 `${VAR}`——否則某些 locale 會把非 ASCII 位元組吃進變數名、`set -u` 當場炸
+
+- **理論說**：`say "已備份為 *.bak-$TS（在 $CODEX_HOME）。"` 看起來沒問題，`$TS` 前面剛設過、字串也用雙引號包好。三平台真機驗收也過了。
+- **實際發生**（真機 macOS，2026-07-03）：使用者跑 `curl … | sh` 裝 Codex，噴 `sh: line 39: TS?: unbound variable`——即使 `set -eu` 下 `TS` 明明在前面設過。根因：`$TS` 後面**緊接全形括號 `（`**（U+FF08，UTF-8 三個位元組）。在使用者那台的 shell/locale 下，變數名解析把 `（` 的首位元組（0xEF）當成名字的一部分 → 讀成 `$TS\xef…` → 未定義 → `set -u` abort，**在寫入任何設定前就中止**。**跟「Codex 桌面版沒關」無關**（那行只是固定 echo）。
+- **為什麼之前驗收沒踩到**：這是 **locale 相依**——UTF-8 locale 的 bash 會正確在 `S` 停住；C/POSIX 或某些 locale 的 shell 會貪婪地吃掉後續位元組。同一支腳本，A 機器好、B 機器炸。
+- **解決方式**：把**所有「後面緊接非 ASCII 字元」的 `$VAR` 都改成 `${VAR}`**（大括號明確界定名字結尾）。用 `perl -CSD -pe 's/\$([A-Za-z_]\w*)(?=[^\x00-\x7F])/\${$1}/g'` 一次掃全檔。四支安裝腳本（sh + ps1）都要。並加**回歸測試**：斷言 render 後的腳本裡沒有「裸 `$VAR` 直接接非 ASCII 位元組」（`re.findall(r"\$[A-Za-z_]\w*[^\x00-\x7F]", body)` 應為空）。
+- **教訓**：① 給非工程師跑的 shell 腳本、又混中文訊息時，**變數一律 `${VAR}`**——尤其緊接標點/中文處。這種 bug 只在特定 locale 現形，本機測不出來、要嘛真機、要嘛靜態掃描擋。② 「三平台驗收過」不等於「所有 locale 過」；locale/編碼類 bug 要用**規則掃描**當守門（呼應「本機測不出來的東西要用 CI/規則擋」）。③ 順帶：這次 image build 被 Trivy 擋下（joserfc 1.6.5 的 HS256 空 HMAC key CVE-2026-49852，transitive via authlib）——有 fix 的 auth 函式庫 CVE 就**升版**（`uv lock --upgrade-package joserfc` → 1.7.2）別 ignore。
+- **來源**：`src/ai_api/install/codex.sh.tmpl`（+ .ps1 + restore 兩支）、`tests/contract/test_install_endpoint.py::test_no_unbraced_var_before_non_ascii`（回歸守門）、`uv.lock`（joserfc 1.7.2）；`sha-1a3462e`（ccsh rev 8 / tew rev 110、2026-07-03）。
