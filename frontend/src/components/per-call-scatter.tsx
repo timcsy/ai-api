@@ -94,8 +94,9 @@ function CallTooltip({
   payload?: Array<{ payload: { rec: CallPoint } }>;
   metric: "cost" | "tokens";
 }) {
-  if (!active || !payload?.length) return null;
-  const r: CallPoint = payload[0].payload.rec;
+  const first = active ? payload?.[0] : undefined;
+  if (!first) return null;
+  const r: CallPoint = first.payload.rec;
   return (
     <div className="rounded-md border bg-background p-2 text-xs shadow-md space-y-0.5">
       <div className="font-medium">{r.model ?? "—"}</div>
