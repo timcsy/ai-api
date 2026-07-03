@@ -334,6 +334,10 @@ async def list_my_allocation_calls(
                 "prompt_tokens": r.prompt_tokens,
                 "completion_tokens": r.completion_tokens,
                 "total_tokens": r.total_tokens,
+                # spec 056: per-record cost + non-token unit (None ⇒ unpriced / token).
+                "cost_usd": str(r.cost_usd) if r.cost_usd is not None else None,
+                "quantity": r.quantity,
+                "unit": r.unit,
             }
             for r in items
         ],

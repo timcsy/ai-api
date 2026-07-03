@@ -10,6 +10,7 @@ import { LegacyRedirectRoutes } from "@/lib/legacy-redirects";
 import { AdminAllocationsPage } from "@/routes/admin/allocations";
 import { AdminAnomalyPage } from "@/routes/admin/anomaly";
 import { AdminAuditPage } from "@/routes/admin/audit";
+import { AdminRecordsPage } from "@/routes/admin/records";
 import { AdminCatalogManagePage } from "@/routes/admin/catalog-manage";
 import { AdminHomePage } from "@/routes/admin/home";
 import { AdminMembersPage } from "@/routes/admin/members";
@@ -100,6 +101,7 @@ export function App() {
                 <Route path="/admin/observability" element={<AdminObservabilityPage />}>
                   <Route index element={<Navigate to="usage" replace />} />
                   <Route path="usage" element={<AdminUsagePage />} />
+                  <Route path="records" element={<AdminRecordsPage />} />
                   <Route path="allocations" element={<AdminAllocationsPage />} />
                   <Route path="quota" element={<AdminQuotaPoolPage />} />
                   <Route path="anomaly" element={<AdminAnomalyPage />} />

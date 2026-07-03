@@ -93,3 +93,50 @@ class RecordsService:
             )
         result = await self._s.execute(stmt)
         return cast(list[CallRecord], list(result.scalars().all()))
+
+    async def list_records(
+        self,
+        *,
+        member_id: str | None = None,
+        allocation_id: str | None = None,
+        subject: str | None = None,
+        from_: datetime | None = None,
+        to: datetime | None = None,
+        outcome: str | None = None,
+        limit: int = 100,
+        before: str | None = None,
+    ) -> list[CallRecord]:
+        """Per-call records across allocations/members (admin, spec 056). Same
+        keyset as list_for_allocation: (started_at DESC, id DESC)."""
+        from ai_api.models import Allocation
+
+        stmt = (
+            select(CallRecord)
+            .order_by(CallRecord.started_at.desc(), CallRecord.id.desc())
+            .limit(limit)
+        )
+        if allocation_id is not None:
+            stmt = stmt.where(CallRecord.allocation_id == allocation_id)
+        if member_id is not None:
+            member_alloc_ids = select(Allocation.id).where(Allocation.member_id == member_id)
+            stmt = stmt.where(CallRecord.allocation_id.in_(member_alloc_ids))
+        if subject is not None:
+            stmt = stmt.where(CallRecord.subject == subject)
+        if from_ is not None:
+            stmt = stmt.where(CallRecord.started_at >= from_)
+        if to is not None:
+            stmt = stmt.where(CallRecord.started_at < to)
+        if outcome is not None:
+            stmt = stmt.where(CallRecord.outcome == outcome)
+        if before:
+            pivot = (
+                select(CallRecord.started_at).where(CallRecord.id == before).scalar_subquery()
+            )
+            stmt = stmt.where(
+                or_(
+                    CallRecord.started_at < pivot,
+                    and_(CallRecord.started_at == pivot, CallRecord.id < before),
+                )
+            )
+        result = await self._s.execute(stmt)
+        return cast(list[CallRecord], list(result.scalars().all()))
