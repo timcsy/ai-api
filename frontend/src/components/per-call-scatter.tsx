@@ -85,7 +85,15 @@ export function PerCallScatter({ records }: { records: CallPoint[] }) {
   );
 }
 
-function CallTooltip({ active, payload, metric }: any) {
+function CallTooltip({
+  active,
+  payload,
+  metric,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: { rec: CallPoint } }>;
+  metric: "cost" | "tokens";
+}) {
   if (!active || !payload?.length) return null;
   const r: CallPoint = payload[0].payload.rec;
   return (
