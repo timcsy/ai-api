@@ -33,7 +33,7 @@ say ""
 if [ "$RESTORED" = "1" ]; then
   say "✓ 已還原最近一次安裝前的 Codex 設定。請重新開啟 Codex。"
   say "  想用更早的備份？$CODEX_HOME 內還有其他 *.bak-* 檔，手動把它 cp 回原本檔名即可。"
-  say "  （還原前的設定已另存為 *.prerestore-$TS，可再切回去。）"
+  say "  （還原前的設定已另存為 *.prerestore-${TS}，可再切回去。）"
 else
   say "找不到任何可還原的備份（$CODEX_HOME 內沒有 *.bak-* 檔）——未改動任何設定。"
 fi

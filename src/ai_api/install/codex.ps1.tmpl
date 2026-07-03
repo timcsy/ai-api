@@ -25,11 +25,11 @@ $ts = Get-Date -Format "yyyyMMdd-HHmmss"
 $backedUp = $false
 foreach ($f in @($Config, $Auth)) {
   if (Test-Path $f) {
-    try { Copy-Item $f "$f.bak-$ts" -Force } catch { Write-Host "ERROR: 無法備份 $f（請確認 $CodexHome 可寫）。已中止，未改任何設定。"; exit 1 }
+    try { Copy-Item $f "$f.bak-$ts" -Force } catch { Write-Host "ERROR: 無法備份 ${f}（請確認 $CodexHome 可寫）。已中止，未改任何設定。"; exit 1 }
     $backedUp = $true
   }
 }
-if ($backedUp) { Write-Host "已備份你原本的 Codex 設定為 *.bak-$ts（在 $CodexHome）。" }
+if ($backedUp) { Write-Host "已備份你原本的 Codex 設定為 *.bak-${ts}（在 ${CodexHome}）。" }
 
 # ---------------------------------------------------------------------------
 # 1. Install the Codex CLI (standalone binary from GitHub Releases; no Node).
@@ -140,7 +140,7 @@ if ($CodexCli) {
 } else {
   # Fail-soft: CLI missing, but config + a real key are ready. Hand over the key.
   Write-Host ""
-  Write-Host "WARNING: Codex CLI 沒有裝成功，但你的設定（$Config）和金鑰都已經備好了。"
+  Write-Host "WARNING: Codex CLI 沒有裝成功，但你的設定（${Config}）和金鑰都已經備好了。"
   Write-Host "  你的平台金鑰（只顯示這一次，請立刻複製保存）："
   Write-Host ""
   Write-Host "    $token"

@@ -105,3 +105,22 @@ async def test_restore_script_served(app_client: AsyncClient, path: str) -> None
     assert ".bak-" in body  # restores from the installer's backups
     assert "config.toml" in body and "auth.json" in body
     assert "桌面版" in body  # same close-desktop reminder as install
+
+
+# Regression: a bare `$VAR` immediately followed by a non-ASCII char (e.g. a
+# fullwidth paren in the Chinese messages) makes some shells swallow the leading
+# byte of that char into the variable name → `set -u` "unbound variable" crash
+# (hit on a real macOS install, 2026-07-03). Every var abutting non-ASCII text
+# MUST be braced (${VAR}). Guard all install scripts against reintroducing it.
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "path", ["/install/codex.sh", "/install/codex.ps1",
+             "/install/codex-restore.sh", "/install/codex-restore.ps1"],
+)
+async def test_no_unbraced_var_before_non_ascii(app_client: AsyncClient, path: str) -> None:
+    import re
+
+    body = (await app_client.get(path)).text
+    # `$name` (not `${name}`) directly followed by a non-ASCII byte.
+    offenders = re.findall(r"\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]", body)
+    assert not offenders, f"{path}: unbraced $VAR before non-ASCII: {offenders[:5]}"
