@@ -6,7 +6,17 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Integer, Numeric, String, Text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai_api.db import Base
@@ -47,7 +57,9 @@ class Allocation(Base):
     created_by: Mapped[str] = mapped_column(String(128), nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Phase 3a
-    quota_tokens_per_month: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # BigInteger: monthly token quotas can legitimately exceed INT4's ~2.1e9
+    # (e.g. a 10e9 self-service default). Postgres INT4 would overflow → 500.
+    quota_tokens_per_month: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     # Phase 33 (046): per-allocation monthly SPEND cap (USD). NULL ⇒ no cost cap.
     # Governs all endpoints via the cost (USD) common denominator — token + non-token
     # (page/image/second/minute/character). Independent hard cap; NOT rebalanced by

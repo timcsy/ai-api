@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,7 +34,9 @@ def _err(code: str, message: str) -> dict[str, Any]:
 
 class SelfServiceUpdate(BaseModel):
     enabled: bool
-    default_quota: int | None = None
+    # Stored in a BIGINT column; cap well below BIGINT max so a pathological value
+    # 422s cleanly instead of erroring at the DB. 1e15 tokens is effectively unlimited.
+    default_quota: int | None = Field(default=None, le=1_000_000_000_000_000)
 
 
 def _config(m: ModelCatalog) -> dict[str, Any]:

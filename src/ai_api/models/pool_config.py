@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, Integer, String
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai_api.db import Base
@@ -21,7 +21,7 @@ class PoolConfig(Base):
     __tablename__ = "pool_config"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
-    total_tokens_per_month: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_tokens_per_month: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     floor_per_allocation: Mapped[int] = mapped_column(Integer, nullable=False, default=1000)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_by: Mapped[str | None] = mapped_column(String(64), nullable=True)

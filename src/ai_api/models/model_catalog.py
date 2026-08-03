@@ -9,7 +9,7 @@ import enum
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Enum, Index, Integer, String, Text
+from sqlalchemy import JSON, BigInteger, Boolean, DateTime, Enum, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai_api.db import Base
@@ -53,7 +53,7 @@ class ModelCatalog(Base):
 
     # Phase 6: self-service allocation
     self_service_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    self_service_default_quota: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    self_service_default_quota: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     # Phase 23: LiteLLM registry provenance — {base_model_key, imported_version,
     # field_sources: {field: litellm|borrowed|manual}, snapshot: {field: value}}.
