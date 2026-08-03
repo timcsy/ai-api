@@ -693,3 +693,11 @@
 - **教訓**：① 盤點可觀測性時分「**彙總層 vs 逐筆層**」兩條線各自查——彙總完整不代表逐筆可達；「後端有端點」≠「使用者看得到」（同「backend 有 API 卻沒 UI = 隱性債」）。② **DB 有記的欄位要確認有沒有序列化出去**——`cost_usd` 存了卻沒進逐筆輸出，是常見的「記了但看不到」。③ **彙總會藏離群**——要抓「某一次異常大呼叫」需逐筆散點，不是日彙總。④ **未定價語意**：逐筆成本 None 要顯示「未定價」不可當 0（跨端點只有花費可比，但沒定價的不能亂補 0）。
 - **流程再犯**：前端 CI 跑 `eslint .`，我本機只跑了 vitest/tsc/build **又漏了 eslint**（`no-explicit-any` 擋下）；且用 `;` 串接 tsc+git 導致 tsc 失敗仍 push 出一個壞 commit。**改前端一定本機先跑 `npx eslint .` + `tsc --noEmit`（用 `&&` 串、別用 `;`）再 push**（強化既有「本機關卡逐字對齊 CI」那條）。
 - **來源**：`api/schemas.py::CallRecordOut`、`api/records.py::list_records`+`GET /admin/records`、`services/records.py::list_records`、`api/me.py`（calls 補成本）、`components/per-call-scatter.tsx`、`routes/admin/records.tsx`；spec 056、無 migration、ccsh rev 9 / tew rev 111、`sha-eb84520`（2026-07-03）。
+
+### token 額度欄位要用 BigInteger——月配額可破 INT4（~21.4 億），Postgres 會溢位 500、SQLite 不會（本機測不出）
+
+- **理論說**：月 token 額度用 `Integer` 存綽綽有餘。
+- **實際發生**（2026-08-03）：admin 在模型的「自助領取」把預設月額度填 `10000000000`（100 億）→「更新失敗」。根因：`model_catalog.self_service_default_quota` 是 Postgres `INTEGER`（INT4，上限 2,147,483,647），100 億**溢位**→ `integer out of range` → 500。而且 `allocations.quota_tokens_per_month`、`pool_config.total_tokens_per_month` 也都是 INT4——就算模型設定存下了，之後自助**領取**把額度複製進 allocation 時一樣會溢位。**SQLite（本機/CI）的 INTEGER 是 64-bit，10e9 照存不誤**，所以單元/契約測試完全抓不到。
+- **解決方式**：三個 token 額度欄位全改 `BigInteger`（migration 0023，**dialect-guarded**——SQLite 已是 64-bit 且不能 ALTER TYPE，直接 skip；Postgres 做 INT4→INT8 widening、小表、無資料損失）。API 加合理上限（`le=1e15`）讓誇張值乾淨 422 而非到 DB 才炸。**回歸守門用「斷言欄位型別是 BigInteger」**（因為 SQLite 不會溢位，跑值的測試擋不住回退成 INT4）。
+- **教訓**：① **凡是「數量會成長的計數/額度」欄位，預設就用 `BigInteger`**——token 數、bytes、累計計數，很容易破 21 億；INT4 是隱形天花板。② 這是「**SQLite 寬鬆 / Postgres 嚴格**」再一次（同 FK 循環那條）——**數值溢位類 bug 本機測不出、要嘛 Postgres 整合測試、要嘛斷言 schema 型別**。③ 額度/計數類欄位加 API 上限（`le=`），把「到 DB 才 500」變成「schema 就 422」。④ 加欄位/改型別時，**同語意的欄位要一起檢**（一個 self_service_default_quota 溢位，就代表 allocation/pool 的同類欄位也會）。
+- **來源**：`models/{allocation,pool_config,model_catalog}.py`（BigInteger）、`alembic/versions/0023_bigint_token_quotas.py`（dialect-guarded ALTER）、`api/admin_self_service.py`（le 上限）、`tests/contract/test_self_service_quota.py`（型別守門）；2026-08-03、ccsh rev 11 / tew rev 113、`sha-6766f2a`。
