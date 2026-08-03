@@ -72,3 +72,13 @@ CVE-2026-54283
 # (same class as the libxml2 entry above). apk upgrade --no-cache (already in
 # Dockerfile.frontend) picks up the fix once Alpine publishes 2.8.1-r0.
 CVE-2026-45186
+
+# ---- 2026-08-03: react-router (frontend) ----
+# GHSA-qwww-vcr4-c8h2 — "React Router RSC Mode CSRF Bypass Allows Action Execution",
+# fixed only in react-router 8.3.0 (a v7→v8 MAJOR bump, breaking). NOT exploitable
+# here: this frontend is a client-side Vite SPA (<BrowserRouter>/<Routes>), it does
+# NOT use RSC mode / @react-router/node server-runtime / server actions — the CSRF
+# path requires RSC server actions we don't have. Deferred to a deliberate v8 major
+# bump (own task), not smuggled into an unrelated PR. (CVE-2026-55685 was the real
+# one and is already fixed by the 7.15.1→7.18.2 bump.)
+GHSA-qwww-vcr4-c8h2
