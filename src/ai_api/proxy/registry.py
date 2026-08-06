@@ -33,6 +33,26 @@ def _ocr_pages(payload: dict[str, Any]) -> int | None:
     return len(pages) if isinstance(pages, list) else None
 
 
+# Mistral OCR request fields beyond model/document. Forward the ones the client
+# actually sent so include_image_base64 / pages reach upstream verbatim (the
+# earlier spec forwarded ONLY `document`, silently dropping these → images never
+# returned, whole doc always OCR'd). Whitelisted (not blind **f) to avoid leaking
+# junk fields to litellm.
+_OCR_PASSTHROUGH = (
+    "pages",                       # 0-indexed page selection (limit → fewer pages billed, no 504)
+    "include_image_base64",        # return embedded images as base64
+    "image_limit",
+    "image_min_size",
+    "bbox_annotation_format",
+    "document_annotation_format",
+    "id",
+)
+
+
+def _ocr_extra(fields: dict[str, Any]) -> dict[str, Any]:
+    return {k: fields[k] for k in _OCR_PASSTHROUGH if fields.get(k) is not None}
+
+
 def _image_count(payload: dict[str, Any]) -> int | None:
     data = payload.get("data")
     return len(data) if isinstance(data, list) else None
@@ -46,7 +66,9 @@ SPECS: list[EndpointSpec] = [
     ),
     EndpointSpec(
         path="/ocr", required=("document",), meter=UnitMeter("page", lambda f, p: _ocr_pages(p)),
-        call=lambda f, r, m: upstream.aocr(model=m, document=f["document"], **creds(r)),
+        call=lambda f, r, m: upstream.aocr(
+            model=m, document=f["document"], **_ocr_extra(f), **creds(r)
+        ),
     ),
     EndpointSpec(
         path="/images/generations", required=("prompt",), meter=TokenMeter(),

@@ -96,6 +96,30 @@ async def test_ocr_unpriced_cost_zero(app_client: AsyncClient, admin_headers: di
 
 
 @pytest.mark.asyncio
+async def test_ocr_forwards_image_and_pages_params(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    """Bugfix: the /ocr spec forwarded ONLY `document`, silently dropping
+    include_image_base64 / pages → images never returned, whole doc always OCR'd.
+    These pass-through fields must now reach upstream verbatim."""
+    alloc = await _alloc(app_client, admin_headers)
+    mock = AsyncMock(return_value=_stub_ocr(2))
+    with patch("ai_api.proxy.upstream.aocr", new=mock):
+        r = await app_client.post(
+            "/v1/ocr", headers={"Authorization": f"Bearer {alloc['token']}"},
+            json={
+                "model": OCR, "document": DOC,
+                "include_image_base64": True, "pages": [0, 1],
+            },
+        )
+    assert r.status_code == 200, r.text
+    kwargs = mock.await_args.kwargs
+    assert kwargs["include_image_base64"] is True
+    assert kwargs["pages"] == [0, 1]
+    assert kwargs["document"] == DOC  # still forwarded
+
+
+@pytest.mark.asyncio
 async def test_ocr_401_no_token(app_client: AsyncClient) -> None:
     r = await app_client.post("/v1/ocr", json={"model": OCR, "document": DOC})
     assert r.status_code == 401
