@@ -215,7 +215,6 @@ async def proxy_chat_completions(
                     except (ValueError, TypeError):
                         payload_obj = {}
                     usage = payload_obj.get("usage")
-                    choices = payload_obj.get("choices") or []
                     if usage:
                         captured_usage = usage
                         if not persisted:
@@ -224,10 +223,16 @@ async def proxy_chat_completions(
                             # disconnects right after the usage chunk.
                             await _record_fresh(usage)
                             persisted = True
-                        # Strip the usage-only terminal chunk when the client
-                        # didn't ask for usage (faithful to their request).
-                        if not choices and not client_wants_usage:
-                            continue
+                        if not client_wants_usage:
+                            # Client didn't ask for usage — don't leak it. Some
+                            # providers (Azure) attach usage to a choices-present
+                            # chunk, others send a choices-empty terminal chunk:
+                            # drop the whole chunk if it carries nothing else,
+                            # else forward it with usage nulled.
+                            if not (payload_obj.get("choices") or []):
+                                continue
+                            payload_obj["usage"] = None
+                            data = json.dumps(payload_obj)
                     yield f"data: {data}\n\n".encode()
                 yield b"data: [DONE]\n\n"
             finally:

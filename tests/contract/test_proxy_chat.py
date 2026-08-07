@@ -147,6 +147,16 @@ def _usage_chunk() -> _Chunk:
     })
 
 
+def _usage_chunk_with_choice() -> _Chunk:
+    # Azure/litellm attach usage to a choices-PRESENT chunk (not the OpenAI
+    # canonical choices-empty terminal chunk).
+    return _Chunk({
+        "id": "chatcmpl-x", "object": "chat.completion.chunk", "model": "gpt-4o-mini",
+        "choices": [{"index": 0, "delta": {"content": None}, "finish_reason": None}],
+        "usage": {"prompt_tokens": 5, "completion_tokens": 7, "total_tokens": 12},
+    })
+
+
 async def _last_success_record() -> CallRecord:
     sm = get_sessionmaker()
     async with sm() as s:
@@ -220,6 +230,39 @@ async def test_proxy_chat_stream_include_usage_forwarded(
     assert r.status_code == 200
     # client asked for usage → the usage chunk IS forwarded
     assert '"prompt_tokens": 5' in r.text
+
+
+@pytest.mark.asyncio
+async def test_proxy_chat_stream_nulls_usage_on_choices_present_chunk(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    """When the provider attaches usage to a choices-present chunk and the client
+    didn't ask for usage, forward the chunk with usage nulled (not leaked) — but
+    still bill from it."""
+    alloc = await _make_allocation(app_client, admin_headers)
+
+    async def _fake(*a, **k):
+        async def gen():
+            yield _delta("hi")
+            yield _usage_chunk_with_choice()
+        return gen()
+
+    with patch("ai_api.proxy.upstream.acompletion", new=_fake):
+        r = await app_client.post(
+            "/v1/chat/completions",
+            headers={"Authorization": f"Bearer {alloc['token']}"},
+            json={
+                "model": "gpt-4o-mini",
+                "messages": [{"role": "user", "content": "hi"}],
+                "stream": True,
+            },
+        )
+    assert r.status_code == 200
+    body = r.text
+    assert '"prompt_tokens": 5' not in body  # usage nulled, not leaked
+    assert '"usage": null' in body            # the choices-present chunk still forwarded
+    rec = await _last_success_record()
+    assert rec.prompt_tokens == 5 and rec.completion_tokens == 7  # billed anyway
 
 
 @pytest.mark.asyncio
