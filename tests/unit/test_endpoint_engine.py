@@ -35,6 +35,18 @@ def test_token_meter_no_price_none_cost() -> None:
     assert m.cost is None and m.record_kwargs["prompt_tokens"] == 5
 
 
+def test_token_meter_maps_input_output_tokens() -> None:
+    # gpt-4o-transcribe/-diarize report input_tokens/output_tokens, not
+    # prompt/completion — must still bill + record (was silently zero before).
+    m = TokenMeter().measure(
+        {}, {"usage": {"input_tokens": 1000, "output_tokens": 1000}}, _token_price()
+    )
+    assert m.record_kwargs["prompt_tokens"] == 1000
+    assert m.record_kwargs["completion_tokens"] == 1000
+    assert m.record_kwargs["total_tokens"] == 2000  # derived when upstream omits it
+    assert m.cost == Decimal("0.020")
+
+
 def test_unit_meter_quantity_from_payload() -> None:
     meter = UnitMeter("image", lambda f, p: len(p.get("data") or []))
     m = meter.measure({}, {"data": [1, 2, 3]}, _unit_price("image", "0.04"))

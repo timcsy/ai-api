@@ -55,9 +55,19 @@ class TokenMeter:
 
     def measure(self, fields: dict[str, Any], payload: dict[str, Any], price: Price | None) -> Metering:
         usage = payload.get("usage") or {}
+        # Newer models (gpt-4o-transcribe/-diarize, Responses-style) report usage
+        # as input_tokens/output_tokens rather than prompt_tokens/completion_tokens
+        # — fall back so token billing isn't silently zero for them.
         pt = usage.get("prompt_tokens")
-        ct = usage.get("completion_tokens") or 0
+        if pt is None:
+            pt = usage.get("input_tokens")
+        ct = usage.get("completion_tokens")
+        if ct is None:
+            ct = usage.get("output_tokens")
+        ct = ct or 0
         tt = usage.get("total_tokens")
+        if tt is None and pt is not None:
+            tt = pt + ct
         cost = calculate_cost(price=price, prompt_tokens=pt, completion_tokens=ct)
         return Metering(cost, {"prompt_tokens": pt, "completion_tokens": ct, "total_tokens": tt})
 
