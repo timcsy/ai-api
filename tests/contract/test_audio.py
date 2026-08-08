@@ -111,7 +111,8 @@ async def test_tts_upstream_error_json(app_client: AsyncClient, admin_headers: d
 async def test_stt_multipart_billed_tokens(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
     alloc = await _alloc(app_client, admin_headers, STT)
     stub = {"text": "hello", "usage": {"prompt_tokens": 4, "total_tokens": 4}}
-    with patch("ai_api.proxy.upstream.atranscription", new=AsyncMock(return_value=stub)):
+    mock = AsyncMock(return_value=stub)
+    with patch("ai_api.proxy.upstream.atranscription", new=mock):
         r = await app_client.post(
             "/v1/audio/transcriptions",
             headers={"Authorization": f"Bearer {alloc['token']}"},
@@ -120,6 +121,12 @@ async def test_stt_multipart_billed_tokens(app_client: AsyncClient, admin_header
         )
     assert r.status_code == 200, r.text
     assert r.json()["text"] == "hello"
+    # The multipart file MUST be converted to a (filename, bytes) tuple — not the
+    # raw starlette UploadFile (which litellm/openai reject → 502). Guards the
+    # fastapi-vs-starlette UploadFile isinstance mismatch; the mock alone can't.
+    sent_file = mock.await_args.kwargs["file"]
+    assert isinstance(sent_file, tuple), f"file passed as {type(sent_file)}, not a tuple"
+    assert sent_file[0] == "a.mp3" and sent_file[1] == b"AUDIOBYTES"
     rec = await _last(CallOutcome.success)
     assert rec is not None and rec.prompt_tokens == 4 and rec.allocation_id == alloc["id"]
 

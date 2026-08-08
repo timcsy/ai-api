@@ -15,9 +15,17 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import HTTPException, Request, UploadFile, status
+from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
+
+# NOTE: import UploadFile from starlette, NOT fastapi. `request.form()` yields
+# starlette.datastructures.UploadFile; fastapi.UploadFile is a *subclass*, so
+# `isinstance(form_value, fastapi.UploadFile)` is False → the file wouldn't be
+# converted to a (filename, bytes) tuple and the raw UploadFile would reach
+# litellm/openai (→ "Expected ... bytes/tuple but received UploadFile" 502).
+# starlette's base class matches both.
+from starlette.datastructures import UploadFile
 
 from ai_api.config import get_settings
 from ai_api.models import Allocation, CallOutcome
