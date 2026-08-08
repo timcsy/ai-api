@@ -54,7 +54,17 @@ server {
         proxy_cache off;
         proxy_read_timeout 3600s;
     }
-    location /v1          { proxy_pass http://${BACKEND_UPSTREAM}; }
+    # Generic /v1 (non-streaming inference): transcription/diarization, OCR on
+    # large PDFs, image generation and long non-streaming chat can each take
+    # minutes. nginx's 60s default proxy_read_timeout cut them off → 504
+    # Gateway Time-out. Match the generous timeout the streaming endpoints use;
+    # proxy_send_timeout covers large audio/file uploads. The backend + litellm
+    # still enforce their own upstream timeouts.
+    location /v1 {
+        proxy_pass http://${BACKEND_UPSTREAM};
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
     location /docs        { proxy_pass http://${BACKEND_UPSTREAM}; }
     location /openapi.json { proxy_pass http://${BACKEND_UPSTREAM}; }
     # Phase 19: Codex install scripts — backend-only (fetched by curl/irm).
