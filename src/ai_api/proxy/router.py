@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import UTC, datetime
 from typing import Any
 
@@ -46,6 +47,27 @@ def _error_payload(code: str, message: str) -> dict[str, Any]:
             "request_id": current_request_id() or None,
         }
     }
+
+
+def _rejected_param(message: str) -> str | None:
+    """Extract the offending param name from an upstream 'unsupported param' 400.
+
+    litellm's `drop_params` only drops params for models it has in its map;
+    custom Azure deployment names (e.g. `gpt-5.6-luna`) aren't recognized, so a
+    reasoning model that only accepts temperature=1 still 400s. We parse the
+    param name from the error so we can drop it and retry. Azure/OpenAI phrasings:
+      "Unsupported value: 'temperature' does not support 0.4 with this model."
+      "Unsupported parameter: 'temperature' is not supported with this model."
+    """
+    for pat in (
+        r"[Uu]nsupported (?:value|parameter):?\s*'([\w.]+)'",
+        r"'([\w.]+)'\s+does not support",
+        r"[Uu]nsupported\s+'([\w.]+)'",
+    ):
+        m = re.search(pat, message)
+        if m:
+            return m.group(1)
+    return None
 
 
 def _outcome_for_code(code: str) -> CallOutcome:
@@ -136,10 +158,37 @@ async def proxy_chat_completions(
     api_version = (resolved.extra_config or {}).get("api_version")
     model_key = requested_model.split("/", 1)[-1]
     passthrough = {f: body[f] for f in _CHAT_PASSTHROUGH_FIELDS if body.get(f) is not None}
-    # Let litellm drop params the target model provably doesn't support (e.g.
-    # reasoning models reject temperature != 1) rather than 400-ing the client —
-    # without this, forwarding a client's temperature breaks reasoning models.
-    passthrough["drop_params"] = True
+
+    async def _call_upstream(*, stream: bool, stream_options: dict[str, Any] | None) -> Any:
+        """Call litellm, dropping a param and retrying if the model rejects one.
+
+        `drop_params=True` handles params for models litellm knows; the retry
+        loop covers the rest (custom Azure deployment names it doesn't recognize,
+        e.g. a reasoning model that only accepts temperature=1). Each retry drops
+        exactly the param named in the 400, so it terminates.
+        """
+        droppable = dict(passthrough)
+        while True:
+            extra: dict[str, Any] = {"drop_params": True, **droppable}
+            if stream:
+                extra["stream"] = True
+                extra["stream_options"] = stream_options
+            try:
+                return await upstream.acompletion(
+                    model=result.upstream_model,
+                    messages=messages,
+                    api_key=api_key,
+                    api_base=api_base,
+                    api_version=api_version,
+                    **extra,
+                )
+            except Exception as e:
+                param = _rejected_param(str(e))
+                if param and param in droppable:
+                    logger.info("upstream rejected param %r; dropping and retrying", param)
+                    droppable.pop(param)
+                    continue
+                raise
 
     # Plain values captured for the streaming generator (must NOT touch the
     # request-scoped session / ORM objects after the handler returns).
@@ -178,16 +227,7 @@ async def proxy_chat_completions(
         # that case to stay faithful to what they requested.
         stream_options = {**(body.get("stream_options") or {}), "include_usage": True}
         try:
-            stream_iter = await upstream.acompletion(
-                model=result.upstream_model,
-                messages=messages,
-                api_key=api_key,
-                api_base=api_base,
-                api_version=api_version,
-                stream=True,
-                stream_options=stream_options,
-                **passthrough,
-            )
+            stream_iter = await _call_upstream(stream=True, stream_options=stream_options)
         except Exception as e:
             logger.exception("upstream call (stream) failed")
             return await record_and_respond(
@@ -249,14 +289,7 @@ async def proxy_chat_completions(
 
     # 4b. Non-streaming
     try:
-        upstream_result = await upstream.acompletion(
-            model=result.upstream_model,
-            messages=messages,
-            api_key=api_key,
-            api_base=api_base,
-            api_version=api_version,
-            **passthrough,
-        )
+        upstream_result = await _call_upstream(stream=False, stream_options=None)
     except Exception as e:
         logger.exception("upstream call failed")
         return await record_and_respond(

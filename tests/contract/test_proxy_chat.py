@@ -121,6 +121,41 @@ async def test_proxy_chat_forwards_passthrough_params(
     assert "stream" not in kwargs  # non-streaming path
 
 
+@pytest.mark.asyncio
+async def test_proxy_chat_retries_dropping_rejected_param(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    """A reasoning model (custom Azure deployment name litellm can't map) 400s on
+    temperature != 1 — the handler drops the named param and retries instead of
+    502-ing. Regression: forwarding temperature broke reasoning models."""
+    alloc = await _make_allocation(app_client, admin_headers)
+    calls: list[dict] = []
+
+    async def _fake(*a, **k):
+        calls.append(k)
+        if "temperature" in k:
+            raise RuntimeError(
+                "litellm.BadRequestError: AzureException BadRequestError - "
+                "Unsupported value: 'temperature' does not support 0.4 with this "
+                "model. Only the default (1) value is supported."
+            )
+        return _stub_litellm_response()
+
+    with patch("ai_api.proxy.upstream.acompletion", new=_fake):
+        r = await app_client.post(
+            "/v1/chat/completions",
+            headers={"Authorization": f"Bearer {alloc['token']}"},
+            json={
+                "model": "gpt-4o-mini",
+                "messages": [{"role": "user", "content": "hi"}],
+                "temperature": 0.4,
+            },
+        )
+    assert r.status_code == 200, r.text
+    assert len(calls) == 2  # first with temperature (rejected), retry without
+    assert "temperature" in calls[0] and "temperature" not in calls[1]
+
+
 # --- streaming (SSE) -------------------------------------------------------
 
 
