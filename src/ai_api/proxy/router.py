@@ -136,6 +136,10 @@ async def proxy_chat_completions(
     api_version = (resolved.extra_config or {}).get("api_version")
     model_key = requested_model.split("/", 1)[-1]
     passthrough = {f: body[f] for f in _CHAT_PASSTHROUGH_FIELDS if body.get(f) is not None}
+    # Let litellm drop params the target model provably doesn't support (e.g.
+    # reasoning models reject temperature != 1) rather than 400-ing the client —
+    # without this, forwarding a client's temperature breaks reasoning models.
+    passthrough["drop_params"] = True
 
     # Plain values captured for the streaming generator (must NOT touch the
     # request-scoped session / ORM objects after the handler returns).

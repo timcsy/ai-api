@@ -117,6 +117,7 @@ async def test_proxy_chat_forwards_passthrough_params(
     assert kwargs["temperature"] == 0.2
     assert kwargs["max_tokens"] == 64
     assert kwargs["tools"][0]["function"]["name"] == "f"
+    assert kwargs["drop_params"] is True  # unsupported params dropped, not 400'd
     assert "stream" not in kwargs  # non-streaming path
 
 
