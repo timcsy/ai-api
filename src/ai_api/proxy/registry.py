@@ -58,6 +58,31 @@ def _image_count(payload: dict[str, Any]) -> int | None:
     return len(data) if isinstance(data, list) else None
 
 
+# Optional transcription form fields forwarded to upstream when the client sends
+# them (model/file handled explicitly). Kept conservative — temperature is left
+# out because some transcription models reject it.
+_STT_PASSTHROUGH = (
+    "language", "prompt", "response_format", "chunking_strategy",
+    "timestamp_granularities", "include",
+)
+
+
+async def _transcription_call(f: dict[str, Any], r: Any, m: str) -> Any:
+    """Transcription upstream call. Forwards whitelisted params, and injects
+    chunking_strategy='auto' on retry when a diarization model demands it —
+    Azure requires chunking_strategy for diarization models but typical clients
+    (and the earlier spec, which forwarded only `file`) don't send it → 502."""
+    extra = {k: f[k] for k in _STT_PASSTHROUGH if f.get(k) is not None}
+    try:
+        return await upstream.atranscription(model=m, file=f["file"], **extra, **creds(r))
+    except Exception as e:
+        if "chunking_strategy" in str(e) and "chunking_strategy" not in extra:
+            return await upstream.atranscription(
+                model=m, file=f["file"], chunking_strategy="auto", **extra, **creds(r)
+            )
+        raise
+
+
 # --- the registry: each endpoint is one row of data --------------------------
 SPECS: list[EndpointSpec] = [
     EndpointSpec(
@@ -90,7 +115,7 @@ SPECS: list[EndpointSpec] = [
     EndpointSpec(
         path="/audio/transcriptions", input_shape=InputShape.multipart, required=("file",),
         meter=TokenMeter(),
-        call=lambda f, r, m: upstream.atranscription(model=m, file=f["file"], **creds(r)),
+        call=_transcription_call,
     ),
     # --- Phase 31 new endpoints ---
     EndpointSpec(

@@ -152,6 +152,35 @@ async def test_stt_401(app_client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_stt_diarization_injects_chunking_strategy(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    """Diarization models require chunking_strategy (Azure 400s without it). The
+    handler retries injecting chunking_strategy='auto' rather than 502-ing."""
+    alloc = await _alloc(app_client, admin_headers, STT)
+    calls: list[dict] = []
+
+    async def _fake(**k):
+        calls.append(k)
+        if "chunking_strategy" not in k:
+            raise RuntimeError(
+                "litellm.BadRequestError: AzureException BadRequestError - "
+                "chunking_strategy is required for diarization models"
+            )
+        return {"text": "hi", "usage": {"prompt_tokens": 3, "total_tokens": 3}}
+
+    with patch("ai_api.proxy.upstream.atranscription", new=_fake):
+        r = await app_client.post(
+            "/v1/audio/transcriptions",
+            headers={"Authorization": f"Bearer {alloc['token']}"},
+            data={"model": STT}, files={"file": ("a.mp3", b"AUDIO", "audio/mpeg")},
+        )
+    assert r.status_code == 200, r.text
+    assert len(calls) == 2  # first without chunking_strategy (rejected), retry with it
+    assert calls[1]["chunking_strategy"] == "auto"
+
+
+@pytest.mark.asyncio
 async def test_stt_upstream_error(app_client: AsyncClient, admin_headers: dict[str, str]) -> None:
     alloc = await _alloc(app_client, admin_headers, STT)
     with patch("ai_api.proxy.upstream.atranscription", new=AsyncMock(side_effect=RuntimeError("boom"))):
