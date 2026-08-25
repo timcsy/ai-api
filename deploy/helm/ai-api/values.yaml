@@ -103,6 +103,13 @@ logging:
 # Keep aligned with upstream provider expectations (OpenAI Files: 25 MB).
 requestBodyLimitMB: 100
 
+# OAuth (first-party Authorization Code + PKCE): comma-separated redirect_uri
+# prefixes an app may be handed a code back to. Empty ⇒ /oauth/authorize is
+# refused (fail-closed) — the anti-open-redirect allowlist. Set per deployment
+# to your first-party apps' callback origins, e.g.
+#   oauthRedirectAllowlist: "https://myapp.ccsh.tn.edu.tw/,https://other.app/callback"
+oauthRedirectAllowlist: ""
+
 migrationJob:
   enabled: true
   backoffLimit: 3

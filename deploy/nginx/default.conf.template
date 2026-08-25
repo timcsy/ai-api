@@ -32,6 +32,10 @@ server {
     location /healthz     { proxy_pass http://${BACKEND_UPSTREAM}; }
     location /auth        { proxy_pass http://${BACKEND_UPSTREAM}; }
     location /me          { proxy_pass http://${BACKEND_UPSTREAM}; }
+    # OAuth token exchange is a backend API (first-party apps POST here directly).
+    # The consent page /oauth/authorize is a browser navigation → SPA (falls
+    # through to `location /`); /me/oauth/* is covered by `location /me` above.
+    location /oauth/token { proxy_pass http://${BACKEND_UPSTREAM}; }
     # Responses API streams Server-Sent Events (Codex). Disable proxy buffering
     # and caching so SSE chunks reach the client immediately (no 502/timeout).
     location /v1/responses {

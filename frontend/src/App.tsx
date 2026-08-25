@@ -15,6 +15,7 @@ import { AdminCatalogManagePage } from "@/routes/admin/catalog-manage";
 import { AdminHomePage } from "@/routes/admin/home";
 import { AdminMembersPage } from "@/routes/admin/members";
 import { AdminAccessPage } from "@/routes/admin/access";
+import { AdminOAuthPage } from "@/routes/admin/oauth";
 import { AdminNotificationsPage } from "@/routes/admin/notifications";
 import { AdminMemberDetailPage } from "@/routes/admin/member-detail";
 import { AdminModelPage } from "@/routes/admin/model";
@@ -35,6 +36,7 @@ import { AllocationDetailPage } from "@/routes/allocation-detail";
 import { AllocationsPage } from "@/routes/allocations";
 import { CatalogPage } from "@/routes/catalog";
 import { DeviceAuthorizePage } from "@/routes/device-authorize";
+import { OAuthAuthorizePage } from "@/routes/oauth-authorize";
 import { AppDetailPage } from "@/routes/app-detail";
 import { ApplicationsPage } from "@/routes/apps";
 import { CatalogDetailPage } from "@/routes/catalog-detail";
@@ -74,6 +76,7 @@ export function App() {
               <Route path="/allocations" element={<AllocationsPage />} />
               <Route path="/usage" element={<UsagePage />} />
               <Route path="/device" element={<DeviceAuthorizePage />} />
+              <Route path="/oauth/authorize" element={<OAuthAuthorizePage />} />
               <Route path="/catalog" element={<CatalogPage />} />
               <Route path="/catalog/*" element={<CatalogDetailPage />} />
               <Route path="/apps" element={<ApplicationsPage />} />
@@ -92,6 +95,7 @@ export function App() {
                 <Route path="/admin/member/:id" element={<AdminMemberDetailPage />} />
                 <Route path="/admin/providers" element={<AdminProvidersPage />} />
                 <Route path="/admin/access" element={<AdminAccessPage />} />
+                <Route path="/admin/oauth" element={<AdminOAuthPage />} />
                 <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
                 <Route path="/admin/tag" element={<AdminTagsPage />} />
                 <Route path="/admin/tag/rules" element={<AdminTagRulesPage />} />
