@@ -765,7 +765,7 @@
 - **盤點發現**：後端 `GET /admin/members` **早就支援** `provider/status/q` server-side 篩選，前端從沒接；批次只有 create/delete；成員清單的 tags 還 per-member N+1 抓。→ 亂的來源是「能力都在、UI 沒串起來」，不是模型問題。
 - **做法**：① 清單回傳補 `tags`（一次查詢、消 N+1）；② 前端加篩選列（搜尋/狀態/登入源/標籤/僅管理員，client-side，成員數小）＋**表頭全選改成選「篩選後的集合」→ 篩選×全選×批次串成主流程**；③ 批次端點 `bulk-status`/`bulk-tags`/`bulk-allocate`（per-item 獨立交易、一筆失敗不擋其他、停用有 last-admin 守門、開通已存在自動略過）；④ 加 `AuditEventType.member_enabled`（VARCHAR enum、免 migration）。
 - **教訓**：① 「更有系統」對清單管理＝**Filter + 批次 + 篩選後全選**這組合，屏蔽掉「一次撈全部、一個個點」的痛。② 加清單欄位（tags）時**同時消 N+1**（一次 IN 查詢 attach），別讓每列各自打一次。③ 批次端點沿用既有 per-item 獨立交易模式（bulk-delete）＋回傳逐筆 result，前端才能顯示「成功 N、略過 M、失敗 K + 原因」。
-- **來源**：`api/admin_members.py`（list 補 tags、`bulk_set_status`/`bulk_tags`/`bulk_allocate`）、`models/auth_audit.py`（member_enabled）、`routes/admin/members.tsx`（篩選列 + 批次工具列 + 兩對話框、MemberTagsCell 改讀列上 tags）、`test_member_bulk_ops.py` + `members-filter-batch.test.tsx`；無 migration、ccsh rev 22、`sha-c6d7089`（2026-08-25）。
+- **來源**：`api/admin_members.py`（list 補 tags、`bulk_set_status`/`bulk_tags`/`bulk_allocate`）、`models/auth_audit.py`（member_enabled）、`routes/admin/members.tsx`（篩選列 + 批次工具列 + 兩對話框、MemberTagsCell 改讀列上 tags）、`test_member_bulk_ops.py` + `members-filter-batch.test.tsx`；無 migration、ccsh rev 22、`sha-c6d7089`（2026-08-25）。**同款套到分配管理**（rev 23、`sha-16b31b2`）：`api/allocations.py` 加 `bulk-action`（pause/resume/revoke/unquarantine）+ `bulk-quota`（token/USD 上限），`routes/admin/allocations.tsx` 加篩選列（搜尋成員/模型、狀態〔進行中=不含撤回〕、模型）+ 批次工具列 + 表頭全選=篩選集 + 批次配額對話框（勾選才改、值空=無上限、不勾=不動）；狀態篩選的「進行中」取代原本的「含已撤回」開關。→ **「篩選×全選×批次」是清單管理的通用模式,值得複製到每個 admin 清單頁（成員、分配，未來金鑰）。**
 
 ### image 隔久重建→buildx 快取失效→新依賴層 digest→node 慢拉→helm hook 逾時整個 release 失敗；解＝先暖 node 快取再部署
 
