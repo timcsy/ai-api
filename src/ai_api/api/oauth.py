@@ -21,7 +21,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import current_member, get_db_session, require_csrf
-from ai_api.config import get_settings
 from ai_api.models import Allocation, AllocationStatus, Member, ModelCatalog
 from ai_api.services.oauth import OAuthError, OAuthService
 
@@ -68,7 +67,6 @@ async def create_consent(
             code_challenge_method=payload.code_challenge_method,
             state=payload.state,
             scope=payload.scope,
-            settings=get_settings(),
         )
     except OAuthError as exc:
         raise _oauth_400(exc) from exc

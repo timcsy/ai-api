@@ -59,6 +59,7 @@
 - **FR-007**：`state` 由 app 提供、原封導回(CSRF)。
 - **FR-008**：發出的金鑰為既有 `Credential`(可撤回、有範圍、計費),以 `client_name` 標示來源、顯示於成員金鑰清單。
 - **FR-009**：不要求 `client_secret`;不發 refresh token。
+- **FR-010**（維護者追加）：`redirect_uri` 白名單為**管理員可在後台編輯**的 DB 單例(`oauth_config`,CHECK id=1),**從 env `OAUTH_REDIRECT_ALLOWLIST` lazy-seed**、之後 DB 為單一真理(同 pool_config／anomaly_config 模式);提供 `GET/PUT /admin/oauth/config` 與後台頁 `/admin/oauth`(「應用授權」)。空清單 = fail-closed。
 
 ## Assumptions（凍結）
 - First-party only;安全靠 session+同意+PKCE+redirect 白名單,不做第三方 client 註冊。

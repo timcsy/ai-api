@@ -15,6 +15,7 @@ from ai_api.api import (
     admin_members,
     admin_model_access,
     admin_notifications,
+    admin_oauth,
     admin_prices,
     admin_providers,
     admin_self_service,
@@ -78,6 +79,7 @@ def create_app() -> FastAPI:
     app.include_router(me.router, tags=["me"])
     app.include_router(device.router, tags=["device"])
     app.include_router(oauth.router, tags=["oauth"])
+    app.include_router(admin_oauth.router, prefix="/admin", tags=["admin-oauth"])
     app.include_router(install.router, tags=["install"])
     app.include_router(allocations.router, prefix="/admin", tags=["admin"])
     app.include_router(credentials.router, prefix="/admin", tags=["admin-credentials"])

@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import re
 import secrets
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
@@ -20,7 +21,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from ulid import ULID
 
-from ai_api.models import Allocation, Credential, Member, OAuthAuthorization, OAuthAuthStatus
+from ai_api.config import get_settings
+from ai_api.models import (
+    Allocation,
+    Credential,
+    Member,
+    OAuthAuthorization,
+    OAuthAuthStatus,
+    OAuthConfig,
+)
 from ai_api.services.allocations import AllocationService
 from ai_api.services.credentials import GeneratedToken
 
@@ -37,14 +46,30 @@ def _b64url_nopad(raw: bytes) -> str:
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
 
-def allowed_redirect_uris(settings: object) -> list[str]:
-    raw = getattr(settings, "oauth_redirect_allowlist", "") or ""
-    return [p.strip() for p in raw.split(",") if p.strip()]
+def parse_allowlist(raw: str | None) -> list[str]:
+    """Split the stored allowlist (comma- or newline-separated) into prefixes."""
+    return [p.strip() for p in re.split(r"[,\n]", raw or "") if p.strip()]
 
 
-def validate_redirect_uri(redirect_uri: str, settings: object) -> None:
+async def get_oauth_config(db: AsyncSession) -> OAuthConfig:
+    """Singleton OAuth config (admin-editable redirect allowlist). Lazy-seeds from
+    settings.OAUTH_REDIRECT_ALLOWLIST on first read so the env→DB move is a no-op;
+    thereafter the DB row is the single source of truth (env = bootstrap default)."""
+    cfg = await db.get(OAuthConfig, 1)
+    if cfg is None:
+        cfg = OAuthConfig(
+            id=1,
+            redirect_allowlist=(getattr(get_settings(), "oauth_redirect_allowlist", "") or ""),
+            updated_at=datetime.now(UTC),
+            updated_by=None,
+        )
+        db.add(cfg)
+        await db.flush()
+    return cfg
+
+
+def validate_redirect_uri(redirect_uri: str, prefixes: list[str]) -> None:
     """Fail-closed prefix allowlist — the critical anti-open-redirect defense."""
-    prefixes = allowed_redirect_uris(settings)
     if not prefixes:
         raise OAuthError("redirect_uri_not_allowed", "no redirect_uri allowlist configured")
     if not any(redirect_uri.startswith(p) for p in prefixes):
@@ -77,9 +102,9 @@ class OAuthService:
         code_challenge_method: str,
         state: str | None,
         scope: str | None,
-        settings: object,
     ) -> OAuthAuthorization:
-        validate_redirect_uri(redirect_uri, settings)
+        cfg = await get_oauth_config(self._s)
+        validate_redirect_uri(redirect_uri, parse_allowlist(cfg.redirect_allowlist))
         if code_challenge_method != "S256":
             raise OAuthError("invalid_request", "only PKCE code_challenge_method=S256 is supported")
         if not code_challenge or len(code_challenge) < 43:

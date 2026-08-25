@@ -26,6 +26,7 @@ from ai_api.models.notification import (
     NotificationRecord,
 )
 from ai_api.models.oauth_authorization import OAuthAuthorization, OAuthAuthStatus
+from ai_api.models.oauth_config import OAuthConfig
 from ai_api.models.oidc_state import OidcState
 from ai_api.models.password_attempt import AttemptOutcome, PasswordAttempt
 from ai_api.models.pool_config import PoolConfig
@@ -69,6 +70,7 @@ __all__ = [
     "NotificationRecord",
     "OAuthAuthStatus",
     "OAuthAuthorization",
+    "OAuthConfig",
     "OidcState",
     "PasswordAttempt",
     "PoolConfig",

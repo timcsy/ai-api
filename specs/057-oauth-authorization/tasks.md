@@ -37,5 +37,12 @@
 - [x] T021 前端 `oauth-authorize.test.tsx`（2 條）：同意頁渲染 + approve 送出正確 allocation_ids + 導回帶 code/state;redirect_uri 被拒顯示錯誤 → **全綠**
 - [x] T022 `conftest.py` 加 `OAUTH_REDIRECT_ALLOWLIST` 測試環境
 
+## Phase 6b — 管理員可編輯白名單（維護者追加,FR-010）
+- [x] T024 `oauth_config` 單例 model（CHECK id=1）+ migration `0025`
+- [x] T025 `get_oauth_config` lazy-seed from env;`validate_redirect_uri(uri, prefixes)` 改吃 DB 清單;`create_consent` 讀 DB config
+- [x] T026 admin API `GET/PUT /admin/oauth/config`（`api/admin_oauth.py`,require_admin_token）
+- [x] T027 後台頁 `/admin/oauth`「應用授權」（textarea 一行一前綴 + 儲存）+ nav + route
+- [x] T028 測試：admin 編輯即時生效 + DB 覆蓋 env + 需 admin（`test_oauth_flow.py` +2）;前端 `admin-oauth.test.tsx`
+
 ## Phase 7 — 上線（auth review gate）
 - [ ] T023 **維護者 review**（auth 功能上 production 前必停）→ 設每個部署的 `oauthRedirectAllowlist` → 部署 ccsh（暖快取後 helm）→ 真機驗一條完整流程

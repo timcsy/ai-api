@@ -154,6 +154,41 @@ async def test_consent_requires_session(app_client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_admin_can_edit_redirect_allowlist(app_client: AsyncClient, admin_headers) -> None:
+    """The allowlist is an admin-editable DB singleton (lazy-seeded from env). A
+    PUT takes effect immediately and overrides the env default."""
+    # lazy-seed reflects the env default
+    got = await app_client.get("/admin/oauth/config", headers=admin_headers)
+    assert got.status_code == 200
+    assert "https://app.test/" in got.json()["prefixes"]
+
+    # narrow the allowlist to a different origin
+    put = await app_client.put(
+        "/admin/oauth/config", headers=admin_headers,
+        json={"redirect_allowlist": "https://newapp.test/"},
+    )
+    assert put.status_code == 200
+    assert put.json()["prefixes"] == ["https://newapp.test/"]
+
+    await _login_with_allocation(app_client, admin_headers, "oauth-cfg@x.com")
+    _, challenge = _pkce()
+    # the previously-allowed origin is now rejected (DB overrides env)
+    old = await _consent(app_client, challenge, redirect="https://app.test/callback")
+    assert old.status_code == 400 and old.json()["detail"]["error"]["code"] == "redirect_uri_not_allowed"
+    # the newly-allowed origin works
+    neu = await _consent(app_client, challenge, redirect="https://newapp.test/cb")
+    assert neu.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_admin_oauth_config_requires_admin(app_client: AsyncClient) -> None:
+    assert (await app_client.get("/admin/oauth/config")).status_code in (401, 403)
+    assert (
+        await app_client.put("/admin/oauth/config", json={"redirect_allowlist": "https://x/"})
+    ).status_code in (401, 403)
+
+
+@pytest.mark.asyncio
 async def test_unsupported_grant_type(app_client: AsyncClient) -> None:
     r = await app_client.post(
         "/oauth/token",
