@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import get_db_session, require_admin_token
@@ -263,6 +264,143 @@ async def patch_allocation(
         allocation.note = payload["note"]
     await session.flush()
     return _to_out(allocation)
+
+
+class BulkAllocationActionRequest(BaseModel):
+    allocation_ids: list[str]
+    action: str  # pause | resume | revoke | unquarantine
+
+
+class BulkAllocationQuotaRequest(BaseModel):
+    allocation_ids: list[str]
+    quota_tokens_per_month: int | None = None
+    quota_cost_usd_per_month: Decimal | None = None
+
+
+@router.post("/allocations/bulk-action")
+async def bulk_allocation_action(payload: BulkAllocationActionRequest) -> dict[str, Any]:
+    """Batch pause / resume / revoke / unquarantine. Per-item independent
+    transaction — one failure never blocks the rest; each item reports its
+    outcome (changed / skipped-with-reason / failed)."""
+    valid = {"pause", "resume", "revoke", "unquarantine"}
+    if payload.action not in valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "bad_request", "message": f"action must be one of {sorted(valid)}"}},
+        )
+    if not payload.allocation_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "bad_request", "message": "allocation_ids must not be empty"}},
+        )
+    from ai_api.db import get_sessionmaker
+    from ai_api.services.allocations import InvalidAllocationState
+
+    sm = get_sessionmaker()
+    results: list[dict[str, Any]] = []
+    changed = failed = 0
+    for aid in payload.allocation_ids:
+        reason: str | None = None
+        try:
+            async with sm() as s:
+                svc = AllocationService(s)
+                if payload.action == "unquarantine":
+                    a = await svc.get(aid)
+                    if a is None:
+                        reason = "not_found"
+                    elif a.status != AllocationStatus.quarantined:
+                        reason = "not_quarantined"
+                    else:
+                        a.status = AllocationStatus.active
+                        await audit.record(
+                            s, event_type=AuditEventType.allocation_unquarantined,
+                            actor_type=ActorType.admin, target_type="allocation", target_id=a.id,
+                        )
+                        await s.commit()
+                        results.append({"allocation_id": aid, "status": "changed", "reason": None})
+                        changed += 1
+                        continue
+                else:
+                    if payload.action == "pause":
+                        a = await svc.pause(aid)
+                    elif payload.action == "resume":
+                        a = await svc.resume(aid)
+                    else:  # revoke
+                        a = await svc.revoke(aid)
+                    if a is None:
+                        reason = "not_found"
+                    else:
+                        await s.commit()
+                        results.append({"allocation_id": aid, "status": "changed", "reason": None})
+                        changed += 1
+                        continue
+        except InvalidAllocationState:
+            reason = "invalid_state"
+        except Exception:
+            reason = "internal"
+        results.append({"allocation_id": aid, "status": "failed", "reason": reason})
+        failed += 1
+    return {"changed": changed, "failed": failed, "results": results}
+
+
+@router.post("/allocations/bulk-quota")
+async def bulk_allocation_quota(payload: BulkAllocationQuotaRequest) -> dict[str, Any]:
+    """Batch-set monthly quota (tokens and/or USD cost cap) across allocations.
+    Pass a value to set it; omit a field to leave it unchanged on each item."""
+    if not payload.allocation_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "bad_request", "message": "allocation_ids must not be empty"}},
+        )
+    fields = payload.model_dump(exclude_unset=True)
+    set_tokens = "quota_tokens_per_month" in fields
+    set_cost = "quota_cost_usd_per_month" in fields
+    if not set_tokens and not set_cost:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "bad_request",
+                              "message": "provide quota_tokens_per_month and/or quota_cost_usd_per_month"}},
+        )
+    if set_tokens and payload.quota_tokens_per_month is not None and payload.quota_tokens_per_month < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "bad_request", "message": "quota_tokens_per_month must be >= 0 or null"}},
+        )
+    if set_cost and payload.quota_cost_usd_per_month is not None and payload.quota_cost_usd_per_month < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "bad_request", "message": "quota_cost_usd_per_month must be >= 0 or null"}},
+        )
+    from ai_api.db import get_sessionmaker
+
+    sm = get_sessionmaker()
+    results: list[dict[str, Any]] = []
+    changed = failed = 0
+    for aid in payload.allocation_ids:
+        try:
+            async with sm() as s:
+                a = await AllocationService(s).get(aid)
+                if a is None:
+                    results.append({"allocation_id": aid, "status": "failed", "reason": "not_found"})
+                    failed += 1
+                    continue
+                if set_tokens:
+                    a.quota_tokens_per_month = payload.quota_tokens_per_month
+                if set_cost:
+                    a.quota_cost_usd_per_month = payload.quota_cost_usd_per_month
+                    await audit.record(
+                        s, event_type=AuditEventType.allocation_cost_quota_updated,
+                        actor_type=ActorType.admin, target_type="allocation", target_id=a.id,
+                        details={"quota_cost_usd_per_month":
+                                 str(payload.quota_cost_usd_per_month) if payload.quota_cost_usd_per_month is not None else None},
+                    )
+                await s.commit()
+            results.append({"allocation_id": aid, "status": "changed", "reason": None})
+            changed += 1
+        except Exception:
+            results.append({"allocation_id": aid, "status": "failed", "reason": "internal"})
+            failed += 1
+    return {"changed": changed, "failed": failed, "results": results}
 
 
 # ---- Phase 18: per-device credentials (admin view) ----
