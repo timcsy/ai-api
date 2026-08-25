@@ -17,6 +17,7 @@ class AuditEventType(enum.StrEnum):
     logout = "logout"
     member_created = "member_created"
     member_disabled = "member_disabled"
+    member_enabled = "member_enabled"
     member_deleted = "member_deleted"
     whitelist_added = "whitelist_added"
     whitelist_removed = "whitelist_removed"

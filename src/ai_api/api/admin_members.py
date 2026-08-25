@@ -1,17 +1,28 @@
 """Admin member management endpoints."""
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_api.api.deps import get_db_session, require_admin_token
 from ai_api.auth.identifier import validate_identifier
 from ai_api.auth.sessions import revoke_all_for_member
-from ai_api.models import Member, MemberProvider, MemberStatus, Session
+from ai_api.models import (
+    Allocation,
+    AllocationStatus,
+    Member,
+    MemberProvider,
+    MemberStatus,
+    MemberTag,
+    Session,
+)
+from ai_api.services.allocations import AllocationService
+from ai_api.services.member_tags import MemberTagService, validate_tag
 from ai_api.services.members import (
     CannotDeleteSelfError,
     LastAdminCannotDeleteError,
@@ -45,6 +56,24 @@ class BulkDeleteRequest(BaseModel):
 
 class BulkCreateRequest(BaseModel):
     emails: str  # newline-separated email list
+
+
+class BulkStatusRequest(BaseModel):
+    member_ids: list[str]
+    status: MemberStatus  # active | disabled
+
+
+class BulkTagsRequest(BaseModel):
+    member_ids: list[str]
+    add: list[str] = []
+    remove: list[str] = []
+
+
+class BulkAllocateRequest(BaseModel):
+    member_ids: list[str]
+    resource_model: str
+    quota_tokens_per_month: int | None = None
+    quota_cost_usd_per_month: Decimal | None = None
 
 
 def _member_admin(m: Member) -> dict[str, Any]:
@@ -105,7 +134,26 @@ async def list_members(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict[str, Any]]:
     members = await MemberService(session).list(provider=provider, status=status_q, q=q)
-    return [_member_admin(m) for m in members]
+    # Attach tags in one query (so the admin UI can filter/show by tag without
+    # an N+1). Only the returned members' tags are fetched.
+    ids = [m.id for m in members]
+    tags_by_member: dict[str, list[str]] = {}
+    if ids:
+        rows = (
+            await session.execute(
+                select(MemberTag.member_id, MemberTag.tag)
+                .where(MemberTag.member_id.in_(ids))
+                .order_by(MemberTag.tag)
+            )
+        ).all()
+        for mid, tag in rows:
+            tags_by_member.setdefault(mid, []).append(tag)
+    out = []
+    for m in members:
+        row = _member_admin(m)
+        row["tags"] = tags_by_member.get(m.id, [])
+        out.append(row)
+    return out
 
 
 @router.get("/members/{member_id}")
@@ -296,6 +344,188 @@ async def bulk_create_members(
             results.append({"email": email, "status": "exists", "invitation_url": None})
             counts["exists"] += 1
     return {**counts, "results": results}
+
+
+@router.post("/members/bulk-status")
+async def bulk_set_status(
+    payload: BulkStatusRequest,
+    current_admin: Member | None = Depends(require_admin_token),
+) -> dict[str, Any]:
+    """Batch enable/disable. Per-item independent transaction. Refuses to disable
+    the last active admin (per item, recomputed as the batch proceeds)."""
+    if not payload.member_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "bad_request", "message": "member_ids must not be empty"}},
+        )
+    from ai_api.db import get_sessionmaker
+
+    sm = get_sessionmaker()
+    acting = current_admin.id if current_admin else "admin"
+    # Snapshot the active-admin pool once; shrink it as we disable so we never
+    # zero it out (mirrors the single-delete last-admin guard).
+    active_admin_ids: set[str] = set()
+    if payload.status == MemberStatus.disabled:
+        async with sm() as s:
+            active_admin_ids = set(
+                (
+                    await s.execute(
+                        select(Member.id).where(
+                            Member.is_admin.is_(True), Member.status == MemberStatus.active
+                        )
+                    )
+                ).scalars().all()
+            )
+
+    results: list[dict[str, Any]] = []
+    changed = failed = 0
+    for mid in payload.member_ids:
+        try:
+            if (
+                payload.status == MemberStatus.disabled
+                and mid in active_admin_ids
+                and len(active_admin_ids) <= 1
+            ):
+                results.append({"member_id": mid, "status": "failed", "reason": "last_admin"})
+                failed += 1
+                continue
+            async with sm() as s:
+                member = await MemberService(s).update(mid, status=payload.status)
+                if member is None:
+                    await s.rollback()
+                    results.append({"member_id": mid, "status": "failed", "reason": "not_found"})
+                    failed += 1
+                    continue
+                from ai_api.auth import audit
+                from ai_api.models import ActorType, AuditEventType
+
+                await audit.record(
+                    s,
+                    event_type=(
+                        AuditEventType.member_disabled
+                        if payload.status == MemberStatus.disabled
+                        else AuditEventType.member_enabled
+                    ),
+                    actor_type=ActorType.admin,
+                    actor_id=acting,
+                    target_type="member",
+                    target_id=mid,
+                )
+                await s.commit()
+            if payload.status == MemberStatus.disabled:
+                active_admin_ids.discard(mid)
+            results.append({"member_id": mid, "status": "changed", "reason": None})
+            changed += 1
+        except Exception:
+            results.append({"member_id": mid, "status": "failed", "reason": "internal"})
+            failed += 1
+    return {"changed": changed, "failed": failed, "results": results}
+
+
+@router.post("/members/bulk-tags")
+async def bulk_tags(
+    payload: BulkTagsRequest,
+    current_admin: Member | None = Depends(require_admin_token),
+) -> dict[str, Any]:
+    """Batch add/remove manual tags across members. Per-item independent."""
+    if not payload.member_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "bad_request", "message": "member_ids must not be empty"}},
+        )
+    add = [validate_tag(t) for t in payload.add]
+    remove = [t.strip().lower() for t in payload.remove if t.strip()]
+    if not add and not remove:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "bad_request", "message": "add or remove must be non-empty"}},
+        )
+    from ai_api.db import get_sessionmaker
+
+    sm = get_sessionmaker()
+    acting = current_admin.id if current_admin else "admin"
+    results: list[dict[str, Any]] = []
+    changed = failed = 0
+    for mid in payload.member_ids:
+        try:
+            async with sm() as s:
+                svc = MemberTagService(s)
+                if add:
+                    await svc.add(mid, add, added_by=acting)
+                if remove:
+                    await svc.remove(mid, remove, removed_by=acting)
+                await s.commit()
+            results.append({"member_id": mid, "status": "changed", "reason": None})
+            changed += 1
+        except LookupError:
+            results.append({"member_id": mid, "status": "failed", "reason": "not_found"})
+            failed += 1
+        except Exception:
+            results.append({"member_id": mid, "status": "failed", "reason": "internal"})
+            failed += 1
+    return {"changed": changed, "failed": failed, "results": results}
+
+
+@router.post("/members/bulk-allocate")
+async def bulk_allocate(
+    payload: BulkAllocateRequest,
+    current_admin: Member | None = Depends(require_admin_token),
+) -> dict[str, Any]:
+    """Batch grant a model to members (creates an allocation + default key each).
+    Members that already have an active allocation for the model are skipped."""
+    if not payload.member_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "bad_request", "message": "member_ids must not be empty"}},
+        )
+    if not payload.resource_model.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "bad_request", "message": "resource_model is required"}},
+        )
+    from ai_api.db import get_sessionmaker
+
+    sm = get_sessionmaker()
+    acting = current_admin.id if current_admin else "admin"
+    results: list[dict[str, Any]] = []
+    granted = skipped = failed = 0
+    for mid in payload.member_ids:
+        try:
+            async with sm() as s:
+                existing = (
+                    await s.execute(
+                        select(func.count())
+                        .select_from(Allocation)
+                        .where(
+                            Allocation.member_id == mid,
+                            Allocation.resource_model == payload.resource_model,
+                            Allocation.status == AllocationStatus.active,
+                        )
+                    )
+                ).scalar_one()
+                if existing:
+                    results.append({"member_id": mid, "status": "skipped", "reason": "already_has"})
+                    skipped += 1
+                    continue
+                member = await s.get(Member, mid)
+                if member is None:
+                    results.append({"member_id": mid, "status": "failed", "reason": "not_found"})
+                    failed += 1
+                    continue
+                await AllocationService(s).create(
+                    member_id=mid,
+                    resource_model=payload.resource_model,
+                    quota_tokens_per_month=payload.quota_tokens_per_month,
+                    quota_cost_usd_per_month=payload.quota_cost_usd_per_month,
+                    created_by=acting,
+                )
+                await s.commit()
+            results.append({"member_id": mid, "status": "granted", "reason": None})
+            granted += 1
+        except Exception:
+            results.append({"member_id": mid, "status": "failed", "reason": "internal"})
+            failed += 1
+    return {"granted": granted, "skipped": skipped, "failed": failed, "results": results}
 
 
 @router.get("/members/{member_id}/sessions")

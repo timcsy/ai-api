@@ -59,6 +59,15 @@ interface AdminMember {
   is_admin: boolean;
   created_at: string;
   has_password: boolean;
+  tags: string[];
+}
+
+interface BulkOpResult {
+  changed?: number;
+  granted?: number;
+  skipped?: number;
+  failed: number;
+  results: { member_id: string; status: string; reason: string | null }[];
 }
 
 const createSchema = z
@@ -87,7 +96,15 @@ export function AdminMembersPage() {
   const [createOpen, setCreateOpen] = React.useState(false);
   const [batchCreateOpen, setBatchCreateOpen] = React.useState(false);
   const [batchDeleteOpen, setBatchDeleteOpen] = React.useState(false);
+  const [batchTagsOpen, setBatchTagsOpen] = React.useState(false);
+  const [batchAllocateOpen, setBatchAllocateOpen] = React.useState(false);
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  // Filters (client-side; member counts are small). search matches email/label.
+  const [search, setSearch] = React.useState("");
+  const [statusF, setStatusF] = React.useState("all");
+  const [providerF, setProviderF] = React.useState("all");
+  const [tagF, setTagF] = React.useState("all");
+  const [adminOnly, setAdminOnly] = React.useState(false);
   const [confirm, setConfirm] = React.useState<
     | { kind: "demote"; member: AdminMember }
     | { kind: "promote"; member: AdminMember }
@@ -170,6 +187,85 @@ export function AdminMembersPage() {
     },
   });
 
+  const bulkToast = (verb: string, r: BulkOpResult) => {
+    const ok = r.changed ?? r.granted ?? 0;
+    const parts = [`${verb} ${ok} 位`];
+    if (r.skipped) parts.push(`略過 ${r.skipped}`);
+    if (r.failed) parts.push(`失敗 ${r.failed}`);
+    const reasons = Array.from(
+      new Set(r.results.filter((x) => x.status === "failed").map((x) => x.reason).filter(Boolean)),
+    );
+    toast({
+      title: parts.join("、"),
+      description: reasons.length ? `失敗原因：${reasons.join("、")}` : undefined,
+      variant: r.failed ? "destructive" : "default",
+    });
+    void queryClient.invalidateQueries({ queryKey: ["admin", "members"] });
+    void queryClient.invalidateQueries({ queryKey: ["admin", "tags"] });
+    setSelected(new Set());
+  };
+
+  const bulkStatusMut = useMutation<BulkOpResult, ApiError, { ids: string[]; status: string }>({
+    mutationFn: ({ ids, status }) =>
+      api<BulkOpResult>("/admin/members/bulk-status", {
+        method: "POST",
+        body: JSON.stringify({ member_ids: ids, status }),
+      }),
+    onSuccess: (r, v) => bulkToast(v.status === "disabled" ? "已停用" : "已啟用", r),
+    onError: (e) => toast({ title: "批次狀態變更失敗", description: e.message, variant: "destructive" }),
+  });
+
+  const bulkTagsMut = useMutation<BulkOpResult, ApiError, { ids: string[]; add: string[]; remove: string[] }>({
+    mutationFn: ({ ids, add, remove }) =>
+      api<BulkOpResult>("/admin/members/bulk-tags", {
+        method: "POST",
+        body: JSON.stringify({ member_ids: ids, add, remove }),
+      }),
+    onSuccess: (r) => {
+      bulkToast("已更新標籤", r);
+      setBatchTagsOpen(false);
+    },
+    onError: (e) => toast({ title: "批次標籤失敗", description: e.message, variant: "destructive" }),
+  });
+
+  const bulkAllocateMut = useMutation<
+    BulkOpResult,
+    ApiError,
+    { ids: string[]; resource_model: string; quota_tokens_per_month?: number }
+  >({
+    mutationFn: ({ ids, resource_model, quota_tokens_per_month }) =>
+      api<BulkOpResult>("/admin/members/bulk-allocate", {
+        method: "POST",
+        body: JSON.stringify({ member_ids: ids, resource_model, quota_tokens_per_month }),
+      }),
+    onSuccess: (r) => {
+      bulkToast("已開通", r);
+      setBatchAllocateOpen(false);
+    },
+    onError: (e) => toast({ title: "批次開通失敗", description: e.message, variant: "destructive" }),
+  });
+
+  const allTags = React.useMemo(() => {
+    const s = new Set<string>();
+    (query.data ?? []).forEach((m) => (m.tags ?? []).forEach((t) => s.add(t)));
+    return Array.from(s).sort();
+  }, [query.data]);
+
+  const filtered = React.useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return (query.data ?? []).filter((m) => {
+      if (term && !m.email.toLowerCase().includes(term)) return false;
+      if (statusF !== "all" && m.status !== statusF) return false;
+      if (providerF !== "all" && m.provider !== providerF) return false;
+      if (tagF !== "all" && !(m.tags ?? []).includes(tagF)) return false;
+      if (adminOnly && !m.is_admin) return false;
+      return true;
+    });
+  }, [query.data, search, statusF, providerF, tagF, adminOnly]);
+
+  const filteredIds = filtered.map((m) => m.id);
+  const allFilteredSelected = filtered.length > 0 && filteredIds.every((id) => selected.has(id));
+
   const performConfirmed = async () => {
     if (!confirm) return;
     const { kind, member } = confirm;
@@ -191,16 +287,79 @@ export function AdminMembersPage() {
         </div>
       </div>
 
+      {/* Filter bar — narrow the list, then select-all + batch acts on the result */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="搜尋帳號 / email"
+          className="h-9 w-full sm:w-56"
+        />
+        <Select value={statusF} onValueChange={setStatusF}>
+          <SelectTrigger className="h-9 w-[120px]"><SelectValue placeholder="狀態" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部狀態</SelectItem>
+            <SelectItem value="active">啟用</SelectItem>
+            <SelectItem value="disabled">停用</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={providerF} onValueChange={setProviderF}>
+          <SelectTrigger className="h-9 w-[130px]"><SelectValue placeholder="登入方式" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部登入</SelectItem>
+            <SelectItem value="google_oidc">google_oidc</SelectItem>
+            <SelectItem value="local_password">local_password</SelectItem>
+            <SelectItem value="external">external</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={tagF} onValueChange={setTagF}>
+          <SelectTrigger className="h-9 w-[130px]"><SelectValue placeholder="標籤" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部標籤</SelectItem>
+            {allTags.map((t) => (
+              <SelectItem key={t} value={t}>{t}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          variant={adminOnly ? "default" : "outline"}
+          size="sm"
+          className="h-9"
+          onClick={() => setAdminOnly((v) => !v)}
+        >
+          僅管理員
+        </Button>
+        {(search || statusF !== "all" || providerF !== "all" || tagF !== "all" || adminOnly) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9"
+            onClick={() => {
+              setSearch("");
+              setStatusF("all");
+              setProviderF("all");
+              setTagF("all");
+              setAdminOnly(false);
+            }}
+          >
+            清除篩選
+          </Button>
+        )}
+        <span className="text-sm text-muted-foreground ml-auto">
+          {filtered.length}{query.data && filtered.length !== query.data.length ? ` / ${query.data.length}` : ""} 位
+        </span>
+      </div>
+
       {selected.size > 0 && (
-        <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/40 px-3 py-2">
           <span className="text-sm">已選 {selected.size} 位</span>
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
-              清除選取
-            </Button>
-            <Button variant="destructive" size="sm" onClick={() => setBatchDeleteOpen(true)}>
-              批次刪除
-            </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>清除選取</Button>
+            <Button variant="outline" size="sm" onClick={() => bulkStatusMut.mutate({ ids: Array.from(selected), status: "active" })}>批次啟用</Button>
+            <Button variant="outline" size="sm" onClick={() => bulkStatusMut.mutate({ ids: Array.from(selected), status: "disabled" })}>批次停用</Button>
+            <Button variant="outline" size="sm" onClick={() => setBatchTagsOpen(true)}>批次標籤</Button>
+            <Button variant="outline" size="sm" onClick={() => setBatchAllocateOpen(true)}>批次開通模型</Button>
+            <Button variant="destructive" size="sm" onClick={() => setBatchDeleteOpen(true)}>批次刪除</Button>
           </div>
         </div>
       )}
@@ -219,13 +378,14 @@ export function AdminMembersPage() {
               <TableHead className="w-10">
                 <Checkbox
                   aria-label="全選"
-                  checked={
-                    query.data.length > 0 && selected.size === query.data.length
-                  }
+                  checked={allFilteredSelected}
                   onCheckedChange={(c) =>
-                    setSelected(
-                      c ? new Set(query.data!.map((m) => m.id)) : new Set(),
-                    )
+                    setSelected((prev) => {
+                      const next = new Set(prev);
+                      if (c) filteredIds.forEach((id) => next.add(id));
+                      else filteredIds.forEach((id) => next.delete(id));
+                      return next;
+                    })
                   }
                 />
               </TableHead>
@@ -239,7 +399,7 @@ export function AdminMembersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {query.data.map((m) => (
+            {filtered.map((m) => (
               <TableRow key={m.id} data-state={selected.has(m.id) ? "selected" : undefined}>
                 <TableCell data-label="選取">
                   <Checkbox
@@ -261,7 +421,7 @@ export function AdminMembersPage() {
                   {m.is_admin && <Badge>admin</Badge>}
                 </TableCell>
                 <TableCell data-label="標籤">
-                  <MemberTagsCell memberId={m.id} />
+                  <MemberTagsCell memberId={m.id} tags={m.tags ?? []} />
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground" data-label="建立時間">
                   {new Date(m.created_at).toLocaleDateString("zh-TW")}
@@ -312,10 +472,10 @@ export function AdminMembersPage() {
                 </TableCell>
               </TableRow>
             ))}
-            {query.data.length === 0 && (
+            {filtered.length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                  尚無成員
+                  {query.data.length === 0 ? "尚無成員" : "無符合條件的成員"}
                 </TableCell>
               </TableRow>
             )}
@@ -375,20 +535,210 @@ export function AdminMembersPage() {
       </AlertDialog>
 
       <BatchCreateMembersDialog open={batchCreateOpen} onOpenChange={setBatchCreateOpen} />
+
+      <BatchTagsDialog
+        open={batchTagsOpen}
+        onOpenChange={setBatchTagsOpen}
+        count={selected.size}
+        allTags={allTags}
+        pending={bulkTagsMut.isPending}
+        onSubmit={(add, remove) => bulkTagsMut.mutate({ ids: Array.from(selected), add, remove })}
+      />
+
+      <BatchAllocateDialog
+        open={batchAllocateOpen}
+        onOpenChange={setBatchAllocateOpen}
+        count={selected.size}
+        pending={bulkAllocateMut.isPending}
+        onSubmit={(model, quota) =>
+          bulkAllocateMut.mutate({
+            ids: Array.from(selected),
+            resource_model: model,
+            quota_tokens_per_month: quota,
+          })
+        }
+      />
     </div>
   );
 }
 
-function MemberTagsCell({ memberId }: { memberId: string }) {
+function BatchTagsDialog({
+  open,
+  onOpenChange,
+  count,
+  allTags,
+  pending,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  count: number;
+  allTags: string[];
+  pending: boolean;
+  onSubmit: (add: string[], remove: string[]) => void;
+}) {
+  const [addText, setAddText] = React.useState("");
+  const [remove, setRemove] = React.useState<Set<string>>(new Set());
+  const add = addText
+    .split(/[\s,，、]+/)
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        onOpenChange(o);
+        if (!o) {
+          setAddText("");
+          setRemove(new Set());
+        }
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>批次標籤 · {count} 位</DialogTitle>
+          <DialogDescription>對選取的成員加上或移除標籤。</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-sm font-medium">加標籤</label>
+            <Input
+              value={addText}
+              onChange={(e) => setAddText(e.target.value)}
+              placeholder="以空白或逗號分隔，例如 class-a 三年級"
+            />
+          </div>
+          {allTags.length > 0 && (
+            <div className="space-y-1">
+              <label className="text-sm font-medium">移除標籤（點選）</label>
+              <div className="flex flex-wrap gap-1">
+                {allTags.map((t) => {
+                  const on = remove.has(t);
+                  return (
+                    <Badge
+                      key={t}
+                      variant={on ? "destructive" : "secondary"}
+                      className="cursor-pointer"
+                      onClick={() =>
+                        setRemove((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(t)) next.delete(t);
+                          else next.add(t);
+                          return next;
+                        })
+                      }
+                    >
+                      {t}
+                      {on ? " ✕" : ""}
+                    </Badge>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button
+            disabled={pending || (add.length === 0 && remove.size === 0)}
+            onClick={() => onSubmit(add, Array.from(remove))}
+          >
+            套用
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function BatchAllocateDialog({
+  open,
+  onOpenChange,
+  count,
+  pending,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  count: number;
+  pending: boolean;
+  onSubmit: (resourceModel: string, quota: number | undefined) => void;
+}) {
+  const [model, setModel] = React.useState("");
+  const [quota, setQuota] = React.useState("");
+  const models = useQuery<Array<{ slug: string }>, ApiError>({
+    queryKey: ["admin", "catalog-models-admin"],
+    queryFn: () => api<Array<{ slug: string }>>("/admin/catalog/models"),
+    enabled: open,
+    staleTime: 60_000,
+  });
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        onOpenChange(o);
+        if (!o) {
+          setModel("");
+          setQuota("");
+        }
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>批次開通模型 · {count} 位</DialogTitle>
+          <DialogDescription>
+            為選取的成員各建立一筆分配（含預設金鑰）。已有該模型有效分配者自動略過。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-sm font-medium">模型</label>
+            <Select value={model} onValueChange={setModel}>
+              <SelectTrigger><SelectValue placeholder="選擇模型" /></SelectTrigger>
+              <SelectContent>
+                {(models.data ?? []).map((m) => (
+                  <SelectItem key={m.slug} value={m.slug}>{m.slug}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">每月 token 額度（選填，留空為無上限）</label>
+            <Input
+              type="number"
+              min={0}
+              value={quota}
+              onChange={(e) => setQuota(e.target.value)}
+              placeholder="例如 1000000"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            disabled={pending || !model}
+            onClick={() => onSubmit(model, quota.trim() ? Number(quota) : undefined)}
+          >
+            開通
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MemberTagsCell({ memberId, tags }: { memberId: string; tags: string[] }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [open, setOpen] = React.useState(false);
   const [newTag, setNewTag] = React.useState("");
 
-  const tagsQuery = useQuery<string[], ApiError>({
-    queryKey: ["admin", "members", memberId, "tags"],
-    queryFn: () => api<string[]>(`/admin/members/${memberId}/tags`),
-  });
+  // Tags come from the member list row (no per-member N+1); mutations invalidate
+  // the list so the row (and the tag filter) refresh.
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ["admin", "members"] });
+    void queryClient.invalidateQueries({ queryKey: ["admin", "tags"] });
+  };
 
   const addMut = useMutation<string[], ApiError, string>({
     mutationFn: (tag) =>
@@ -398,8 +748,7 @@ function MemberTagsCell({ memberId }: { memberId: string }) {
       }),
     onSuccess: () => {
       setNewTag("");
-      queryClient.invalidateQueries({ queryKey: ["admin", "members", memberId, "tags"] });
-      queryClient.invalidateQueries({ queryKey: ["admin", "tags"] });
+      invalidate();
     },
     onError: (e) => toast({ title: "加標籤失敗", description: e.message, variant: "destructive" }),
   });
@@ -409,16 +758,13 @@ function MemberTagsCell({ memberId }: { memberId: string }) {
       api<void>(`/admin/members/${memberId}/tags?tag=${encodeURIComponent(tag)}`, {
         method: "DELETE",
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "members", memberId, "tags"] });
-      queryClient.invalidateQueries({ queryKey: ["admin", "tags"] });
-    },
+    onSuccess: invalidate,
     onError: (e) => toast({ title: "移除標籤失敗", description: e.message, variant: "destructive" }),
   });
 
   return (
     <div className="flex items-center gap-1 flex-wrap">
-      {tagsQuery.data?.map((tag) => (
+      {tags.map((tag) => (
         <Badge
           key={tag}
           variant="secondary"
