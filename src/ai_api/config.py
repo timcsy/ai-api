@@ -99,6 +99,12 @@ class Settings(BaseSettings):
     # truth is the Helm value `requestBodyLimitMB`.
     request_body_limit_mb: int = Field(default=100, alias="REQUEST_BODY_LIMIT_MB")
 
+    # OAuth (first-party Authorization Code + PKCE): comma-separated redirect_uri
+    # prefixes an app may be handed a code back to. Empty ⇒ the authorize step is
+    # refused (fail-closed) — this allowlist is the critical anti-open-redirect
+    # defense (a stray redirect_uri = token theft).
+    oauth_redirect_allowlist: str = Field(default="", alias="OAUTH_REDIRECT_ALLOWLIST")
+
     # Phase 5: provider credential encryption
     # 32-byte url-safe base64 Fernet key (e.g., Fernet.generate_key()).
     # In production this MUST come from a K8s Secret; empty value triggers

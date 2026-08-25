@@ -25,6 +25,7 @@ from ai_api.models.notification import (
     NotificationOutcome,
     NotificationRecord,
 )
+from ai_api.models.oauth_authorization import OAuthAuthorization, OAuthAuthStatus
 from ai_api.models.oidc_state import OidcState
 from ai_api.models.password_attempt import AttemptOutcome, PasswordAttempt
 from ai_api.models.pool_config import PoolConfig
@@ -66,6 +67,8 @@ __all__ = [
     "NotificationDedupBucket",
     "NotificationOutcome",
     "NotificationRecord",
+    "OAuthAuthStatus",
+    "OAuthAuthorization",
     "OidcState",
     "PasswordAttempt",
     "PoolConfig",
