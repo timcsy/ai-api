@@ -8,5 +8,7 @@ This project maintains structured knowledge in `knowledge/`:
 - **Experience** (`knowledge/experience.md`): Distilled lessons from past development — patterns, pitfalls, and takeaways.
 
 Read these files at the start of any task to understand the project's *why* and constraints.
-Additional context may be found in `knowledge/research/`, `knowledge/design/`, and `knowledge/history/`.
+Additional context may be found in `knowledge/concepts/`, `knowledge/history/`, and `knowledge/draft/`.
+
+Learned procedures live in `knowledge/skills/` (agentskills.io SKILL.md format). If your tool auto-loads skills, they may be projected into your skill directory; otherwise read the relevant `SKILL.md` there and follow it.
 <!-- /Knowie -->

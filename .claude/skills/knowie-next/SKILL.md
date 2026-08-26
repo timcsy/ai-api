@@ -1,128 +1,99 @@
 ---
 name: knowie-next
-description: Plan the next step based on project knowledge
+description: Plan the next step as a brief grounded in vision, principles, and experience — then carry it into the spec
 user-invocable: true
-argument-hint: "[direction or feature area to explore]"
+argument-hint: "[a direction or feature; empty = infer from vision + recent commits]"
 ---
+
+# Knowie Core
+
+**What knowie is**: a project's *why* memory — the knowledge code can't hold, and that has no oracle to catch when it rots. It's a protocol parasitic on markdown: any AI that can read/write files can use it.
+
+## Mission & root axioms (never violate)
+- **Mission (telos): memory for shared understanding.** knowie remembers for the *human + AI consensus* — keep both aligned, the human holds decision sovereignty, the "why" stays traceable. Everything else serves this. (Not "memory so the agent gets stronger" — that's Letta/Hermes's root.)
+1. **One concept, many projections.** Organize by concept.
+2. **Memory stays (roughly) reconstructable.** Keep why + the *minimal how/what* needed to rebuild past cognition (a recall unit = why + how + which concepts). Don't duplicate what code already holds as truth (redundant, drifts) — but it's not "zero what"; the bar is "enough to reconstruct," not "why only."
+
+## Structure
+- `principles` / `vision` / `experience` = the normative / situational / existential perspectives; the three entry points.
+- Inside `principles`: **root principles** (very stable, rarely change) + **derived principles** (derived from root, may evolve, must cite their derivation, must not contradict root).
+- Detail sinks into `concepts/` **by concept**.
+- `history/` = causal trail (why things became what they are).
+- `draft/` = short-term memory: undecided things; decays by default, consolidated only when repeatedly used.
+- `episodes/` = episodic memory: full lived experiences worth recalling — the scene behind an experience lesson, **or the brainstorming behind a consolidated draft** (*why* we explored it this way). Most fade; only the recall-worthy are kept.
+- **Filenames follow the base's language** (`knowledge/.knowie.json` → `language`): for a `zh-TW` base, name new `concepts/` / `episodes/` / `history/` / `draft/` files in that language (Han characters), not English (`distillation.md`), matching what's already there. Exception: `skills/` folders and canonical filenames (`SKILL.md`, `README.md`, `.knowie.json`) stay as English identifiers — they're invocable/symlinked, not prose. Content language follows the same setting. **Never a space in a filename** — use `-`: a space makes `%20`-encoded and literal links disagree, so half the pointers to that file break silently.
+
+## Two intake lines
+- **Thinking → `draft`**: undecided thoughts (problems / designs / insights) — incubate, then **dispatch on exit** (next bullet).
+- **Doing → action reflow**: a finished roadmap item reflows — lesson → `experience`, full scene → `episodes`, decision-transition → `history`. experience's main source is *doing*, not draft.
+
+## Consolidating is dispatch, not relocation
+When anything leaves `draft/` (or an item finishes), **disperse it across every folder that applies — never move the block whole**: direction → roadmap/`experience` · recurring concept → `concepts/` · the **brainstorming scene (why we explored it this way, options weighed) → `episodes/`** · decision-transition → `history/`. The brainstorming scene is the easiest to lose — drop it and a future reader keeps the conclusion but forgets the *why behind the why*.
+
+## Invariants (MUST)
+- **Captured ≠ committed.** Undecided → `draft/`; writing into the three files or root principles needs human confirmation.
+- **Record transitions, not just states.** Every change leaves a "why it changed"; mark the old one `superseded` and link to the new — don't delete.
+- **Root principles stay stable.** Changing them takes a special path + a recorded reason; their churn should approach zero.
+- **Converge.** Re-running a tidy should be near no-op; concepts converge toward few roots.
+- **Answer to ground truth.** Any claim of "read it / compared it" attaches a verbatim quote + line number (user can grep). No silent skipping, no self-reported coverage.
+
+## Tests (to judge, not to enumerate cases)
+- **Qualifies as a concept?** → Does it project onto all three perspectives? Strong in only one → still a single lesson/principle; keep in `draft/`.
+- **Record the causality?** → Would a future reader be confused ("didn't we say X?")? Yes → record.
+- **Real parent-concept or fake?** → Does it have pruning power? Vague enough to hold anything = bad abstraction.
+- **Named well?** → Is the name a **claim you can judge text against** ("copying a truth schedules the day it expires") rather than a noun you can file text under ("projection")? A noun only files; a claim prunes — it makes the pruning-power test fire at naming time, instead of months later when the concept turns out to hold nothing.
+- **A lesson worth keeping?** → Does it change how some **criterion** is written? A lesson phrased as a *practice* ("split the binding layer from rendering and it becomes testable") expires with the stack; phrased as a *criterion* ("a measurer that changes what it measures isn't measuring it") it travels. Same rule as these skills: tests, not steps.
+- **Keep or cut (any mechanism / phrase)?** → If cut, could an AI quietly skip it and no one notice? Yes → keep; No → cut.
+
+## Emphasis is a budget
+Bold marks **the criterion itself**; ⚠️ marks "I got this wrong right here". Everything else stays plain prose. Emphasis is a signal aimed at the reader's attention — human *and* AI — so spending it everywhere buys nothing and drags recall precision down with it. A file past ~5 ⚠️ has zero.
+
+## Division of labor
+- **AI does the reversible, mechanical**: move, index, prune, detect, draft.
+- **Human does the irreversible, semantic**: commit, amend root principles, anoint parent-concepts. AI proposes; it never writes into the long-term tier on its own.
+
+## How these skills are written (they obey this too)
+- Give **tests + reasons**, not exhaustive steps (contexts are infinite; only tests generalize).
+- Whatever can live in structure (templates / filenames / indexes) shouldn't be written into instructions.
+- Necessary friction (what plugs a hole) stays — compressed to one line; theater (what only looks good) is cut.
 
 # Knowie Next
 
-Help the user decide and plan what to work on next, grounded in the project's principles, vision, and experience.
+Turn the knowledge base into a **structured plan** for the next step, and carry the *why* into the spec tool so it's obeyed during implementation.
 
-## User Input
+## Steps
+1. **Check `draft/` for ripe items first.** Before planning, scan `draft/` for any topic mature enough to graduate (recognition chain: a *design* settled enough to commit → its exit is the **vision roadmap**; an *experience/insight* verified enough → consolidate). Surface these — never silently build a design straight from `draft/`; a design must become a roadmap item (the human-commit gate) before it's implemented.
+2. **Read with evidence** — attach a verbatim quote for whatever you rely on.
+3. **Retrieve — recall over precision.** Pull everything relevant from all three perspectives **and `knowledge/skills/`** — a learned skill that does this step → recommend *using* it, don't re-plan it from scratch. Missing a relevant one is worse than one extra (retrieval recall is the bottleneck for adherence).
+4. **Write the plan as a brief, organized by the three perspectives** (below).
+5. **Hand off** — give the brief's cautions to the spec tool. Suggest only; never auto-implement, never auto-invoke another skill.
 
-```text
-$ARGUMENTS
-```
+## The plan — a brief grounded in all three perspectives
+Every line cites where it comes from; skip a line if empty.
 
-## Governance Principles
+**The next step is the *best* move, not necessarily the roadmap's sequential item.** next may re-prioritize, jump roadmap order, or flag a **re-route** (a committed route found wrong → say so and make admitting it cheap). Justify the jump from the three perspectives like any recommendation. Guardrail: a *new* route still passes the gate (draft → roadmap) before it's built — jumping ≠ bypassing the commit gate.
 
-- **Principles are the highest authority.** Every recommendation must be traceable to a principle. If it isn't, flag it as a pragmatic choice.
-- **Vision is the roadmap.** Follow the established order unless experience provides compelling reason to deviate.
-- **Experience is the guardrail.** Always check for relevant lessons before recommending an approach.
-- **Never auto-invoke other skills.** Only suggest them.
+**Next: [name] — [one-line]** · roadmap position: [phase / milestone]
 
-## Workflow
+- **From vision** (the roadmap / situational):
+  - **Prerequisites** — verify against the *code*, not just what vision says.
+  - **In scope** / **Out of scope** — state exclusions explicitly, to prevent scope creep.
+  - **Acceptance** — concrete, verifiable criteria.
+- **From principles** (normative):
+  - Which principle this serves — **quote it + show the derivation chain**. Can't trace to one? Flag it a pragmatic choice, not a principled one.
+- **From experience** (existential):
+  - Relevant lesson — **quote it + how to apply**.
+  - **Risks** (from past pitfalls) + mitigation.
+  - **Other routes considered** + why not — the rejected options carry the richest *why*.
 
-### 1. Read knowledge files
+## Output — end with a choice, don't auto-act
+After the brief, if step 1 found ripe `draft/` items, end with the option:
+**"Before we start, promote these first? (design → roadmap, then build it through the roadmap; insight → consolidate.)"** — list them. The human decides; you propose. This is the gate that keeps a design from being built straight out of `draft/`. (For a focused, human-initiated consolidate outside planning, that's `/knowie-consolidate`.)
 
-Read all three core files:
-- `knowledge/principles.md`
-- `knowledge/vision.md`
-- `knowledge/experience.md`
+Promoting is a **dispatch, not a relocation** (see core: *Consolidating is dispatch*) — direction → roadmap/`experience`, recurring concept → `concepts/`, brainstorming scene → `episodes/`, transition → `history/`. A new roadmap item carries **acceptance criteria** (verifiable) and a **two-way link** to its design draft. The draft is **not deleted** — it stays as the in-flight design rationale until the item is done (then it reflows + retires, judge §4). Only the pieces already dispatched elsewhere (concept, transition) leave the draft.
 
-Also check:
-- `knowledge/design/` for relevant design documents
-- Project structure and recent git log for actual state
+## Skill candidate — the prevention catch
+If the planned step is a **repeated manual operation** with no skill yet → flag it a **skill candidate** (prevention: skill it *before* doing it manually again; capture records it, the human confirms). next is the earliest, cheapest catch of repetition — before the next manual redo. (judge catches what slips through, later.)
 
-### 2. Determine direction
-
-**If `$ARGUMENTS` provides a direction** (e.g., "error handling", "mobile support"):
-- Locate it in the vision roadmap
-- Check prerequisites — are prior milestones actually complete? (check code, not just what vision says)
-- Find relevant experience entries (lessons, pitfalls, patterns)
-- Find relevant design documents
-- Check if principles constrain the approach
-
-**If `$ARGUMENTS` is empty**:
-- Look at the vision roadmap for the next incomplete milestone
-- Cross-reference with actual project state (what's really done?)
-- Consider experience lessons that might affect priority
-- Suggest the most logical next step with justification
-
-### 3. Converge
-
-Through conversation with the user, converge on all of these items:
-
-- **Feature name**: short, descriptive
-- **One-line description**: what it delivers to the user/system
-- **Roadmap position**: which phase/milestone it belongs to
-- **Prerequisites**: what must be done first (check if actually done)
-- **Scope**:
-  - What's included (explicit list)
-  - What's explicitly excluded (prevent scope creep)
-- **Grounded in principles**: which principle(s) this serves, and how. Show the derivation chain.
-- **Informed by experience**: relevant lesson(s) and how to apply them. Quote the specific lesson.
-- **Risks**: based on experience, what could go wrong? What mitigation is available?
-- **Success criteria**: how do we know this is done? Make it concrete and verifiable.
-
-### 4. Output
-
-Present a concise feature brief:
-
-```markdown
-## Next: [Feature Name]
-
-**Description**: [One-line description]
-
-**Roadmap**: [Phase/milestone reference]
-
-**Prerequisites**:
-- [x] [Completed prerequisite]
-- [ ] [Missing prerequisite — must be addressed first]
-
-**Scope**:
-- ✅ [Included]
-- ✅ [Included]
-- ❌ [Explicitly excluded]
-
-**Grounded in principles**:
-- Principle: "[quoted principle]"
-- How this feature serves it: [explanation]
-
-**Informed by experience**:
-- Lesson: "[quoted lesson from experience.md]"
-- How to apply: [specific guidance for this feature]
-
-**Risks**:
-- [Known risk from experience] → Mitigation: [approach]
-
-**Success criteria**:
-- [ ] [Concrete, verifiable criterion]
-- [ ] [Concrete, verifiable criterion]
-```
-
-### 5. Suggest next action
-
-After presenting the feature brief, scan the project for spec/planning tools:
-
-- Check `.claude/skills/` for spec-related skills (e.g., `speckit-specify`, `speckit-plan`)
-- Check `.specify/` for Speckit
-- Check `openspec/` for OpenSpec
-- Check `.kiro/specs/` for Kiro Specs
-
-**If a spec tool is found**: suggest the specific command.
-  Example: "You can now use `/speckit-specify` to create a detailed specification for this feature."
-
-**If no spec tool is found**: give a generic prompt.
-  "You can now use your preferred specification tool to flesh out the details, or start implementing directly."
-
-## Guidelines
-
-- **Language**: Read `knowledge/.knowie.json` → `language` field (e.g., `"zh-TW"`). Use that language for ALL output — section headers, descriptions, suggestions, everything. If `knowledge/.knowie.json` is missing or has no language field, detect from conversation context or default to English.
-- Keep the feature brief concise — it's a starting point, not a full spec
-- **Every recommendation must reference knowledge files.** Don't invent principles or cite non-existent experience. If there's no relevant principle, say so explicitly.
-- Verify project state before claiming prerequisites are met — check actual code, not just what vision says
-- If the user's direction conflicts with principles or experience, flag it clearly with the specific conflict, but let them decide
-- If the roadmap is empty or unclear, help the user think through priorities rather than guessing
-- Never auto-invoke other skills — only suggest them
+## Invariant
+Every recommendation traces to vision / principles / experience. Nothing from thin air — if there's no relevant knowledge for a point, say so explicitly.

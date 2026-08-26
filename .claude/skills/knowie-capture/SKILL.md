@@ -1,8 +1,8 @@
 ---
-name: knowie-init
-description: Create the knowledge base through layered, low-pressure conversation
+name: knowie-capture
+description: Dispatch a discussion or idea into the knowledge base — split by perspective, sort by maturity
 user-invocable: true
-argument-hint: "[a topic or file to focus on; empty = assess all]"
+argument-hint: "[the idea; or empty to capture the current discussion]"
 ---
 
 # Knowie Core
@@ -57,25 +57,38 @@ Bold marks **the criterion itself**; ⚠️ marks "I got this wrong right here".
 - Whatever can live in structure (templates / filenames / indexes) shouldn't be written into instructions.
 - Necessary friction (what plugs a hole) stays — compressed to one line; theater (what only looks good) is cut.
 
-# Knowie Init
+# Knowie Capture
 
-Help the user create `knowledge/` through conversation. Low pressure: filling one bullet beats an empty file — say so when they hesitate.
+Take a chunk of thinking (a finished discussion, an idea) and **dispatch** it into the knowledge base — route it, don't dump it.
 
-## Build the structure
-The three files (principles / vision / experience) + empty Key Extensions tables + `concepts/`, `history/`, `draft/`.
+## The move
+Split the input into *which kinds* of knowledge it produced, then route each piece by maturity. Writing ≠ dumping into one file.
 
-## Route once
-> "Want me to (a) offer common examples and patterns you react to and extend — less blank-page pressure; or (b) describe it in your own words first, and I only offer examples if you get stuck?"
+## Tests — per piece of the input
+- **Which perspective?** normative → `principles` · situational → `vision` · existential → `experience` · a recurring root → a `concepts/` file · a decision that *supersedes* a prior one, or a rejected option → `history/` (a **transition**, not a completion — see below).
+- **Which kind → which exit?** (recognition chain: problem → design → experience)
+  - *Experience* (a verified lesson / a pitfall hit) → `experience`; its full scene, if recall-worthy → `episodes` (link them, and link the episode out to the *how* it produced — spec / PR / commit — point out, don't copy; pin a commit for a regenerable spec). Note experience's main source is *doing*'s reflow, not draft.
+  - *Design* (a proposal / mechanism) → can't be settled until built+used → park as a `draft/` topic block; **when mature, its exit is the vision roadmap** (a human commits to building it), not direct consolidation. On promotion the roadmap item gets **acceptance criteria** and a **two-way link** to the draft; the draft stays as the in-flight rationale (don't delete it) until the item is done, then it reflows + retires (see judge §4).
+  - *Problem* (an open question) → `draft/` topic block; its exit is finding an answer (→ becomes a design or experience).
+  - *Rejected option* → tombstone in `history/` with the reason — the richest why; don't drop it for the conclusion alone.
+  - *Completion ≠ transition.* "Shipped X / tests green / increment done" is **not** `history/` — even under a "Transition" heading. Its home is the commit / CHANGELOG (the *how*-leg) + the exploration scene (`episodes`); its lesson reflows to `experience`. A milestone earns a `history/` entry **only when it revealed a pivot** — a prior decision or assumption changed — and then the entry records *that pivot*, not the delivery list. **Test:** delete the delivery/test lines; if an "old → new, and why it changed" remains, it's history — if only "we finished it" remains, it isn't (one `history/` entry per shipped increment is the smell).
 
-- Default to **(a) example-first** for hesitant users or empty files; lead each question with concrete options.
-- **(b) free-form**: go straight to the open questions. Remember the choice.
+## Two reflexes
+- **Don't collapse dimensions.** One discussion usually spans perspectives — don't shove it all into `vision`. Route each piece to where it belongs.
+- **When unsure if it's settled → `draft/`, not the three files.** (Captured ≠ committed.)
 
-## Per file — layered (ask 2-3, listen, go deeper)
-- **principles**: push for the *root* — the one belief everything else derives from; don't settle for surface rules. Establish root principles first (very few), then derived ones (cite the derivation chain).
-- **vision**: one-sentence goal → current state → next milestones, each with verifiable success criteria.
-- **experience**: trigger recall with concrete common lessons; convert what resonates into the four-part form (theory said → actually happened → resolved by → lesson).
+## Fire without being asked — reliance and pivot are the signals
+The misses come from never running capture, not from running it wrong. Two signals should make you capture *on your own*, before being asked:
+- **Reliance ≠ captured.** The moment you cite a criterion / lesson / decision as if it's established — "as we decided X", "per X", "this echoes X" — that reliance *is* proof X is load-bearing. **Stop and check X is actually in the base; if not, capture it now.** A vivid, agreed discussion is **not** capture — an idea fresh in context only *feels* stored, and the one you're actively relying on is the most dangerous miss.
+- **Topic pivot.** When the thread changes subject, sweep what just got decided/learned for anything not yet in the base — a discussion abandoned for the next question is where capture is lost. (judge backstops both with a mechanical scan for cited-but-uncaptured names.)
 
-## Invariants
-- Write only on confirmation; show the draft first; never overwrite without showing a diff.
-- Root principles: few, not many.
-- Translate the example options into the user's language — don't leave them in English.
+## Procedural capture — repeated *doing* → a candidate skill
+A second mode: not dispatching a discussion, but noticing you've done the **same operation repeatedly** (scrape-build a dataset, batch-translate…). That's procedural memory forming — capture it.
+- **Notice + record a candidate** → a `draft/` block: what the task is + *how* you did it this time. (A candidate is still data/undecided → it incubates in `draft/` like anything else.)
+- **On repetition + maturity → the human confirms → consolidate into `knowledge/skills/`** (the cerebellum, source of truth) as one skill: a folder + `SKILL.md` (agentskills.io format) carrying its *why*.
+- **Then project it into the present tools' skill dirs so it's usable now.** The source of truth stays in `knowledge/skills/`; *project* it — per-skill **relative symlink** (`../../knowledge/skills/<name>`; an absolute path breaks on every other machine) into **every** dir listed in `knowledge/.knowie.json` → `skillDirs`, so edits to the source reach every tool with no drift. **Enumerate that list** — projecting only into the dir you read yourself is why `.agents/skills/` was never created on real bases, leaving Codex/Gemini blind to every skill the project learned. (No `skillDirs` key = a base predating it → `npx knowie update` fills it in.) **Where symlinks fail (e.g. Windows), copy instead** and note it needs re-sync. It's reversible → **do it yourself; don't make the user run a CLI** for a skill they just made — the AI is present, so the AI does it (CLI is only for AI-absent bootstrap; see core). (judge §5 re-ensures these projections after a fresh clone or when a new tool appears.)
+- **Stricter gate than knowledge**: a skill is *executed* (it acts, can fail silently) → consolidating needs firmer human confirmation than committing knowledge.
+- **Form**: a *domain* skill automates a mechanical task → it may be procedural/rote (steps), unlike a *meta* skill (judgment). Don't force domain skills into judgment-form.
+
+## Output
+Show the dispatch plan (what goes where) first. Write `draft/` directly; for anything in the long-term tier or the roadmap, write only on confirmation.
