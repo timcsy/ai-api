@@ -1,50 +1,12 @@
 # 經驗
 
 > 較早期、與目前架構關聯較弱的工具坑（TS composite、Vitest 嵌套 Vite、ESLint no-undef、
-> Alpine apk upgrade、httpx URL quote、SQLAlchemy 多分支 select）已移至
-> [`history/lessons-archive.md`](history/lessons-archive.md)。
+> Alpine apk upgrade、httpx URL quote、SQLAlchemy 多分支 select）+ 已內化的通用前端/測試坑
+> （React Query 共用 key、抽共用元件、錯誤封包 shape、tz-aware、CSS grid truncate、
+> fire-and-forget drain、印 SDK 回傳值、Tailwind grid base）已移至
+> [`history/lessons-archive.md`](history/lessons-archive.md)。本檔只留仍會影響未來決策的教訓。
 
 ## 教訓
-
-### React Query：兩個 query 共用 key 但回傳形狀不同 → 讀到別人的快取
-
-- **理論說**：用資源名當 queryKey（如 `["me","allocations"]`）很直覺，反正都在打同一個端點。
-- **實際發生**：dashboard 列表用 `useQuery(["me","allocations"])` 回**陣列**；分配詳情頁也用
-  `["me","allocations"]` 但 queryFn 回**單筆**（`list.find(...)`）。從 dashboard 點進詳情時，
-  React Query 認為 key 已有新鮮資料 → 詳情頁直接讀到快取的**陣列**，沒跑自己的 find。
-  `alloc.resource_model` 變 undefined → 標題退回 ULID、curl 顯示 `<model-slug>` 佔位。
-- **解決方式**：給語意/形狀不同的 query **不同的 key**——詳情頁改 `["me","allocation-detail", id]`，
-  並在會變動它的 mutation（rotate）一併 invalidate。
-- **教訓**：queryKey 是「快取身分證」，不是「端點名」。**回傳形狀不同 → key 必須不同**；
-  同一端點的 list 與 detail 衍生視圖要各自獨立 key，否則會互相污染且難以察覺。
-- **來源**：`frontend/src/routes/allocation-detail.tsx`，修正於 PR #19
-
-### 同一概念的 UI 做兩份一定會 drift → 抽共用元件
-
-- **理論說**：兩頁都要「怎麼呼叫 API」的範例，各自寫一份比較快。
-- **實際發生**：分配詳情與型錄詳情各做一套——標題（如何使用 vs 使用範例）、分頁數（3 vs 4）、
-  有無複製鈕、佔位符（`$YOUR_TOKEN` vs `$TOKEN`）全都不一樣，型錄那份還用了去前綴的 model
-  （proxy 其實吃完整 slug）→ 範例跑不動。使用者一眼就覺得「兩邊很割裂」。
-- **解決方式**：抽 `<ApiUsageExample model={slug}/>` 共用元件，兩頁都用；統一文案/分頁/佔位符，
-  model 一律用完整 slug。各頁只保留真正該不同的部分。
-- **教訓**：同一個概念在兩處呈現，第一次就抽共用元件——複製出來的兩份**必然**隨時間 drift，
-  且會累積成「割裂感」與隱性 bug（如錯誤的 model 範例）。
-- **來源**：`frontend/src/components/api-usage-example.tsx`，PR #18
-
-### UI 錯誤封包 shape 不一致會默默吃掉全 app 的錯誤訊息
-
-- **理論說**：前端 `api-client` 統一讀 `body.error.{code,message}` 就能顯示後端錯誤。
-- **實際發生**：Phase 5.2 在規則頁送惡意 regex，後端正確回 422 + 具體訊息
-  （`nested quantifier (ReDoS risk)`），但 UI 只跳「建立失敗」沒下文。追查發現
-  兩種錯誤封包並存：proxy 回 `{error:{...}}`，但 FastAPI `HTTPException(detail=...)`
-  包成 `{detail:{error:{...}}}`。api-client 只認前者，於是**所有走 HTTPException
-  的 admin 錯誤訊息**都被降級成空的 `statusText`——不只規則頁，是全 app 潛伏已久的 bug。
-- **解決方式**：api-client 改成 `body.error ?? body.detail?.error`，兩種 shape 都吃；
-  一行修復讓全 app 的 admin 錯誤訊息恢復可讀。
-- **教訓**：錯誤訊息的「封包形狀」要當成跨層契約。前後端若有兩種 error envelope，
-  client 必須都解析；否則使用者只看到無資訊的通用錯誤，且這種 bug 潛伏很久
-  （成功路徑不受影響，沒人發現）。新端點上線時順手驗一次「錯誤路徑」訊息真的有顯示。
-- **來源**：`frontend/src/lib/api-client.ts`；Phase 5.2 PR #14
 
 ### 對稱加密金鑰要在 pod 啟動時就驗證，別等 runtime
 
@@ -109,18 +71,6 @@
   關聯；`get()` 改寫成 `select(...).options(selectinload(...))`。
 - **教訓**：async ORM 沒有「自動 lazy-load」這回事 — 預載是規則，不是優化。
 - **來源**：`src/ai_api/services/allocations.py` 的 `revoke()` / `lookup_by_token()`
-
-### datetime 一律 tz-aware
-
-- **理論說**：SQLAlchemy 的 `Mapped[datetime]` 預設行為跨資料庫相容。
-- **實際發生**：本機 SQLite 跑得好好的，到 testcontainers Postgres 立刻炸：
-  `can't subtract offset-naive and offset-aware datetimes`。Postgres 拒絕
-  混用 naive 與 aware。
-- **解決方式**：所有時間欄位 `mapped_column(DateTime(timezone=True), ...)`；
-  Python 端一律 `datetime.now(UTC)`，不用 `datetime.utcnow()`。
-- **教訓**：當開發與生產用不同資料庫後端時，「能跑」不等於「正確」；明確
-  寫出時區語意是 DB-portability 的底線。
-- **來源**：`src/ai_api/models/{allocation,credential,call_record}.py`
 
 ### 拒絕路徑必須在 raise 前綁定上下文
 
@@ -201,17 +151,6 @@
   分多輪擠牙膏。**`grep 既有同類欄位` 是找出所有 sink 最快的方法。**
 - **來源**：`services/pricing.py` `current_price_map`、`api/usage.py`、`cli/load_prices.py`、
   `frontend` 多個 route；階段 11
-
-### CSS grid 內要 `truncate`，該格必須 `min-w-0`
-
-- **理論說**：給格子加 `truncate` 就會把過長文字截斷加省略號。
-- **實際發生**：「最近呼叫」表用 `grid-cols-5` 等寬，但一條不可斷行的 request UUID 把該欄
-  撐到比分配寬度還寬，`truncate` 也沒生效——結果「總 tokens」與「請求 ID」視覺上黏成一團。
-- **解決方式**：grid/flex 子項預設 `min-width:auto`（不會縮過內容），要讓 `truncate` 作用必須
-  加 `min-w-0`；並用比例欄寬（`grid-cols-[...fr]`）+ 欄間距，長 ID 加 `title` tooltip。
-- **教訓**：`truncate`（`overflow:hidden`）在 grid/flex 子項裡幾乎都要搭配 `min-w-0` 才有效，
-  這是排版「欄位互相擠爆」最常見的根因。
-- **來源**：`frontend/src/routes/allocation-detail.tsx` 最近呼叫表；階段 11
 
 ### 把 admin 操作開放給 member：沿用同一 service + 嚴格擁有者檢查
 
@@ -348,36 +287,6 @@
   渲染路徑就能看到——**新事件類型優先映射到既有語意**比加 enum + 改 UI 簡單一輪。
 - **來源**：`src/ai_api/proxy/responses.py` `event_gen` 對 `response.failed` 分支；階段 12
 
-### fire-and-forget 副作用要配一個 drain()，否則整合測試無法 deterministic 驗證
-
-- **理論說**：通知這種「不能阻塞主流程」的副作用，用 `asyncio.create_task` 丟出去就好，測試
-  直接斷言結果。
-- **實際發生**：`audit.record()` 觸發 `asyncio.create_task(notifier.notify(...))` fire-and-forget
-  後立即 return；整合測試在 task 還沒跑完時就去查 `notification_record` / aiosmtpd 收件匣 → 查到空、
-  flaky。`await asyncio.sleep(0.1)` 之類的「猜時間」既慢又不可靠（CI 慢機器照樣 race）。
-- **解決方式**：在 hook 模組保留一個 module-level `set[Task]`（task 完成時自我 discard），並提供
-  `drain_notifier_tasks()` test helper——`while pending: await gather(*snapshot)`（snapshot 因為
-  drain 過程可能再生 task）。測試流程變成「觸發 → `await drain_notifier_tasks()` → 斷言」，完全
-  deterministic、零 sleep。production 不呼叫 drain，task 自然背景完成。
-- **教訓**：任何 fire-and-forget 副作用（通知、背景寫入、cache warm）要 testable，就得在「射出去」
-  的同一個模組提供「等它落地」的 hook。別在測試裡 sleep 猜時間。pattern：module-level pending set
-  + 自我 discard callback + drain helper。production 路徑不變、測試路徑可同步。
-- **來源**：`src/ai_api/services/notifier_hook.py` `fire()` / `drain_notifier_tasks()`；
-  `tests/integration/test_notification_hooks.py`；階段 13
-
-### 採用 SDK 前先印一次真實回傳值——`aiosmtplib.send` 回 `(errors_dict, message)` 不是 `(code, dict)`
-
-- **理論說**：SMTP send 成功回 250，所以 `aiosmtplib.send()` 大概回 `(code, per_recipient_errors)`。
-- **實際發生**：照印象寫 `code, errors = await aiosmtplib.send(...)`，測試 `assert code == 250` 直接
-  炸 `assert {} == 250`——實際回傳是 `(errors_dict, response_message_str)`：成功時 errors 是空 dict、
-  response 是 `"OK"` 之類字串，**根本沒有 250 這個數字**（要靠 `errors == {}` 判斷成功）。
-- **解決方式**：實作前先寫 3 行 script 真的呼叫一次、`print(type(result), repr(result))`，看清楚
-  shape 再寫解析。本案最後用「`errors` 空 = 成功，非空 = 各 recipient 的 `(code, msg)`」。
-- **教訓**：呼應「採用前先驗證 SDK 能力邊界」——但更基本：**連回傳值的 shape 都要先印一次**，不要
-  靠「SMTP 應該回 250」的領域直覺去猜 library 的 Python 介面。一次 `print(repr(...))` 省下一輪
-  red-herring 的 debug。
-- **來源**：`src/ai_api/services/notifier_email.py` `_smtp_send`；階段 13
-
 ### 新增「需要對外連線」的功能，要同步檢查 NetworkPolicy egress——本機測不出來
 
 - **理論說**：通知功能在本機 + CI 全綠（39 測試 + aiosmtpd 真握手），SMTP 邏輯正確就能上線。
@@ -420,8 +329,8 @@
   Can't sort tables`。根因：`notification_dedup_bucket.primary_record_id` ↔ `notification_record.
   dedup_bucket_id` 互相 FK 形成循環，`metadata.create_all`/`drop_all` 需要 topological sort 排不出來。
   本機測試用 SQLite in-memory，**對 FK 排序寬鬆**（甚至預設不強制 FK），所以 create_all 過得去；
-  Postgres 嚴格做 topological sort 才炸。「本機 SQLite 過 ≠ Postgres 過」又一例（前面已有 datetime
-  tz-aware 那條同源）。
+  Postgres 嚴格做 topological sort 才炸。「本機 SQLite 過 ≠ Postgres 過」又一例（同源:datetime
+  tz-aware,已封存於 `history/lessons-archive.md`）。
 - **解決方式**：互相 FK 的其中一個加 `use_alter=True` + 明確 name，讓 SQLAlchemy 以獨立
   `ALTER TABLE ADD CONSTRAINT` 發出、打破建表時的循環。本機重現：`Base.metadata.sorted_tables`
   會噴 `SAWarning: ...unresolvable cycles`（用 `warnings.simplefilter('error')` 可逼成硬錯提早抓）。
@@ -430,24 +339,6 @@
   topological sort 直接拒。設計到「A 指 B、B 也指 A」時，當下就標 `use_alter=True`。本機快速自檢：
   `python -c "import warnings; warnings.simplefilter('error'); from ai_api.db import Base; import ai_api.models; Base.metadata.sorted_tables"`。
 - **來源**：`src/ai_api/models/notification.py` `primary_record_id` `use_alter=True`；階段 13
-
-### Tailwind `grid` 沒給 base `grid-cols-1` → 手機用「內容寬」欄，recharts/寬內容溢出畫面
-
-- **理論說**：`grid gap-6 md:grid-cols-2` 在手機（< md）沒指定欄數，預設就是單欄、會自己填滿寬度。
-- **實際發生**：階段 16 RWD 後，使用者回報用量頁的圖在手機「超出去」。根因：Tailwind `grid` 若**沒有
-  base `grid-cols-*`**，CSS 預設 `grid-template-columns: none` → 隱式欄用 `auto`（**內容寬**）撐開；recharts
-  `ResponsiveContainer width="100%"` 量到的是這個被內容撐大的欄寬，於是圖比 viewport 還寬、整頁水平溢出。
-  `lg:grid-cols-2` 只在 ≥lg 生效，手機那段等於沒有欄定義。同類問題也潛伏在 catalog/dashboard 的卡片 grid。
-- **解決方式**：一律補 base `grid-cols-1`——Tailwind 的 `grid-cols-1` 是 `repeat(1, minmax(0, 1fr))`，
-  關鍵是 **`minmax(0, ...)` 允許欄縮到 0**（不被內容撐開），所以 `grid grid-cols-1 gap-6 md:grid-cols-2`
-  手機就乖乖滿版單欄、不溢出。另給 recharts 的 wrapper 加 `w-full min-w-0`（ResponsiveContainer 在 grid/flex
-  子項要能縮，父層必須允許 `min-width: 0`，呼應「grid/flex 子項要 truncate 必須 min-w-0」同源）。
-- **教訓**：**`grid` 一定要寫 base 欄數**（`grid-cols-1`），不要只寫 `md:grid-cols-N` 就以為手機是單欄——
-  沒 base 欄 = `auto` 內容寬欄 = 寬內容（圖表、寬表、長字串）會撐爆 viewport。判準：任何 `grid` class
-  若 `grid-cols-*` 只出現在斷點前綴（`md:`/`lg:`）而無裸 `grid-cols-1`，就是這個坑。recharts 尤其明顯，
-  因為它用量到的容器寬反推圖寬，形成「容器被內容撐大 → 圖更大」的放大迴圈。
-- **來源**：`frontend/src/components/{admin-usage-charts,admin-home-charts,ui/chart}.tsx`、
-  `routes/{catalog,dashboard}.tsx`；階段 16 收尾（手機真機才暴露）
 
 ### 改主鍵的 migration 要「建新表+複製+swap」；驗它的整合測試要 DROP SCHEMA 還原
 
@@ -532,7 +423,7 @@
 ### 連帶刪除要在服務層顯式做，別靠 DB ondelete——SQLite 測試環境不強制 FK
 
 - **理論說**：FK 都標了 `ondelete`（CASCADE / SET NULL / RESTRICT），刪父 row 時子 row 自動連帶處理，靠 DB 就好。
-- **實際發生**：階段 30「安全刪除成員」要刪分配（連帶把 `CallRecord.allocation_id` 設 NULL 保留用量史、cascade 憑證）。schema 的 ondelete 都齊全，但 `db.py` **沒設 `PRAGMA foreign_keys=ON`** → **SQLite（dev/CI）不強制** ondelete，Postgres（生產）卻會。若靠 DB cascade：contract 測試（SQLite）會「看似通過」但連帶根本沒發生，到生產才以不同行為炸開——正是「dev/prod 用不同 DB 後端時『能跑』≠『正確』」（見 datetime tz-aware 那條）的同類陷阱。
+- **實際發生**：階段 30「安全刪除成員」要刪分配（連帶把 `CallRecord.allocation_id` 設 NULL 保留用量史、cascade 憑證）。schema 的 ondelete 都齊全，但 `db.py` **沒設 `PRAGMA foreign_keys=ON`** → **SQLite（dev/CI）不強制** ondelete，Postgres（生產）卻會。若靠 DB cascade：contract 測試（SQLite）會「看似通過」但連帶根本沒發生，到生產才以不同行為炸開——正是「dev/prod 用不同 DB 後端時『能跑』≠『正確』」（同類陷阱:datetime tz-aware,已封存於 `history/lessons-archive.md`）。
 - **解決方式**：在 `MemberService.delete` 內以 **ORM 顯式**逐步處理整條連帶（`UPDATE call_records SET allocation_id=NULL` → 刪 credential_allocations → credentials → allocations → member），單一交易，**完全不依賴 DB ondelete**。並把這條的驗證寫成 **integration 測試（跑真 Postgres，FK 真強制）** 而非只在 SQLite contract 測，雙重保險。
 - **教訓**：凡「刪一個東西要連帶處理子資料」的邏輯，**在服務層顯式寫出每一步**，別把正確性託付給 DB 的 ondelete——只要測試 DB 與生產 DB 的 FK 強制行為不同（SQLite 預設關、Postgres 開），靠 DB cascade 就會 dev/prod drift 且測試測不出來。顯式做＝可攜、可測、可在每步插稽核。需要驗 DB 端真實行為時，補一支 Postgres integration 測試。
 - **來源**：`src/ai_api/services/members.py` `delete`；`tests/integration/test_member_safe_delete.py`；階段 30
