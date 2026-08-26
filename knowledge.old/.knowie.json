@@ -7,10 +7,9 @@
     "speckit",
     "claude-code"
   ],
-  "updatedAt": "2026-08-26T00:00:00.000Z",
+  "updatedAt": "2026-08-26T05:44:26.754Z",
   "skillDirs": [
     ".agents/skills",
     ".claude/skills"
-  ],
-  "structureVersion": "2"
+  ]
 }
