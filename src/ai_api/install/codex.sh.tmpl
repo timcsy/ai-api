@@ -39,14 +39,21 @@ done
 [ "$BACKED_UP" = "1" ] && say "已備份你原本的 Codex 設定為 *.bak-${TS}（在 ${CODEX_HOME}）。"
 
 # ---------------------------------------------------------------------------
-# 1. Install the Codex CLI (standalone binary from GitHub Releases; no Node).
-#    Fail-soft: if the CLI can't be installed (network / antivirus / unsupported
-#    OS), DON'T abort. The CLI is only needed to *store* the token (step 4) and
-#    self-test — steps 2-3 (write config + browser device-flow) work without it.
-#    On failure we still mint the key and hand it over for a manual finish.
+# 1. Codex CLI is OPT-IN. Most people use the Codex desktop app (or an editor
+#    extension), which reads ~/.codex directly and does NOT need the CLI binary.
+#    Default: SKIP the CLI download (a large GitHub download that antivirus /
+#    networks often block, and pure waste for desktop users). Opt in with
+#    `--cli` (or CODEX_WITH_CLI=1) to also install + log in + self-test via the
+#    CLI. If `codex` is already on PATH we use it regardless.
 # ---------------------------------------------------------------------------
-CODEX_CLI=1
-if ! command -v codex >/dev/null 2>&1; then
+WANT_CLI=0
+case "${1:-}" in --cli|--with-cli) WANT_CLI=1 ;; esac
+[ "${CODEX_WITH_CLI:-}" = "1" ] && WANT_CLI=1
+
+CODEX_CLI=0
+if command -v codex >/dev/null 2>&1; then
+  CODEX_CLI=1  # already installed → use it
+elif [ "$WANT_CLI" = "1" ]; then
   say "Installing Codex CLI..."
   OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
   ARCH="$(uname -m)"
@@ -57,8 +64,7 @@ if ! command -v codex >/dev/null 2>&1; then
     linux)  TARGET="${ARCH}-unknown-linux-musl" ;;
   esac
   if [ -z "$TARGET" ]; then
-    say "NOTE: 無法自動安裝 Codex CLI（不支援的系統 '$OS'）；會繼續完成其餘設定。"
-    CODEX_CLI=0
+    say "NOTE: 無法自動安裝 Codex CLI（不支援的系統 '${OS}'）；會改用桌面版設定繼續。"
   else
     BIN_DIR="$HOME/.local/bin"; mkdir -p "$BIN_DIR"
     URL="https://github.com/openai/codex/releases/latest/download/codex-${TARGET}.tar.gz"
@@ -67,13 +73,15 @@ if ! command -v codex >/dev/null 2>&1; then
       [ -f "$BIN_DIR/codex-${TARGET}" ] && mv "$BIN_DIR/codex-${TARGET}" "$BIN_DIR/codex"
       chmod +x "$BIN_DIR/codex" 2>/dev/null || true
       case ":$PATH:" in *":$BIN_DIR:"*) : ;; *) PATH="$BIN_DIR:$PATH"; export PATH ;; esac
+      CODEX_CLI=1
     else
-      say "NOTE: 無法下載 Codex CLI（可能被網路／防毒擋住）；會繼續完成其餘設定，稍後可手動安裝。"
-      CODEX_CLI=0
+      say "NOTE: 無法下載 Codex CLI（可能被網路／防毒擋住）；會改用桌面版設定繼續。"
     fi
   fi
+else
+  say "（預設略過安裝 Codex CLI；多數人用桌面版即可。若想用 CLI，請在指令結尾加上 --cli 重跑。）"
 fi
-# Even if we tried, the binary may not actually be runnable — re-check.
+# A download may still not be runnable — re-check.
 command -v codex >/dev/null 2>&1 || CODEX_CLI=0
 
 # ---------------------------------------------------------------------------
@@ -129,8 +137,8 @@ MODEL=$(printf '%s' "$RESP" | python3 -c 'import sys,json;print(json.load(sys.st
 
 # ---------------------------------------------------------------------------
 # 4. Pin the default model (no CLI needed — also helps the desktop App), then
-#    store the credential via the CLI and verify. If the CLI is unavailable,
-#    hand the member their key + how to finish instead of failing.
+#    store the key in auth.json and verify over HTTPS. The CLI is optional: when
+#    present we also run `codex login`, but the desktop-app path never needs it.
 # ---------------------------------------------------------------------------
 # Pin Codex's default model to the one this key grants, so plain `codex` uses
 # your model instead of Codex's built-in default. Switch anytime with /model.
@@ -145,28 +153,42 @@ PY
   say "Default model set to $MODEL (switch anytime with /model)."
 fi
 
+# Write auth.json ({"OPENAI_API_KEY": ...}) directly so the desktop app, an
+# editor extension, or a later CLI all pick up the key with NO manual entry.
+# (Any prior auth.json was backed up above; the restore script puts it back.)
+python3 - "$AUTH" "$TOKEN" <<'PY'
+import json, pathlib, sys
+pathlib.Path(sys.argv[1]).write_text(json.dumps({"OPENAI_API_KEY": sys.argv[2]}) + "\n")
+PY
+say "Wrote ${AUTH} (key stored for the desktop app / CLI)."
+
 if [ "$CODEX_CLI" = "1" ]; then
-  # Clear any prior login (e.g. a ChatGPT account) so our API key wins — a stale
-  # login can otherwise take precedence. Safe no-op if not logged in.
+  # CLI present: clear any prior login (e.g. a ChatGPT account) so our API key
+  # wins, then log in via the CLI's own authoritative store. Safe no-op if not
+  # logged in.
   codex logout >/dev/null 2>&1 || true
-  printf '%s' "$TOKEN" | codex login --with-api-key >/dev/null 2>&1 || {
-    say "ERROR: codex login failed."; exit 1; }
-  say "Verifying connection..."
-  if codex exec --skip-git-repo-check "say only: ok" >/dev/null 2>&1; then
-    say "✓ 連線成功 — just run 'codex' from any new terminal."
+  printf '%s' "$TOKEN" | codex login --with-api-key >/dev/null 2>&1 || true
+fi
+
+# Verify the key against the gateway over plain HTTPS — works without the CLI,
+# and catches "configured but never actually connected".
+say "Verifying connection..."
+if curl -fsS "$CCSH_BASE/models" -H "Authorization: Bearer $TOKEN" >/dev/null 2>&1; then
+  if [ "$CODEX_CLI" = "1" ]; then
+    say "✓ 連線與金鑰已驗證 — 在任何新終端機執行 'codex' 即可開始。"
   else
-    say "Installed, but the test call did not confirm. Try running 'codex' yourself."
+    say "✓ 連線與金鑰已驗證 — 開啟 Codex 桌面版（或編輯器的 Codex 擴充）即可開始，它會讀取剛寫入的設定。"
   fi
 else
-  # Fail-soft: CLI missing, but config + a real key are ready. Hand over the key.
+  # Self-test failed: hand over the key so the member can still finish manually.
   say ""
-  say "⚠ Codex CLI 沒有裝成功，但你的設定（${CONFIG}）和金鑰都已經備好了。"
+  say "⚠ 設定已寫入，但自我測試沒通過（可能是網路／防火牆，或金鑰問題）。"
   say "  你的平台金鑰（只顯示這一次，請立刻複製保存）："
   say ""
-  say "    $TOKEN"
+  say "    ${TOKEN}"
   say ""
-  say "  之後二選一就能用："
-  say "  1) 把 Codex CLI 裝好後，用上面的金鑰執行（把 <KEY> 換成金鑰）："
+  say "  可改用這把金鑰手動完成（二選一）："
+  say "  1) 裝好 Codex CLI 後執行（把 <KEY> 換成金鑰）："
   say "       printf '%s' '<KEY>' | codex login --with-api-key"
   say "  2) Codex 桌面 App：在 App 設定填入上面的金鑰當 API key（provider 已指向本平台）。"
 fi

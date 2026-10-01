@@ -32,10 +32,18 @@ foreach ($f in @($Config, $Auth)) {
 if ($backedUp) { Write-Host "已備份你原本的 Codex 設定為 *.bak-${ts}（在 ${CodexHome}）。" }
 
 # ---------------------------------------------------------------------------
-# 1. Install the Codex CLI (standalone binary from GitHub Releases; no Node).
+# 1. Codex CLI is OPT-IN. Most people use the Codex desktop app (or an editor
+#    extension), which reads ~/.codex directly and does NOT need the CLI binary.
+#    Default: SKIP the CLI download (often blocked by SmartScreen / antivirus,
+#    and pure waste for desktop users). Opt in with CODEX_WITH_CLI=1 to also
+#    install + log in + self-test via the CLI. If `codex` is already on PATH we
+#    use it regardless.
 # ---------------------------------------------------------------------------
-$CodexCli = $true
-if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
+$WantCli = ($env:CODEX_WITH_CLI -eq "1") -or ($args -contains "--cli") -or ($args -contains "--with-cli")
+$CodexCli = $false
+if (Get-Command codex -ErrorAction SilentlyContinue) {
+  $CodexCli = $true  # already installed → use it
+} elseif ($WantCli) {
   Write-Host "Installing Codex CLI..."
   $BinDir = Join-Path $HOME ".local\bin"
   New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
@@ -45,15 +53,13 @@ if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
     Invoke-WebRequest -Uri $Url -OutFile $Zip
     Expand-Archive -Path $Zip -DestinationPath $BinDir -Force
     if (";$env:PATH;" -notlike "*;$BinDir;*") { $env:PATH = "$BinDir;$env:PATH" }
+    if (Get-Command codex -ErrorAction SilentlyContinue) { $CodexCli = $true }
   } catch {
-    # Fail-soft: don't abort. The CLI only stores the token (step 4) + self-tests;
-    # steps 2-3 (config + device-flow) work without it. We finish and hand over the key.
-    Write-Host "NOTE: 無法下載／安裝 Codex CLI（可能被網路／防毒 SmartScreen 擋住）；會繼續完成其餘設定，稍後可手動安裝。"
-    $CodexCli = $false
+    Write-Host "NOTE: 無法下載／安裝 Codex CLI（可能被網路／防毒 SmartScreen 擋住）；會改用桌面版設定繼續。"
   }
+} else {
+  Write-Host "（預設略過安裝 Codex CLI；多數人用桌面版即可。若想用 CLI，請先設定 `$env:CODEX_WITH_CLI='1' 再重跑。）"
 }
-# Even if we tried, the binary may not actually be runnable — re-check.
-if (-not (Get-Command codex -ErrorAction SilentlyContinue)) { $CodexCli = $false }
 
 # ---------------------------------------------------------------------------
 # 2. Write a CLEAN config.toml for this platform (any prior one was backed up
@@ -112,8 +118,8 @@ $defaultModel = if ($resp.model) { [string]$resp.model } else { "" }
 
 # ---------------------------------------------------------------------------
 # 4. Pin the default model (no CLI needed — also helps the desktop App), then
-#    store the credential via the CLI and verify. If the CLI is unavailable,
-#    hand the member their key + how to finish instead of failing.
+#    store the key in auth.json and verify over HTTPS. The CLI is optional: when
+#    present we also run `codex login`, but the desktop-app path never needs it.
 # ---------------------------------------------------------------------------
 # Pin Codex's default model to the one this key grants, so plain `codex` uses
 # your model instead of Codex's built-in default. Switch anytime with /model.
@@ -125,28 +131,44 @@ if ($defaultModel) {
   Write-Host "Default model set to $defaultModel (switch anytime with /model)."
 }
 
+# Write auth.json ({"OPENAI_API_KEY": ...}) directly so the desktop app, an
+# editor extension, or a later CLI all pick up the key with NO manual entry.
+# (Any prior auth.json was backed up above; the restore script puts it back.)
+Set-Content -Path $Auth -Value (@{ OPENAI_API_KEY = $token } | ConvertTo-Json -Compress)
+Write-Host "Wrote $Auth (key stored for the desktop app / CLI)."
+
 if ($CodexCli) {
-  # Clear any prior login (e.g. a ChatGPT account) so our API key wins — a stale
-  # login can otherwise take precedence. Safe no-op if not logged in.
+  # CLI present: clear any prior login (e.g. a ChatGPT account) so our API key
+  # wins, then log in via the CLI's own authoritative store. Safe no-op if not
+  # logged in.
   try { codex logout 2>$null | Out-Null } catch {}
-  $token | codex login --with-api-key | Out-Null
-  Write-Host "Verifying connection..."
-  try {
-    codex exec --skip-git-repo-check "say only: ok" | Out-Null
-    Write-Host "OK - just run 'codex' from any new terminal."
-  } catch {
-    Write-Host "Installed, but the test call did not confirm. Try running 'codex' yourself."
+  try { $token | codex login --with-api-key | Out-Null } catch {}
+}
+
+# Verify the key against the gateway over plain HTTPS — works without the CLI,
+# and catches "configured but never actually connected".
+Write-Host "Verifying connection..."
+$verified = $false
+try {
+  Invoke-RestMethod -Method Get -Uri "$CcshBase/models" -Headers @{ Authorization = "Bearer $token" } | Out-Null
+  $verified = $true
+} catch {}
+if ($verified) {
+  if ($CodexCli) {
+    Write-Host "OK - 連線與金鑰已驗證，在任何新終端機執行 'codex' 即可開始。"
+  } else {
+    Write-Host "OK - 連線與金鑰已驗證，開啟 Codex 桌面版（或編輯器的 Codex 擴充）即可開始，它會讀取剛寫入的設定。"
   }
 } else {
-  # Fail-soft: CLI missing, but config + a real key are ready. Hand over the key.
+  # Self-test failed: hand over the key so the member can still finish manually.
   Write-Host ""
-  Write-Host "WARNING: Codex CLI 沒有裝成功，但你的設定（${Config}）和金鑰都已經備好了。"
+  Write-Host "WARNING: 設定已寫入，但自我測試沒通過（可能是網路／防火牆，或金鑰問題）。"
   Write-Host "  你的平台金鑰（只顯示這一次，請立刻複製保存）："
   Write-Host ""
   Write-Host "    $token"
   Write-Host ""
-  Write-Host "  之後二選一就能用："
-  Write-Host "  1) 把 Codex CLI 裝好後，用上面的金鑰執行（把 <KEY> 換成金鑰）："
+  Write-Host "  可改用這把金鑰手動完成（二選一）："
+  Write-Host "  1) 裝好 Codex CLI 後執行（把 <KEY> 換成金鑰）："
   Write-Host "       `$env:KEY='<KEY>'; `$env:KEY | codex login --with-api-key"
   Write-Host "  2) Codex 桌面 App：在 App 設定填入上面的金鑰當 API key（provider 已指向本平台）。"
 }

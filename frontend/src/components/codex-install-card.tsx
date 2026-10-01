@@ -36,7 +36,9 @@ export function CodexInstallCard({ baseUrl }: { baseUrl: string }) {
         <CardTitle className="text-base">安裝 Codex（一行指令）</CardTitle>
         <CardDescription>
           複製到終端機執行，依指示在瀏覽器授權一次即可——不需貼 token、不需設環境變數。
-          授權後會在你的「我的應用金鑰」新增一把金鑰給這台裝置。
+          授權後會在你的「我的應用金鑰」新增一把金鑰給這台裝置，並直接寫進 Codex 設定，
+          <strong>開啟 Codex 桌面版就能用</strong>。預設<strong>不會安裝指令列（CLI）</strong>
+          ——多數人用不到；需要 CLI 的人見下方「進階」。
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -92,18 +94,9 @@ export function CodexInstallCard({ baseUrl }: { baseUrl: string }) {
               <p className="font-medium text-foreground">✓ 適用</p>
               <ul className="mt-1 list-disc space-y-1 pl-5">
                 <li>
-                  <strong>指令列（CLI）</strong>（最穩、推薦）：會把 <code className="break-all">~/.codex</code> 設定
-                  <strong>重設為乾淨的平台設定</strong>（你原本的 config 與登入會<strong>先備份成 <code>*.bak-時間戳</code>、可還原</strong>），
-                  並用平台金鑰取代目前登入。想換回自己的 OpenAI 帳號：重跑 <code className="break-all">codex login</code> 或還原備份即可（可逆）。
-                </li>
-                <li>
-                  <strong>編輯器擴充（VS Code / Cursor / JetBrains 的 Codex）</strong>：與 CLI 共用同一份設定，
-                  從各自的 marketplace 裝好後通常會一起指向本平台、<strong>免再設定</strong>。
-                </li>
-                <li>
-                  <strong>Codex 桌面 App</strong>：用上面的一鍵安裝（走 CLI 寫好共用設定）後，桌面 App 開起來讀同一份
-                  <code className="break-all"> ~/.codex</code> 就能用、<strong>免再設定</strong>。
-                  （別在 App 自己的 GUI 手動填 API key——那條目前有已知問題；走共用設定這條最穩。）
+                  <strong>Codex 桌面 App</strong>（最多人用）：上面的一鍵安裝會直接把平台設定與金鑰寫進
+                  <code className="break-all"> ~/.codex</code>（你原本的 config／登入會<strong>先備份成 <code>*.bak-時間戳</code>、可還原</strong>），
+                  桌面 App 開起來讀同一份設定就能用、<strong>免再設定、免手動填金鑰</strong>。
                   若官方桌面 App 裝不起來，可改用社群鏡像{" "}
                   <a
                     href="https://github.com/Wangnov/codex-app-mirror"
@@ -114,6 +107,17 @@ export function CodexInstallCard({ baseUrl }: { baseUrl: string }) {
                     codex-app-mirror
                   </a>
                   （非官方、<strong>風險自負</strong>）。
+                </li>
+                <li>
+                  <strong>編輯器擴充（VS Code / Cursor / JetBrains 的 Codex）</strong>：與桌面版共用同一份
+                  <code className="break-all"> ~/.codex</code> 設定，從各自的 marketplace 裝好後通常會一起指向本平台、<strong>免再設定</strong>。
+                </li>
+                <li>
+                  <strong>指令列（CLI，進階選用）</strong>：預設<strong>不會安裝</strong>。需要的人在指令結尾加
+                  <code className="break-all"> --cli</code>（Windows 則先設環境變數
+                  <code className="break-all"> $env:CODEX_WITH_CLI=&apos;1&apos;</code>）重跑，會另外裝好 CLI 並登入。它會把
+                  <code className="break-all"> ~/.codex</code> <strong>重設為乾淨的平台設定</strong>、用平台金鑰取代目前登入；
+                  想換回自己的 OpenAI 帳號重跑 <code className="break-all">codex login</code> 或還原備份即可（可逆）。
                 </li>
               </ul>
             </div>

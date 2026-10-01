@@ -60,6 +60,28 @@ async def test_install_script_failsoft_when_cli_unavailable(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("path", ["/install/codex.sh", "/install/codex.ps1"])
+async def test_cli_is_opt_in_default_skips_to_desktop(
+    app_client: AsyncClient, path: str
+) -> None:
+    """Most members use the Codex desktop app, not the CLI. The CLI install is
+    OPT-IN (default skip): the script gates the large GitHub download behind an
+    explicit flag, writes the key straight into auth.json so the desktop app /
+    editor extension picks it up with no manual entry, and verifies over HTTPS
+    (no CLI needed)."""
+    body = (await app_client.get(path)).text
+    # Opt-in marker + the gate variable (install is conditional, not forced).
+    assert "CODEX_WITH_CLI" in body
+    gate = "WANT_CLI" if path.endswith(".sh") else "WantCli"
+    assert gate in body
+    # Key written directly to auth.json for the desktop app (no CLI dependency).
+    assert "OPENAI_API_KEY" in body
+    # Self-test hits the gateway over HTTPS with the minted key.
+    assert "/models" in body
+    assert "Bearer" in body
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["/install/codex.sh", "/install/codex.ps1"])
 async def test_install_script_no_decouple_strategy(app_client: AsyncClient, path: str) -> None:
     """US3: merge-style default provider + websockets off; never readonly/wrapper."""
     body = (await app_client.get(path)).text
