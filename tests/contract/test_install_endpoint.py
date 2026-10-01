@@ -160,9 +160,47 @@ async def test_restore_script_served(app_client: AsyncClient, path: str) -> None
 # (hit on a real macOS install, 2026-07-03). Every var abutting non-ASCII text
 # MUST be braced (${VAR}). Guard all install scripts against reintroducing it.
 @pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["/install/codex.sh", "/install/codex.ps1"])
+async def test_install_warns_history_is_provider_grouped(
+    app_client: AsyncClient, path: str
+) -> None:
+    """Switching providers HIDES (never deletes) the old account's Codex chats.
+    The installer must say so and point at the merge helper, so members don't
+    think their history is gone."""
+    body = (await app_client.get(path)).text
+    assert "供應商" in body  # explains the provider-grouping behaviour
+    assert "codex resume" in body  # one recovery path
+    assert "codex-merge-history" in body  # the merge helper command
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "path", ["/install/codex-merge-history.sh", "/install/codex-merge-history.ps1"]
+)
+async def test_merge_history_script_served(app_client: AsyncClient, path: str) -> None:
+    """The merge helper re-tags stored conversations to the current provider so
+    they all show together — backing up sessions + the state DB first."""
+    r = await app_client.get(path)
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith("text/plain")
+    body = r.text
+    assert get_settings().base_url.rstrip("/") in body
+    # Backs up before changing anything (reversible), and reminds to close desktop.
+    assert ".bak-" in body
+    assert "桌面版" in body
+    # Re-tags both stores: SQLite threads.model_provider + rollout session_meta.
+    assert "model_provider" in body
+    assert "threads" in body
+    assert "rollout-" in body
+    # Reads the active provider from config.toml (the merge target).
+    assert "config.toml" in body
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "path", ["/install/codex.sh", "/install/codex.ps1",
-             "/install/codex-restore.sh", "/install/codex-restore.ps1"],
+             "/install/codex-restore.sh", "/install/codex-restore.ps1",
+             "/install/codex-merge-history.sh", "/install/codex-merge-history.ps1"],
 )
 async def test_no_unbraced_var_before_non_ascii(app_client: AsyncClient, path: str) -> None:
     import re

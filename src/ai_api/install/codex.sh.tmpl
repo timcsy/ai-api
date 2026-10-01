@@ -195,4 +195,12 @@ else
   say "  2) Codex 桌面 App：在 App 設定填入上面的金鑰當 API key（provider 已指向本平台）。"
 fi
 
-[ "$BACKED_UP" = "1" ] && say "（要還原舊設定：把 $CODEX_HOME 內的 *.bak-$TS 改回原本檔名即可。）"
+# Codex groups the history list by provider and only shows the active one, so
+# switching here HIDES (never deletes) your previous account's conversations.
+say ""
+say "ⓘ 關於舊對話：Codex 依「供應商」分組顯示，切到本平台後你原本帳號的歷史對話會被暫時隱藏"
+say "   （不是刪除，檔案都還在）。要看舊對話可切回原供應商、或用 'codex resume'；"
+say "   想把舊對話也一起顯示在本平台底下，執行一次："
+say "     curl -fsSL ${BASE_URL}/install/codex-merge-history.sh | sh"
+
+[ "$BACKED_UP" = "1" ] && say "（要還原舊設定：把 ${CODEX_HOME} 內的 *.bak-${TS} 改回原本檔名即可。）"

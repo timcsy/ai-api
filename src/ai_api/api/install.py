@@ -50,3 +50,17 @@ async def restore_codex_sh() -> str:
 async def restore_codex_ps1() -> str:
     """Windows restore: `irm <base>/install/codex-restore.ps1 | iex`."""
     return _render("codex-restore.ps1.tmpl")
+
+
+@router.get("/install/codex-merge-history.sh", response_class=PlainTextResponse)
+async def merge_history_codex_sh() -> str:
+    """macOS / Linux: re-tag all stored Codex conversations to the current
+    provider so they all show together (Codex groups history by provider and
+    hides the others). Backs up sessions + state DB first. Reversible."""
+    return _render("codex-merge-history.sh.tmpl")
+
+
+@router.get("/install/codex-merge-history.ps1", response_class=PlainTextResponse)
+async def merge_history_codex_ps1() -> str:
+    """Windows: `irm <base>/install/codex-merge-history.ps1 | iex`."""
+    return _render("codex-merge-history.ps1.tmpl")

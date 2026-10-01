@@ -1,0 +1,97 @@
+# Make ALL your past Codex conversations show under the CURRENT provider (Windows).
+# Usage:  irm __BASE_URL__/install/codex-merge-history.ps1 | iex
+#
+# Codex groups the history list by provider and only shows the active one, so
+# after switching to this platform your previous account's chats are HIDDEN (not
+# deleted). This re-tags every stored conversation to your current provider so
+# they all appear together. Everything is backed up first (timestamped) —
+# reversible. (Trade-off: they then show under THIS provider, not the old one.)
+$ErrorActionPreference = "Stop"
+
+$BaseUrl = "__BASE_URL__"
+$CodexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME ".codex" }
+$Config = Join-Path $CodexHome "config.toml"
+
+Write-Host "-- 合併 Codex 對話記錄到目前的供應商 --"
+Write-Host "若 Codex 桌面版正在執行，請先「完全關閉」它（含工作列／系統匣常駐圖示）再繼續。"
+Write-Host ""
+
+if (-not (Test-Path $Config)) { Write-Host "找不到 ${Config}；請先用安裝指令設定本平台。"; exit 1 }
+
+# Back up sessions + state DB(s) BEFORE touching anything.
+$ts = Get-Date -Format "yyyyMMdd-HHmmss"
+$sessions = Join-Path $CodexHome "sessions"
+if (Test-Path $sessions) {
+  Copy-Item $sessions "$sessions.bak-$ts" -Recurse -Force
+  Write-Host "已備份 sessions -> sessions.bak-$ts"
+}
+Get-ChildItem -Path $CodexHome -Filter "state_*.sqlite" -ErrorAction SilentlyContinue | ForEach-Object {
+  Copy-Item $_.FullName "$($_.FullName).bak-$ts" -Force
+  Write-Host "已備份 $($_.Name) -> $($_.Name).bak-$ts"
+}
+
+# The desktop app stores chats in SQLite — re-tagging them safely needs Python.
+$py = $null
+foreach ($c in @("python", "python3", "py")) {
+  $g = Get-Command $c -ErrorAction SilentlyContinue
+  if ($g) { $py = $g.Source; break }
+}
+if (-not $py) {
+  Write-Host ""
+  Write-Host "找不到 Python，無法自動合併（桌面版對話存在 SQLite，需要 Python 才能安全改寫）。"
+  Write-Host "替代方式：在 Codex 切回原本的供應商就能看到舊對話，或用 'codex resume <id>' 開啟特定對話。"
+  Write-Host "（已先做好備份：sessions.bak-$ts / *.sqlite.bak-${ts}，可隨時還原。）"
+  exit 0
+}
+
+$script = Join-Path $env:TEMP "codex_merge_$ts.py"
+@'
+import glob, json, os, re, sqlite3, sys, pathlib
+home, config = sys.argv[1], sys.argv[2]
+txt = pathlib.Path(config).read_text(encoding="utf-8")
+m = re.search(r'(?m)^\s*model_provider\s*=\s*"([^"]+)"', txt)
+provider = m.group(1) if m else ""
+if not provider:
+    print("config.toml has no model_provider.")
+    sys.exit(1)
+print("provider: " + provider)
+
+db_changed = 0
+for db in glob.glob(os.path.join(home, "state_*.sqlite")):
+    try:
+        con = sqlite3.connect(db); cur = con.cursor()
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='threads'")
+        if cur.fetchone():
+            cols = [r[1] for r in cur.execute("PRAGMA table_info(threads)")]
+            if "model_provider" in cols:
+                cur.execute("UPDATE threads SET model_provider=?", (provider,))
+                con.commit(); db_changed += (cur.rowcount or 0)
+        con.close()
+    except Exception as e:
+        print("  (skip " + os.path.basename(db) + ": " + str(e) + ")")
+
+roll_changed = 0
+for f in glob.glob(os.path.join(home, "sessions", "**", "rollout-*.jsonl"), recursive=True):
+    try:
+        lines = pathlib.Path(f).read_text(encoding="utf-8").splitlines()
+        if not lines:
+            continue
+        obj = json.loads(lines[0])
+        if isinstance(obj, dict) and obj.get("type") == "session_meta":
+            pay = obj.get("payload")
+            if isinstance(pay, dict) and pay.get("model_provider") not in (None, provider):
+                pay["model_provider"] = provider
+                lines[0] = json.dumps(obj, ensure_ascii=False)
+                pathlib.Path(f).write_text("\n".join(lines) + "\n", encoding="utf-8")
+                roll_changed += 1
+    except Exception:
+        pass
+
+print("  SQLite threads updated: " + str(db_changed) + "; rollout files updated: " + str(roll_changed))
+'@ | Set-Content -Path $script -Encoding UTF8
+& $py $script $CodexHome $Config
+Remove-Item $script -ErrorAction SilentlyContinue
+
+Write-Host ""
+Write-Host "完成。重新開啟 Codex，應該就能看到全部對話。"
+Write-Host "想復原？把 $CodexHome 內的 sessions.bak-$ts / *.sqlite.bak-$ts 改回原本名稱即可。"

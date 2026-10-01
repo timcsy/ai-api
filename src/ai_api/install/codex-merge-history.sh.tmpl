@@ -1,0 +1,87 @@
+#!/bin/sh
+# Make ALL your past Codex conversations show under the CURRENT provider.
+# Usage:  curl -fsSL __BASE_URL__/install/codex-merge-history.sh | sh
+#
+# Codex groups the history list by provider and only shows the active one, so
+# after switching to this platform your previous account's chats are HIDDEN (not
+# deleted). This re-tags every stored conversation to your current provider so
+# they all appear together. Everything is backed up first (timestamped) —
+# reversible. (Trade-off: they then show under THIS provider, not the old one.)
+set -eu
+
+BASE_URL="__BASE_URL__"
+CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+CONFIG="$CODEX_HOME/config.toml"
+say() { printf '%s\n' "$*"; }
+need() { command -v "$1" >/dev/null 2>&1 || { say "ERROR: 需要 '$1' 才能執行。"; exit 1; }; }
+need python3
+
+say "── 合併 Codex 對話記錄到目前的供應商 ──"
+say "若 Codex 桌面版正在執行，請先「完全關閉」它（含 Windows 工作列／系統匣常駐圖示）再繼續。"
+say ""
+
+[ -f "$CONFIG" ] || { say "找不到 ${CONFIG}；請先用安裝指令設定本平台。"; exit 1; }
+
+# Back up sessions + state DB(s) BEFORE touching anything. Fail loud on error.
+TS="$(date +%Y%m%d-%H%M%S 2>/dev/null || echo backup)"
+if [ -d "$CODEX_HOME/sessions" ]; then
+  cp -R "$CODEX_HOME/sessions" "$CODEX_HOME/sessions.bak-$TS" || {
+    say "ERROR: 備份 sessions 失敗，已中止、未改任何資料。"; exit 1; }
+  say "已備份 sessions → sessions.bak-${TS}"
+fi
+for db in "$CODEX_HOME"/state_*.sqlite; do
+  [ -f "$db" ] || continue
+  cp "$db" "$db.bak-$TS" || { say "ERROR: 備份 ${db} 失敗，已中止。"; exit 1; }
+  say "已備份 $(basename "$db") → $(basename "$db").bak-${TS}"
+done
+
+# Re-tag: SQLite `threads.model_provider` (desktop/newer) + rollout session_meta
+# (CLI/TUI). Both are matched against the active provider read from config.toml.
+python3 - "$CODEX_HOME" "$CONFIG" <<'PY'
+import glob, json, os, re, sqlite3, sys, pathlib
+home, config = sys.argv[1], sys.argv[2]
+txt = pathlib.Path(config).read_text(encoding="utf-8")
+m = re.search(r'(?m)^\s*model_provider\s*=\s*"([^"]+)"', txt)
+provider = m.group(1) if m else ""
+if not provider:
+    print("config.toml 沒有 model_provider，無法判斷目前供應商。")
+    sys.exit(1)
+print(f"目前供應商：{provider}")
+
+db_changed = 0
+for db in glob.glob(os.path.join(home, "state_*.sqlite")):
+    try:
+        con = sqlite3.connect(db); cur = con.cursor()
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='threads'")
+        if cur.fetchone():
+            cols = [r[1] for r in cur.execute("PRAGMA table_info(threads)")]
+            if "model_provider" in cols:
+                cur.execute("UPDATE threads SET model_provider=?", (provider,))
+                con.commit(); db_changed += (cur.rowcount or 0)
+        con.close()
+    except Exception as e:
+        print(f"  (略過 {os.path.basename(db)}: {e})")
+
+roll_changed = 0
+for f in glob.glob(os.path.join(home, "sessions", "**", "rollout-*.jsonl"), recursive=True):
+    try:
+        lines = pathlib.Path(f).read_text(encoding="utf-8").splitlines()
+        if not lines:
+            continue
+        obj = json.loads(lines[0])
+        if isinstance(obj, dict) and obj.get("type") == "session_meta":
+            pay = obj.get("payload")
+            if isinstance(pay, dict) and pay.get("model_provider") not in (None, provider):
+                pay["model_provider"] = provider
+                lines[0] = json.dumps(obj, ensure_ascii=False)
+                pathlib.Path(f).write_text("\n".join(lines) + "\n", encoding="utf-8")
+                roll_changed += 1
+    except Exception:
+        pass
+
+print(f"  SQLite threads 更新 {db_changed} 筆；rollout 檔更新 {roll_changed} 個")
+PY
+
+say ""
+say "✓ 完成。重新開啟 Codex，應該就能在目前供應商底下看到全部對話。"
+say "  想復原？把 ${CODEX_HOME} 內的 sessions.bak-${TS} / *.sqlite.bak-${TS} 改回原本名稱即可。"
