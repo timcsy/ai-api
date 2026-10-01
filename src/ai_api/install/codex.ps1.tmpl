@@ -83,12 +83,15 @@ Write-Host "Wrote $Config (clean platform config; provider 'ccsh' -> $CcshBase)"
 # ---------------------------------------------------------------------------
 # 3. Device-flow: authorize in the browser, no token copy-paste.
 # ---------------------------------------------------------------------------
+# NOTE: use a distinct name for the authorize RESPONSE. PowerShell variables are
+# CASE-INSENSITIVE, so `$auth` IS `$Auth` (the auth.json path set above, written
+# in step 4) — reusing it here would clobber the path.
 $label = "Codex on $env:COMPUTERNAME"
-$auth = Invoke-RestMethod -Method Post -Uri "$BaseUrl/device/authorize" `
+$devAuth = Invoke-RestMethod -Method Post -Uri "$BaseUrl/device/authorize" `
   -ContentType "application/json" -Body (@{ device_label = $label } | ConvertTo-Json)
-$deviceCode = $auth.device_code
-$userCode   = $auth.user_code
-$interval   = if ($auth.interval) { [int]$auth.interval } else { 5 }
+$deviceCode = $devAuth.device_code
+$userCode   = $devAuth.user_code
+$interval   = if ($devAuth.interval) { [int]$devAuth.interval } else { 5 }
 
 Write-Host ""
 Write-Host "  Open this page in your browser (you must be logged in):"

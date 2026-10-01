@@ -105,12 +105,14 @@ say "Wrote $CONFIG (clean platform config; provider 'ccsh' -> $CCSH_BASE)"
 # ---------------------------------------------------------------------------
 # 3. Device-flow: authorize in the browser, no token copy-paste.
 # ---------------------------------------------------------------------------
+# NOTE: use a distinct name for the authorize RESPONSE — $AUTH is the auth.json
+# PATH (set above, written in step 4). Reusing $AUTH here would clobber it.
 LABEL="Codex on $(hostname 2>/dev/null || echo device)"
-AUTH=$(curl -fsSL -X POST "$BASE_URL/device/authorize" \
+DEV_AUTH=$(curl -fsSL -X POST "$BASE_URL/device/authorize" \
   -H 'Content-Type: application/json' -d "{\"device_label\":\"$LABEL\"}")
-DEVICE_CODE=$(printf '%s' "$AUTH" | python3 -c 'import sys,json;print(json.load(sys.stdin)["device_code"])')
-USER_CODE=$(printf '%s' "$AUTH" | python3 -c 'import sys,json;print(json.load(sys.stdin)["user_code"])')
-INTERVAL=$(printf '%s' "$AUTH" | python3 -c 'import sys,json;print(json.load(sys.stdin)["interval"])')
+DEVICE_CODE=$(printf '%s' "$DEV_AUTH" | python3 -c 'import sys,json;print(json.load(sys.stdin)["device_code"])')
+USER_CODE=$(printf '%s' "$DEV_AUTH" | python3 -c 'import sys,json;print(json.load(sys.stdin)["user_code"])')
+INTERVAL=$(printf '%s' "$DEV_AUTH" | python3 -c 'import sys,json;print(json.load(sys.stdin)["interval"])')
 
 say ""
 say "  Open this page in your browser (you must be logged in):"

@@ -116,6 +116,31 @@ async def test_install_script_hardening(app_client: AsyncClient, path: str) -> N
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["/install/codex.sh", "/install/codex.ps1"])
+async def test_auth_path_var_not_clobbered_by_authorize_response(
+    app_client: AsyncClient, path: str
+) -> None:
+    """Regression (2026-10-01, real Windows run): the auth.json PATH variable
+    must NOT be reused for the /device/authorize RESPONSE. The response is now
+    written to auth.json in step 4, so clobbering the path makes Set-Content /
+    python write the key to a garbage path and crash.
+
+    PowerShell variables are CASE-INSENSITIVE, so `$auth` IS `$Auth` (the path) —
+    the response must use a clearly different name (e.g. $devAuth / DEV_AUTH)."""
+    import re
+
+    body = (await app_client.get(path)).text
+    if path.endswith(".sh"):
+        # The authorize curl result must not land in $AUTH (the auth.json path).
+        assert not re.search(r"(?<![A-Z_])AUTH=\$\(curl", body)
+        assert "DEV_AUTH=$(curl" in body
+    else:
+        # Case-insensitive: forbid `$auth = Invoke-RestMethod` in any casing.
+        assert not re.search(r"\$auth\s*=\s*Invoke-RestMethod", body, re.IGNORECASE)
+        assert "$devAuth = Invoke-RestMethod" in body
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("path", ["/install/codex-restore.sh", "/install/codex-restore.ps1"])
 async def test_restore_script_served(app_client: AsyncClient, path: str) -> None:
     """Restore endpoint puts back the most recent installer backup (*.bak-<ts>)."""
