@@ -89,6 +89,69 @@ async def test_responses_200_non_stream(app_client: AsyncClient, admin_headers: 
 
 
 @pytest.mark.asyncio
+async def test_responses_upstream_4xx_passthrough_not_502(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    """A provider 4xx (e.g. 'Exceeded maximum number of images') means the
+    CLIENT's request was invalid — surface it AS a 4xx, not a 502, and record it
+    as `upstream_invalid_request` so it stays OUT of the upstream-error burst
+    alert (which would wrongly tell admins the provider is broken)."""
+    await _seed_catalog(RESP_MODEL, ["responses"])
+    await _seed_azure_provider(app_client, admin_headers)
+    alloc = await _make_allocation(app_client, admin_headers)
+
+    class _UpstreamBadRequest(Exception):
+        status_code = 400
+
+    err = _UpstreamBadRequest("Exceeded maximum number of images (50) allowed in the request.")
+    with patch("ai_api.proxy.upstream.aresponses", new=AsyncMock(side_effect=err)):
+        r = await app_client.post(
+            "/v1/responses",
+            headers={"Authorization": f"Bearer {alloc['token']}"},
+            json={"model": RESP_MODEL, "input": "hi"},
+        )
+    assert r.status_code == 400, r.text  # not 502
+    body = r.json()
+    assert body["error"]["code"] == "upstream_invalid_request"
+    assert "Exceeded maximum number of images" in body["error"]["message"]
+
+    sm = get_sessionmaker()
+    async with sm() as s:
+        rec = (await s.execute(
+            select(CallRecord).where(
+                CallRecord.outcome == CallOutcome.upstream_invalid_request
+            )
+        )).scalar_one()
+    assert rec.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_responses_upstream_401_stays_502(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    """A provider 401/403 is OUR credential's fault, not the caller's — keep it a
+    502 (the client's key is fine) rather than leaking a misleading 401."""
+    await _seed_catalog(RESP_MODEL, ["responses"])
+    await _seed_azure_provider(app_client, admin_headers)
+    alloc = await _make_allocation(app_client, admin_headers)
+
+    class _UpstreamAuth(Exception):
+        status_code = 401
+
+    with patch(
+        "ai_api.proxy.upstream.aresponses",
+        new=AsyncMock(side_effect=_UpstreamAuth("invalid api key")),
+    ):
+        r = await app_client.post(
+            "/v1/responses",
+            headers={"Authorization": f"Bearer {alloc['token']}"},
+            json={"model": RESP_MODEL, "input": "hi"},
+        )
+    assert r.status_code == 502, r.text
+    assert r.json()["error"]["code"] == "upstream_error"
+
+
+@pytest.mark.asyncio
 async def test_responses_401_no_token(app_client: AsyncClient) -> None:
     r = await app_client.post("/v1/responses", json={"model": RESP_MODEL, "input": "x"})
     assert r.status_code == 401

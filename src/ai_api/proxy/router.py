@@ -84,8 +84,25 @@ def _outcome_for_code(code: str) -> CallOutcome:
         "model_not_responses_capable": CallOutcome.rejected_model_unsupported,
         "response_forbidden": CallOutcome.rejected_response_forbidden,
         "response_not_found": CallOutcome.rejected_response_not_found,
+        "upstream_invalid_request": CallOutcome.upstream_invalid_request,
         "upstream_error": CallOutcome.upstream_error,
     }.get(code, CallOutcome.gateway_error)
+
+
+def classify_upstream_exc(exc: BaseException) -> tuple[str, str, int]:
+    """Map an upstream (litellm) exception to (error_code, message, http_status).
+
+    A provider 4xx means the CLIENT's request was invalid (e.g. "Exceeded maximum
+    number of images", bad params) — surface it AS a 4xx so the caller fixes
+    their request, and tag it `upstream_invalid_request` so it stays OUT of the
+    upstream-error burst/health signal. Auth failures (401/403) are NOT the
+    caller's fault (our provider credential) → keep them as 502 (+ the credential
+    audit callers emit). Everything else is a real upstream failure → 502.
+    """
+    sc = getattr(exc, "status_code", None)
+    if isinstance(sc, int) and 400 <= sc < 500 and sc not in (401, 403):
+        return "upstream_invalid_request", f"upstream rejected the request: {exc}", sc
+    return "upstream_error", f"upstream call failed: {exc}", status.HTTP_502_BAD_GATEWAY
 
 
 @router.post("/chat/completions")
@@ -230,9 +247,7 @@ async def proxy_chat_completions(
             stream_iter = await _call_upstream(stream=True, stream_options=stream_options)
         except Exception as e:
             logger.exception("upstream call (stream) failed")
-            return await record_and_respond(
-                "upstream_error", f"upstream call failed: {e}", status.HTTP_502_BAD_GATEWAY
-            )
+            return await record_and_respond(*classify_upstream_exc(e))
 
         async def _record_fresh(usage_obj: dict[str, Any]) -> None:
             # Always a FRESH session: the request-scoped one is closed once the
@@ -292,11 +307,7 @@ async def proxy_chat_completions(
         upstream_result = await _call_upstream(stream=False, stream_options=None)
     except Exception as e:
         logger.exception("upstream call failed")
-        return await record_and_respond(
-            "upstream_error",
-            f"upstream call failed: {e}",
-            status.HTTP_502_BAD_GATEWAY,
-        )
+        return await record_and_respond(*classify_upstream_exc(e))
 
     payload = upstream_result if isinstance(upstream_result, dict) else upstream_result.model_dump()
     # Non-streaming: handler hasn't returned yet, so the request session is live;

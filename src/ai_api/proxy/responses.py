@@ -27,7 +27,7 @@ from ai_api.observability.request_id import current_request_id
 from ai_api.proxy import upstream
 from ai_api.proxy.auth import parse_bearer_token
 from ai_api.proxy.preflight import PreflightRejection, run_preflight
-from ai_api.proxy.router import _error_payload, _outcome_for_code
+from ai_api.proxy.router import _error_payload, _outcome_for_code, classify_upstream_exc
 from ai_api.services import responses_support
 from ai_api.services.pricing import calculate_cost, lookup_price_for_call
 from ai_api.services.records import RecordsService
@@ -324,7 +324,7 @@ async def proxy_responses(
             await _maybe_emit_credential_auth_failed(
                 e, provider=provider, credential_id=getattr(resolved, "id", None)
             )
-            return await reject("upstream_error", f"upstream call failed: {e}", 502)
+            return await reject(*classify_upstream_exc(e))
 
         async def _record_fresh(usage: Any, resp_id: str | None) -> None:
             # Always a FRESH session: the request-scoped one is already closed
@@ -475,7 +475,7 @@ async def proxy_responses(
         await _maybe_emit_credential_auth_failed(
             e, provider=provider, credential_id=getattr(resolved, "id", None)
         )
-        return await reject("upstream_error", f"upstream call failed: {e}", 502)
+        return await reject(*classify_upstream_exc(e))
 
     payload = _as_dict(upstream_result) if not isinstance(upstream_result, dict) else upstream_result
     # Non-streaming: handler hasn't returned yet, so the request session is live;

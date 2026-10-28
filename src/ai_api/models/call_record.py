@@ -35,6 +35,11 @@ class CallOutcome(enum.StrEnum):
     rejected_model_unsupported = "rejected_model_unsupported"
     rejected_response_forbidden = "rejected_response_forbidden"
     rejected_response_not_found = "rejected_response_not_found"
+    # Provider returned a 4xx meaning the CLIENT's request was invalid (e.g. too
+    # many images, bad params) — distinct from upstream_error (a real upstream/
+    # gateway failure) so it is surfaced as a 4xx and kept OUT of the upstream
+    # error-burst health signal. VARCHAR enum (native_enum=False) → no migration.
+    upstream_invalid_request = "upstream_invalid_request"
     upstream_error = "upstream_error"
     gateway_error = "gateway_error"
 

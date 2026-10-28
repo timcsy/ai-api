@@ -83,6 +83,7 @@ export function AdminRecordsPage() {
               <SelectItem value="all">全部</SelectItem>
               <SelectItem value="success">僅成功</SelectItem>
               <SelectItem value="upstream_error">僅上游錯誤</SelectItem>
+              <SelectItem value="upstream_invalid_request">僅上游拒絕請求（4xx）</SelectItem>
               <SelectItem value="rejected_quarantined">僅被隔離擋下</SelectItem>
             </SelectContent>
           </Select>

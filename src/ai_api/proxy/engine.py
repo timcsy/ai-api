@@ -15,7 +15,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,7 +33,7 @@ from ai_api.observability.request_id import current_request_id
 from ai_api.proxy.auth import parse_bearer_token
 from ai_api.proxy.endpoint_spec import EndpointSpec, InputShape, OutputShape
 from ai_api.proxy.preflight import PreflightRejection, run_preflight
-from ai_api.proxy.router import _error_payload, _outcome_for_code
+from ai_api.proxy.router import _error_payload, _outcome_for_code, classify_upstream_exc
 from ai_api.services.pricing import lookup_price_for_call
 from ai_api.services.records import RecordsService
 
@@ -125,9 +125,7 @@ async def run_endpoint(
         upstream_result = await spec.call(fields, resolved, result.upstream_model)
     except Exception as e:
         logger.exception("upstream call failed (%s)", spec.path)
-        return await record_and_respond(
-            "upstream_error", f"upstream call failed: {e}", status.HTTP_502_BAD_GATEWAY
-        )
+        return await record_and_respond(*classify_upstream_exc(e))
 
     # 5. Shape the payload / extract bytes (per output shape)
     if spec.output_shape == OutputShape.binary:
