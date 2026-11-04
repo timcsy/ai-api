@@ -18,6 +18,9 @@ dependencies = [
     "httpx>=0.27.0",
     "python-ulid>=3.0.0",
     "authlib>=1.3.0",
+    # joserfc: transitive via authlib; floored for CVE-2026-119283 (HIGH, DoS via
+    # unbounded recipient count in JWE), fixed in 1.7.5.
+    "joserfc>=1.7.5",
     "argon2-cffi>=23.1.0",
     "itsdangerous>=2.2.0",
     "email-validator>=2.2.0",
