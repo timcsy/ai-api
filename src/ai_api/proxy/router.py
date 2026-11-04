@@ -95,12 +95,16 @@ def classify_upstream_exc(exc: BaseException) -> tuple[str, str, int]:
     A provider 4xx means the CLIENT's request was invalid (e.g. "Exceeded maximum
     number of images", bad params) — surface it AS a 4xx so the caller fixes
     their request, and tag it `upstream_invalid_request` so it stays OUT of the
-    upstream-error burst/health signal. Auth failures (401/403) are NOT the
-    caller's fault (our provider credential) → keep them as 502 (+ the credential
-    audit callers emit). Everything else is a real upstream failure → 502.
+    upstream-error burst/health signal. Three 4xx codes are NOT the caller's
+    fault and are kept as 502 (so they feed the burst/health signal, and clients
+    retry on 5xx rather than giving up on a 4xx):
+      - 401/403: our provider credential is bad (+ the credential audit callers emit).
+      - 404: Azure `DeploymentNotFound` — the deployment is missing or was just
+        created (eventual consistency); transient/config, not the request's content.
+    Everything else is a real upstream failure → 502.
     """
     sc = getattr(exc, "status_code", None)
-    if isinstance(sc, int) and 400 <= sc < 500 and sc not in (401, 403):
+    if isinstance(sc, int) and 400 <= sc < 500 and sc not in (401, 403, 404):
         return "upstream_invalid_request", f"upstream rejected the request: {exc}", sc
     return "upstream_error", f"upstream call failed: {exc}", status.HTTP_502_BAD_GATEWAY
 

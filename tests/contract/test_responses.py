@@ -152,6 +152,41 @@ async def test_responses_upstream_401_stays_502(
 
 
 @pytest.mark.asyncio
+async def test_responses_upstream_404_deployment_stays_502(
+    app_client: AsyncClient, admin_headers: dict[str, str]
+) -> None:
+    """Azure 404 `DeploymentNotFound` is NOT the caller's invalid request — the
+    deployment is missing or was just created (eventual consistency). Keep it a
+    502/`upstream_error` so it feeds the burst signal and clients retry (it's
+    transient: 'works later'), instead of a 404 that makes Codex give up."""
+    await _seed_catalog(RESP_MODEL, ["responses"])
+    await _seed_azure_provider(app_client, admin_headers)
+    alloc = await _make_allocation(app_client, admin_headers)
+
+    class _UpstreamNotFound(Exception):
+        status_code = 404
+
+    err = _UpstreamNotFound(
+        "DeploymentNotFound - The API deployment for this resource does not exist."
+    )
+    with patch("ai_api.proxy.upstream.aresponses", new=AsyncMock(side_effect=err)):
+        r = await app_client.post(
+            "/v1/responses",
+            headers={"Authorization": f"Bearer {alloc['token']}"},
+            json={"model": RESP_MODEL, "input": "hi"},
+        )
+    assert r.status_code == 502, r.text  # not 404
+    assert r.json()["error"]["code"] == "upstream_error"
+
+    sm = get_sessionmaker()
+    async with sm() as s:
+        rec = (await s.execute(
+            select(CallRecord).where(CallRecord.outcome == CallOutcome.upstream_error)
+        )).scalar_one()
+    assert rec.status_code == 502
+
+
+@pytest.mark.asyncio
 async def test_responses_401_no_token(app_client: AsyncClient) -> None:
     r = await app_client.post("/v1/responses", json={"model": RESP_MODEL, "input": "x"})
     assert r.status_code == 401
