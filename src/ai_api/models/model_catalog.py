@@ -59,6 +59,12 @@ class ModelCatalog(Base):
     # field_sources: {field: litellm|borrowed|manual}, snapshot: {field: value}}.
     # Null for hand-entered models (zero regression).
     litellm_sync: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True, default=None)
+    # Phase: pin this model to ONE provider credential (by id). When set, the proxy
+    # routes the model to exactly that credential (e.g. the Azure resource that
+    # actually hosts this deployment) instead of round-robining across all active
+    # credentials of the same provider — which otherwise 404s (DeploymentNotFound)
+    # when multiple Azure resources host different deployments. NULL ⇒ round-robin.
+    provider_credential_id: Mapped[str | None] = mapped_column(String(32), nullable=True, default=None)
 
     __table_args__ = (
         Index("idx_model_catalog_status", "status"),

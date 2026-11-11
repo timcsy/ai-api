@@ -46,6 +46,13 @@ import { LiteLLMUpdateDiff } from "@/components/litellm-update-diff";
 import { per1kToPer1m } from "@/lib/price-format";
 import { ApiError, api } from "@/lib/api-client";
 
+interface ProviderCred {
+  id: string;
+  provider: string;
+  label: string;
+  base_url: string | null;
+}
+
 interface Visibility {
   provider_has_credential: boolean;
   visible_member_count: number;
@@ -80,6 +87,7 @@ interface CatalogModel {
   denied_tags: string[];
   self_service_enabled: boolean;
   self_service_default_quota: number | null;
+  provider_credential_id?: string | null;
   price: {
     input_per_1k: string;
     output_per_1k: string;
@@ -130,6 +138,17 @@ export function AdminModelDetailPage() {
     queryFn: () => api<CatalogModel[]>("/admin/catalog/models"),
   });
   const model = modelsQuery.data?.find((m) => m.slug === slug);
+
+  // Active credentials for this model's provider — to show which resource a pinned
+  // model routes to (and to let the edit dialog offer the choices).
+  const provCredsQuery = useQuery<ProviderCred[], ApiError>({
+    queryKey: ["admin", "providers", model?.provider, "active"],
+    queryFn: () => api<ProviderCred[]>(`/admin/providers?provider=${model!.provider}&status=active`),
+    enabled: !!model,
+  });
+  const pinnedCred = model?.provider_credential_id
+    ? provCredsQuery.data?.find((c) => c.id === model.provider_credential_id)
+    : undefined;
 
   const [defaultAccess, setDefaultAccess] = React.useState<"open" | "restricted">("open");
   const [allowedTags, setAllowedTags] = React.useState<string[]>([]);
@@ -327,6 +346,18 @@ export function AdminModelDetailPage() {
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
             <div><span className="text-muted-foreground">供應商：</span>{model.provider}</div>
+            <div className="sm:col-span-2">
+              <span className="text-muted-foreground">路由：</span>
+              {!model.provider_credential_id ? (
+                <span>自動（輪詢此供應商所有使用中的憑證）</span>
+              ) : pinnedCred ? (
+                <span>指定 <span className="font-medium">{pinnedCred.label}</span>
+                  {pinnedCred.base_url && <span className="text-muted-foreground font-mono text-xs">（{pinnedCred.base_url}）</span>}
+                </span>
+              ) : (
+                <span className="text-amber-700">⚠ 已指定的憑證停用或不存在，呼叫會回 503；請在「編輯」重新指定或改回自動</span>
+              )}
+            </div>
             <div>
               <span className="text-muted-foreground">類型：</span>
               {KIND_LABEL[model.kind ?? "chat"] ?? model.kind ?? "—"}
@@ -626,6 +657,16 @@ function EditBasicsDialog({
   const [capabilities, setCapabilities] = React.useState("");
   const [recommendedFor, setRecommendedFor] = React.useState("");
   const [tags, setTags] = React.useState("");
+  // Pin this model to one provider credential (the resource that hosts its
+  // deployment). "" ⇒ 自動輪詢 (round-robin), the pre-existing behaviour.
+  const [providerCredId, setProviderCredId] = React.useState("");
+
+  // Active credentials for THIS model's provider — the pinnable resources.
+  const credsQuery = useQuery<ProviderCred[], ApiError>({
+    queryKey: ["admin", "providers", model?.provider, "active"],
+    queryFn: () => api<ProviderCred[]>(`/admin/providers?provider=${model!.provider}&status=active`),
+    enabled: model !== null,
+  });
 
   React.useEffect(() => {
     if (model) {
@@ -639,6 +680,7 @@ function EditBasicsDialog({
       setCapabilities(model.capabilities.join(", "));
       setRecommendedFor(model.recommended_for.join(", "));
       setTags(model.tags.join(", "));
+      setProviderCredId(model.provider_credential_id ?? "");
     }
   }, [model]);
 
@@ -659,6 +701,8 @@ function EditBasicsDialog({
           capabilities: csv(capabilities),
           recommended_for: csv(recommendedFor),
           tags: csv(tags),
+          // null clears the pin (back to round-robin); a value pins to that credential.
+          provider_credential_id: providerCredId || null,
         }),
       }),
     onSuccess: () => onSaved(),
@@ -699,6 +743,28 @@ function EditBasicsDialog({
               <Label htmlFor="b-ctx">Context window</Label>
               <Input id="b-ctx" type="number" className="mt-1" value={contextWindow} onChange={(e) => setContextWindow(e.target.value)} />
             </div>
+          </div>
+          <div>
+            <Label>指定供應商憑證（路由到哪個資源）</Label>
+            <Select value={providerCredId || "auto"} onValueChange={(v) => setProviderCredId(v === "auto" ? "" : v)}>
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">自動（輪詢此供應商所有使用中的憑證）</SelectItem>
+                {credsQuery.data?.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.label}{c.base_url ? `（${c.base_url}）` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              同一個供應商有多個憑證（例如兩個 Azure 資源、各自不同 deployment）時，
+              指定這個模型固定走哪一個資源，避免輪詢派到沒有此 deployment 的資源而回 404。
+              「自動」維持輪詢。
+              {providerCredId && !credsQuery.data?.some((c) => c.id === providerCredId) && (
+                <span className="text-amber-700"> ⚠ 目前綁定的憑證已停用或不存在，請重新指定或選「自動」。</span>
+              )}
+            </p>
           </div>
           <div>
             <Label htmlFor="b-desc">說明</Label>

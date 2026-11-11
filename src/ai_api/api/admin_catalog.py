@@ -98,6 +98,8 @@ class ModelCatalogUpdate(BaseModel):
     example_request: dict[str, Any] | None = None
     official_doc_url: str | None = None
     status: str | None = None
+    # Pin the model to one provider credential (its hosting resource); null ⇒ round-robin.
+    provider_credential_id: str | None = None
 
 
 def _err(code: str, message: str) -> dict[str, Any]:
@@ -136,6 +138,7 @@ def _to_dict(m: ModelCatalog, price: dict[str, str] | None = None) -> dict[str, 
         "self_service_enabled": m.self_service_enabled,
         "self_service_default_quota": m.self_service_default_quota,
         "litellm_sync": m.litellm_sync,  # Phase 23 provenance or null
+        "provider_credential_id": m.provider_credential_id,  # pinned resource or null
         "price": price,  # current per-1K {input_per_1k, output_per_1k} or null
         "created_at": m.created_at.isoformat(),
         "updated_at": m.updated_at.isoformat(),
@@ -417,9 +420,37 @@ async def admin_update_model(
     m = await session.get(ModelCatalog, slug)
     if m is None:
         raise HTTPException(status_code=404, detail=_err("not_found", "model not found"))
+    fields_set = payload.model_dump(exclude_unset=True)
+    # Validate a pin before applying it: the credential must exist, be active, and
+    # belong to THIS model's provider (pinning azure/gpt-x to an openai credential
+    # would never route correctly). null clears the pin (back to round-robin).
+    pin = fields_set.get("provider_credential_id")
+    if "provider_credential_id" in fields_set and pin is not None:
+        from ai_api.models import ProviderCredentialStatus
+        from ai_api.services.provider_credentials import ProviderCredentialService
+
+        cred = await ProviderCredentialService(session).get(pin)
+        if cred is None:
+            raise HTTPException(
+                status_code=400, detail=_err("bad_credential", "provider credential not found")
+            )
+        if cred.status != ProviderCredentialStatus.active:
+            raise HTTPException(
+                status_code=400,
+                detail=_err("bad_credential", f"credential '{cred.label}' is not active"),
+            )
+        if cred.provider != m.provider:
+            raise HTTPException(
+                status_code=400,
+                detail=_err(
+                    "bad_credential",
+                    f"credential '{cred.label}' is provider '{cred.provider}', "
+                    f"but this model is provider '{m.provider}'",
+                ),
+            )
     changed = False
     touched_syncable: list[str] = []
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    for field, value in fields_set.items():
         setattr(m, field, value)
         changed = True
         if field in litellm_registry.SYNCABLE_FIELDS:

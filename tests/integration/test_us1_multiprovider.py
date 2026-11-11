@@ -156,3 +156,125 @@ async def test_us1_round_robin_alternates_credentials(
     # Two distinct credentials seen across two calls (round-robin by last_used_at)
     assert set(seen_keys) == {"sk-openai-1", "sk-openai-2"}
     assert c1.id != c2.id
+
+
+async def _create_catalog_model(client: AsyncClient, admin_headers: dict, slug: str) -> None:
+    provider = slug.split("/", 1)[0]
+    r = await client.post(
+        "/admin/catalog/models",
+        headers=admin_headers,
+        json={
+            "slug": slug,
+            "provider": provider,
+            "display_name": slug,
+            "description": "",
+            "context_window": 4096,
+            "cost_tier": "low",
+        },
+    )
+    assert r.status_code in (200, 201), r.text
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_pinned_model_routes_only_to_its_credential(
+    app_client: AsyncClient, admin_headers: dict, make_provider_credential
+) -> None:
+    """A model pinned to one credential routes THERE every call — NOT round-robin.
+
+    Mirrors the real bug: two `azure` resources host different deployments, so
+    round-robin 404s half the time (DeploymentNotFound). Pinning the model to the
+    resource that hosts it makes every call deterministic."""
+    await make_provider_credential(
+        provider="azure", label="resA", api_key="az-A", base_url="https://a.openai.azure.com"
+    )
+    cred_b = await make_provider_credential(
+        provider="azure", label="resB", api_key="az-B", base_url="https://b.openai.azure.com"
+    )
+    await _create_catalog_model(app_client, admin_headers, "azure/gpt-pinned")
+
+    # Pin the model to resource B.
+    rp = await app_client.patch(
+        "/admin/catalog/models/azure/gpt-pinned",
+        headers=admin_headers,
+        json={"provider_credential_id": cred_b.id},
+    )
+    assert rp.status_code == 200, rp.text
+    assert rp.json()["provider_credential_id"] == cred_b.id
+
+    alloc = await _create_alloc(app_client, admin_headers, "azure/gpt-pinned")
+    seen: list[str] = []
+
+    async def fake(**kwargs):
+        seen.append(kwargs["api_key"])
+        return _stub()
+
+    with patch("litellm.acompletion", side_effect=fake):
+        for _ in range(3):
+            r = await app_client.post(
+                "/v1/chat/completions",
+                headers={"Authorization": f"Bearer {alloc['token']}"},
+                json={"model": "azure/gpt-pinned", "messages": [{"role": "user", "content": "hi"}]},
+            )
+            assert r.status_code == 200, r.text
+    # Every call used resource B — never A (round-robin would have alternated).
+    assert seen == ["az-B", "az-B", "az-B"]
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_pinned_to_disabled_credential_is_503(
+    app_client: AsyncClient, admin_headers: dict, make_provider_credential
+) -> None:
+    """A pin to a credential that is later disabled surfaces 503 (visible misconfig),
+    not a silent fall-back to round-robin onto the wrong (still-active) resource.
+
+    Two azure creds exist so the provider still HAS an active credential (else the
+    access check short-circuits to model_forbidden before credential resolution)."""
+    cred_a = await make_provider_credential(
+        provider="azure", label="resA", api_key="az-A", base_url="https://a.openai.azure.com"
+    )
+    cred_b = await make_provider_credential(
+        provider="azure", label="resB", api_key="az-B", base_url="https://b.openai.azure.com"
+    )
+    await _create_catalog_model(app_client, admin_headers, "azure/gpt-pinned2")
+    rp = await app_client.patch(
+        "/admin/catalog/models/azure/gpt-pinned2",
+        headers=admin_headers,
+        json={"provider_credential_id": cred_b.id},
+    )
+    assert rp.status_code == 200, rp.text
+
+    # Disable ONLY the pinned credential; cred_a stays active.
+    rd = await app_client.post(f"/admin/providers/{cred_b.id}/disable", headers=admin_headers)
+    assert rd.status_code in (200, 204), rd.text
+    assert cred_a.id != cred_b.id
+
+    alloc = await _create_alloc(app_client, admin_headers, "azure/gpt-pinned2")
+    r = await app_client.post(
+        "/v1/chat/completions",
+        headers={"Authorization": f"Bearer {alloc['token']}"},
+        json={"model": "azure/gpt-pinned2", "messages": [{"role": "user", "content": "hi"}]},
+    )
+    assert r.status_code == 503, r.text
+    assert r.json()["error"]["code"] == "provider_unavailable"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_pin_rejects_cross_provider_credential(
+    app_client: AsyncClient, admin_headers: dict, make_provider_credential
+) -> None:
+    """Pinning an azure model to an openai credential is a 400 (would never route)."""
+    openai_cred = await make_provider_credential(
+        provider="openai", label="oai", api_key="sk-oai"
+    )
+    await _create_catalog_model(app_client, admin_headers, "azure/gpt-pinned3")
+    rp = await app_client.patch(
+        "/admin/catalog/models/azure/gpt-pinned3",
+        headers=admin_headers,
+        json={"provider_credential_id": openai_cred.id},
+    )
+    assert rp.status_code == 400, rp.text
+    # Admin HTTPExceptions use FastAPI's {"detail": {"error": ...}} envelope.
+    assert rp.json()["detail"]["error"]["code"] == "bad_credential"

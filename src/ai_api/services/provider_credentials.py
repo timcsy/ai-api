@@ -75,6 +75,23 @@ class ProviderCredentialService:
         cred = (await self._s.execute(stmt)).scalar_one_or_none()
         if cred is None:
             return None
+        return await self._resolve_and_touch(cred)
+
+    async def resolve_active_by_id(self, credential_id: str) -> ResolvedCredential | None:
+        """Resolve ONE specific credential by id, but only if it is active.
+
+        Used when a catalog model pins itself to a specific credential (the Azure
+        resource that actually hosts its deployment). Returns None if the id is
+        unknown or the credential is disabled — the caller surfaces that as a
+        provider-unavailable so a stale/disabled pin is visible, not silently
+        round-robined back onto the wrong resource.
+        """
+        cred = await self._s.get(ProviderCredential, credential_id)
+        if cred is None or cred.status != ProviderCredentialStatus.active:
+            return None
+        return await self._resolve_and_touch(cred)
+
+    async def _resolve_and_touch(self, cred: ProviderCredential) -> ResolvedCredential:
         first_use = cred.last_used_at is None
         # Build the resolved credential from the row as read. We deliberately do
         # NOT mutate `cred` on the request session (that would re-emit the UPDATE

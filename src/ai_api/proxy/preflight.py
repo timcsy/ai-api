@@ -195,17 +195,35 @@ async def run_preflight(
                 allocation,
             )
 
-    # Resolve provider credential.
+    # Resolve provider credential. A catalog model may PIN itself to ONE specific
+    # credential (the Azure resource that actually hosts its deployment); routing
+    # there avoids the round-robin landing on a resource that lacks the deployment
+    # (→ 404 DeploymentNotFound). NULL pin ⇒ round-robin across the provider's
+    # active credentials (the pre-existing behaviour, with Azure env fallback).
     cred_service = ProviderCredentialService(session)
-    try:
-        resolved = await _resolve_credential(cred_service, provider, settings)
-    except ProviderUnavailableError:
-        return PreflightRejection(
-            "provider_unavailable",
-            f"no active credential for provider '{provider}'",
-            503,
-            allocation,
-        )
+    pinned_id = model_row.provider_credential_id if model_row is not None else None
+    if pinned_id:
+        resolved_opt = await cred_service.resolve_active_by_id(pinned_id)
+        if resolved_opt is None or resolved_opt.provider != provider:
+            return PreflightRejection(
+                "provider_unavailable",
+                f"model '{canonical_model}' is pinned to a provider credential that "
+                f"is not usable (disabled, deleted, or a different provider); an "
+                f"admin must re-pin the model or re-enable that credential",
+                503,
+                allocation,
+            )
+        resolved = resolved_opt
+    else:
+        try:
+            resolved = await _resolve_credential(cred_service, provider, settings)
+        except ProviderUnavailableError:
+            return PreflightRejection(
+                "provider_unavailable",
+                f"no active credential for provider '{provider}'",
+                503,
+                allocation,
+            )
 
     # litellm needs a provider prefix to route; un-prefixed catalog slugs get the
     # resolved provider prepended (preserves the pre-alias behavior).
