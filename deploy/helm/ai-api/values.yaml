@@ -57,10 +57,14 @@ frontend:
 resources:
   requests:
     cpu: 100m
-    memory: 256Mi
+    memory: 512Mi
   limits:
     cpu: 500m
-    memory: 512Mi
+    # 2Gi, not 512Mi: long-context / multimodal Responses payloads (seen up to
+    # ~344k prompt tokens — multi-MB JSON) spike memory while parsing; at 512Mi a
+    # burst of concurrent big requests OOM-killed every pod → crash loop → 502 for
+    # all. RAM is plentiful on the node; CPU (1 core) is the scarce resource.
+    memory: 2Gi
 
 # Secrets — provide via --set / sealed-secrets / external-secrets in real env.
 adminBootstrapToken: ""
